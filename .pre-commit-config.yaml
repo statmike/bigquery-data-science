@@ -1,0 +1,26 @@
+# Local pre-commit hooks for statmike/bigquery-data-science.
+# Install once with: uv run pre-commit install
+# Run manually across all files with: uv run pre-commit run --all-files
+
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check (src & tests)
+        entry: uv run ruff check src tests
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: mypy
+        name: mypy strict (src)
+        entry: uv run mypy src
+        language: system
+        types: [python]
+        pass_filenames: false
+
+      - id: bigquery-data-science-sweep
+        name: bigquery-data-science sweep (skills, syntax, narratives, links & headers)
+        entry: uv run bigquery-data-science sweep
+        language: system
+        pass_filenames: false

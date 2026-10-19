@@ -1,0 +1,60 @@
+# Virtual environments
+.venv/
+.venv-*/
+env/
+venv/
+
+# Python bytecode & caches
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Packaging & build artifacts
+*.egg-info/
+build/
+dist/
+
+# Jupyter & execution artifacts
+.ipynb_checkpoints/
+*-checkpoint.*
+iframe_figures/
+
+# Agent harnesses: ignore teamwork/local state, but TRACK .agents/skills/ and .claude/skills/
+.agents/*
+!.agents/skills/
+.claude/*
+!.claude/skills/
+.adk/
+.antigravitycli
+
+# IDE & OS files
+.vscode/
+.idea/
+.cursor/
+.windsurf/
+.DS_Store
+Thumbs.db
+temp
+*.log
+
+# Terraform state (if any local experiments run)
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# Secrets & Service Account Keys (ADC only — NEVER commit credentials)
+.env
+.env.*
+*-key.json
+*_key.json
+*.json.key
+service-account*.json
+*credentials*.json
+application_default_credentials.json
+gcp-*.json

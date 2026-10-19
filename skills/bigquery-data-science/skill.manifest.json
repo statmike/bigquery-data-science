@@ -1,0 +1,13 @@
+{
+  "name": "bigquery-data-science",
+  "version": "0.7.0",
+  "source_project": null,
+  "narrative_sources": {},
+  "generated_date": "2026-10-19",
+  "source_commit": null,
+  "reference_files": [
+    "namespace-matrix.md"
+  ],
+  "syntax_files": [],
+  "narrative_files": []
+}

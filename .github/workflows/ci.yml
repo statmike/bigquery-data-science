@@ -1,0 +1,50 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    name: quality (py${{ matrix.python-version }})
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv and Python ${{ matrix.python-version }}
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Verify uv.lock is in sync with pyproject.toml
+        run: uv lock --check
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Lint (ruff)
+        run: uv run ruff check src tests
+
+      - name: Type check (mypy)
+        run: uv run mypy --python-version ${{ matrix.python-version }} src
+
+      - name: Unit tests (pytest)
+        run: uv run pytest -q
+
+      - name: Skill & reference verification sweep
+        run: uv run bigquery-data-science sweep
+
+      - name: Verify notebook & markdown headers
+        run: python3 architectures/headers/sync_headers.py --check
+
+      - name: Cold-install wheel & sdist smoke gate
+        run: ./scripts/check_install.sh

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "bigquery-data-science",
+  "version": "0.7.0",
+  "description": "BigQuery ML, BigQuery AI, and 4-Lens Agent Skills for SQL and Python data science on Google Cloud: task routing, prerequisite matrix, surgical syntax cards, and 104 live-verified walkthroughs.",
+  "author": {
+    "name": "Mike Henderson",
+    "url": "https://github.com/statmike"
+  },
+  "homepage": "https://github.com/statmike/bigquery-data-science",
+  "repository": "https://github.com/statmike/bigquery-data-science",
+  "license": "Apache-2.0",
+  "skills": "./skills/",
+  "keywords": [
+    "bigquery",
+    "bigquery-ml",
+    "bigquery-ai",
+    "google-cloud",
+    "gemini-enterprise",
+    "vertex-ai",
+    "agent-skills",
+    "mcp",
+    "machine-learning",
+    "generative-ai",
+    "sql"
+  ],
+  "ownership": {
+    "team": "cloud-gtm/agentic-data-science",
+    "poc": "statmike"
+  }
+}

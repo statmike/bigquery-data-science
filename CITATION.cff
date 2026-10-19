@@ -1,0 +1,25 @@
+cff-version: 1.2.0
+title: "bigquery-data-science: BigQuery ML, BigQuery AI, and 4-Lens Agent Skills for SQL and Python Data Science"
+message: "If you use workflows, notebooks, SQL scripts, or agent skills from bigquery-data-science in your work or research, please cite it using the metadata below."
+type: software
+authors:
+  - given-names: Mike
+    family-names: Henderson
+    alias: statmike
+repository-code: "https://github.com/statmike/bigquery-data-science"
+url: "https://github.com/statmike/bigquery-data-science"
+license: Apache-2.0
+version: "0.7.0"
+date-released: "2026-10-19"
+keywords:
+  - google-cloud
+  - bigquery
+  - bigquery-ml
+  - bigquery-ai
+  - gemini-enterprise
+  - vertex-ai
+  - google-adk
+  - agent-skills
+  - mcp
+  - machine-learning
+  - generative-ai

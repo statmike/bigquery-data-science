@@ -1,0 +1,45 @@
+# `AI.GENERATE_DOUBLE`
+
+> **Source:** [`bigquery-ai/reference/general-purpose-functions.md#aigenerate_double`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/general-purpose-functions.md#aigenerate_double)
+
+- **Description:** (Preview) Scalar function that analyzes any combination of text and unstructured data, returning a STRUCT containing a FLOAT64 value. Sends requests to a Vertex AI Gemini model. Contact `bqml-feedback@google.com` for support during preview.
+- **Use cases:** Numeric estimation, scoring/rating, classification with numeric confidence, sentiment analysis with numeric score.
+- [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-generate-double)
+- **Type:** Scalar function (returns a STRUCT value per row) -- Preview
+
+**Syntax:**
+```sql
+AI.GENERATE_DOUBLE(
+  [prompt =>] 'PROMPT',
+  [, endpoint => 'ENDPOINT']
+  [, model_params => MODEL_PARAMS]
+  [, connection_id => 'CONNECTION']
+  [, request_type => 'REQUEST_TYPE']
+)
+```
+
+**Inputs:** Identical parameter set to AI.GENERATE_BOOL (see above for full details).
+
+**Outputs:**
+
+Returns a STRUCT per row:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `result` | FLOAT64 | Model's numeric response. NULL if request fails or is filtered. |
+| `full_response` | JSON | Full response from generateContent. |
+| `status` | STRING | API response status (empty = success). |
+
+**Supported models:** Any GA or preview Gemini model. Default: `gemini-3.5-flash-lite`.
+
+**Best practices:** Same as AI.GENERATE_BOOL.
+
+**Limitations:** Same as AI.GENERATE_BOOL (Preview, video limits, thinking charges).
+
+**Locations:** All Gemini-supporting regions plus US and EU multi-regions.
+
+**Provisioned throughput:** Supported via `request_type` parameter.
+
+**BigFrames API:** `bigframes.bigquery.ai.generate_double(prompt)` — Scalar function returning a Series of structs with FLOAT64 result. Same tuple prompt pattern as generate_bool. Access result via `.struct.field("result")`.
+
+---
