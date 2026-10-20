@@ -1,6 +1,6 @@
 ---
 name: bigquery-data-science
-description: Use FIRST when someone wants to predict, classify, forecast, embed, search, extract, or explain data in BigQuery and needs to choose between a trained model (bigquery-ml: CREATE MODEL + ML.*), a zero-training generative or foundation model function (bigquery-ai: AI.* + TimesFM + TabFM), or a pre-trained Google Cloud AI service model (ML.PROCESS_DOCUMENT, ML.TRANSLATE, ML.UNDERSTAND_TEXT, ML.ANNOTATE_IMAGE, ML.TRANSCRIBE).
+description: "Use FIRST when someone wants to predict, classify, forecast, embed, search, extract, or explain data in BigQuery and needs to choose between a trained model (bigquery-ml — CREATE MODEL + ML.*), a zero-training generative or foundation model function (bigquery-ai — AI.* + TimesFM + TabFM), or a pre-trained Google Cloud AI service model (ML.PROCESS_DOCUMENT, ML.TRANSLATE, ML.UNDERSTAND_TEXT, ML.ANNOTATE_IMAGE, ML.TRANSCRIBE)."
 metadata:
   version: "0.7.0"
 ---

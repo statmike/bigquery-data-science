@@ -80,6 +80,20 @@ def _check_frontmatter(skill_md_text: str, result: ValidationResult) -> None:
     if description is None:
         result.errors.append("frontmatter missing 'description'")
     else:
+        desc_match = _DESCRIPTION_RE.search(frontmatter)
+        raw_desc = desc_match.group(1).strip() if desc_match else ""
+        if (
+            raw_desc
+            and raw_desc not in {">-", ">", "|-", "|"}
+            and not (
+                (raw_desc.startswith('"') and raw_desc.endswith('"'))
+                or (raw_desc.startswith("'") and raw_desc.endswith("'"))
+            )
+            and ": " in raw_desc
+        ):
+            result.errors.append(
+                "description contains unquoted ': ' (quote the YAML string or use ' — ')"
+            )
         if not description:
             result.errors.append("description is empty")
         if len(description) > 1024:
