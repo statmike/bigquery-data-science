@@ -30,7 +30,7 @@ from bigquery_data_science.installer import (
 try:
     __version__ = version("bigquery-data-science")
 except PackageNotFoundError:
-    __version__ = "0.7.0"
+    __version__ = "0.8.0"
 
 list_skills = list_bundled_skills
 

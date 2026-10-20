@@ -9,7 +9,7 @@ import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.7.0"
+EXPECTED_VERSION = "0.8.0"
 SKILL_NAMES: tuple[str, ...] = (
     "bigquery-data-science",
     "bigquery-ml",

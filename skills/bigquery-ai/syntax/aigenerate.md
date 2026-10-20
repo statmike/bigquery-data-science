@@ -46,7 +46,7 @@ Returns a STRUCT with:
 | `full_response` | JSON | Full response from `projects.locations.endpoints.generateContent`. |
 | `status` | STRING | API response status. Empty if successful. |
 
-**Supported models:** Any GA or preview Gemini model; the reference page lists the Gemini 3.x family. Default: `gemini-3.5-flash-lite`. Can use global endpoint for cross-region processing.
+**Supported models:** Any GA or preview Gemini model; the reference page lists `gemini-4-argon` and the Gemini 3.x family. Default: `gemini-3.5-flash-lite`. Can use global endpoint for cross-region processing.
 
 **Best practices:**
 - Function incurs Vertex AI charges each time it is called. Track costs accordingly.

@@ -382,7 +382,56 @@ ORDER BY category, approach
 client.query(query).to_dataframe()
 ```
 
-### 11. Multimodal — aggregate documents with ObjectRef
+### 11. Structured output with `output_schema`
+
+Specify `output_schema` to return a typed `STRUCT` conforming to your schema rather than a plain string. This enables direct SQL extraction of nested fields, arrays, and sub-structs without regex or JSON parsing:
+
+```python
+query = """
+WITH sample_data AS (
+  SELECT *
+  FROM UNNEST([
+    STRUCT('author_a' AS author, 'I love building web applications in Python and Rust' AS text),
+    STRUCT('author_a', 'WebAssembly and Rust make frontend tooling blisteringly fast'),
+    STRUCT('author_b', 'Deep learning architectures require massive GPU clusters'),
+    STRUCT('author_b', 'Transformers and attention mechanisms continue to evolve')
+  ])
+)
+SELECT
+  author,
+  AI.AGG(
+    text,
+    'Summarize the topics this author discusses. Keep it concise.',
+    output_schema => 'topics ARRAY<STRUCT<name STRING, explanation STRING>>'
+  ) AS summary
+FROM sample_data
+GROUP BY author
+"""
+client.query(query).to_dataframe()
+```
+
+### 12. Error tolerance with `max_error_ratio`
+
+Use `max_error_ratio` (between `0.0` and `1.0`) to configure the threshold of acceptable row-level inference failures in large batch aggregations. If the failure ratio exceeds this threshold, the query fails with actionable error diagnostics; otherwise, partial results from successful calls are returned:
+
+```python
+query = """
+SELECT
+  AI.AGG(
+    review,
+    'Summarize customer reviews into a concise consensus.',
+    max_error_ratio => 0.1
+  ) AS summary
+FROM UNNEST([
+  'Fast delivery but the packaging was crushed.',
+  'Product works great, very happy with it.',
+  'Instructions were confusing but the item itself is solid.'
+]) AS review
+"""
+client.query(query).to_dataframe()
+```
+
+### 13. Multimodal — aggregate documents with ObjectRef
 
 `AI.AGG` takes multimodal input as a `STRUCT` wrapping an `ObjectRef`. An object table's `ref` column goes in directly.
 

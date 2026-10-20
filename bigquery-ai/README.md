@@ -134,7 +134,7 @@ See the [Unstructured Data Infrastructure](reference/unstructured-data-infrastru
 | `AI.IF` | [notebook](functions/ai_if/ai_if.ipynb) · [sql](functions/ai_if/ai_if.sql) | Scalar | Preview | BOOL | STRUCT prompt | Evaluate a natural language condition. Optimizes query plan to reduce Gemini calls. |
 | `AI.SCORE` | [notebook](functions/ai_score/ai_score.ipynb) · [sql](functions/ai_score/ai_score.sql) | Scalar | Preview | FLOAT64 | Tuple | Rate inputs on a scale you describe. Auto-generates a scoring rubric. |
 | `AI.CLASSIFY` | [notebook](functions/ai_classify/ai_classify.ipynb) · [sql](functions/ai_classify/ai_classify.sql) | Scalar | Preview | STRING or ARRAY | Direct | Classify inputs into categories you provide. Supports multi-label. |
-| `AI.AGG` | [notebook](functions/ai_agg/ai_agg.ipynb) · [sql](functions/ai_agg/ai_agg.sql) | Aggregate | Preview | STRING | Direct | Aggregate data with natural language instructions. Auto-batches beyond context window. |
+| `AI.AGG` | [notebook](functions/ai_agg/ai_agg.ipynb) · [sql](functions/ai_agg/ai_agg.sql) | Aggregate | GA | STRING or STRUCT | Direct | Aggregate data with natural language instructions. Auto-batches beyond context window; supports structured output via output_schema. |
 
 ### Embeddings & Search — Create vectors, compute similarity, search semantically
 
