@@ -5,6 +5,26 @@ All notable changes to `bigquery-data-science` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-10-20
+
+### Added
+- **`AI.AGG` Structured Output & Error Tolerance Support:**
+  - Added coverage for GA `output_schema` parameter emitting typed `STRUCT` records directly from aggregation via SQL DDL schema strings.
+  - Added coverage for GA `max_error_ratio` parameter for fault-tolerant aggregation.
+  - Added Section 11 (`output_schema`) and Section 12 (`max_error_ratio`) to `bigquery-ai/functions/ai_agg/ai_agg.ipynb` and matching Examples 9 & 10 to `bigquery-ai/functions/ai_agg/ai_agg.sql`.
+- **`gemini-4-argon` Foundation Model Support:**
+  - Added `gemini-4-argon` to `skills/pinned-models.json`, `bigquery-ai/RESOURCES.md`, and `bigquery-ai/reference/general-purpose-functions.md`. Verified live via BigQuery.
+- **GoogleSQL Reusable Column Aliases GA:**
+  - Documented GoogleSQL GA support for referencing `SELECT` aliases inside expressions and `WHERE` clauses.
+
+### Changed
+- **`AI.AGG` Status Transition:**
+  - Graduated `AI.AGG` from Preview to GA in `bigquery-ai/README.md`, `bigquery-ai/reference/managed-functions.md`, and `skills/bigquery-ai/reference/managed-functions.md`.
+- **Skill Progressive Lenses Re-synchronized:**
+  - Lens 3 (`skills/bigquery-ai/syntax/aiagg.md`): Regenerated surgical syntax card with `output_schema` and `max_error_ratio` signatures.
+  - Lens 4 (`skills/bigquery-ai/narrative/ai_agg.md`): Regenerated textbook narrative from the executed `ai_agg.ipynb`.
+  - Refreshed manifests across all 3 agent skills (`bigquery-data-science`, `bigquery-ml`, `bigquery-ai`).
+
 ## [0.7.0] - 2026-10-19
 
 ### Added

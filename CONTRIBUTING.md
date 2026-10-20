@@ -44,12 +44,12 @@ Releases are published to TestPyPI and PyPI via GitHub Actions OIDC Trusted Publ
 
 ### Semantic Versioning (`X.Y.Z`)
 
-- **Major (`X.0.0`) — Breaking changes to the public contract:**
-  - Removing or incompatibly changing exported functions in `bigquery_data_science`, CLI subcommands (`install`, `list`, `path`, `kernel`, `lookup`, `search`, `triage`, `mcp`, `sweep`), MCP tool schemas, or skill directory layouts.
-- **Minor (`X.Y.0`) — Backwards-compatible features:**
-  - Adding new notebooks, SQL workflows, skill reference/syntax/narrative files, CLI subcommands/flags, or MCP tools.
-- **Patch (`X.Y.Z`) — Backwards-compatible fixes and documentation updates:**
-  - Fixing typos, updating model pins in `skills/pinned-models.json`, refreshing syntax cards or narratives, and bug fixes.
+- **Major (`X.0.0`) — Skills architecture, names & structural contract shifts:**
+  - Changes in skills layout, naming, or hierarchy (`skills/`), packaging changes, or removing/incompatibly changing CLI subcommands, MCP tool schemas, or Python library public exports.
+- **Minor (`X.Y.0`) — Multi-area monthly sweeps & capability rollouts:**
+  - Multi-area updates spanning monthly upstream sweeps: adding new notebooks, workflows, foundation models, options, and synchronized 4-lens skill updates.
+- **Patch (`X.Y.Z`) — Targeted single-area updates & fixes:**
+  - Targeted single-area updates, isolated bug fixes, typo fixes, or individual notebook adjustments.
 
 ### 1. Version Bump & Changelog Lockstep
 

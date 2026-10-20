@@ -5,10 +5,13 @@
 -- can analyze data exceeding the Gemini context window.
 --
 -- Type: Aggregate function (use with GROUP BY)
--- Returns: STRING — one result per group (NULL on total failure, partial on partial failure)
+-- Status: Generally Available (GA)
+-- Returns: STRING (default) or STRUCT (with output_schema) — one result per group (NULL on total failure, partial on partial failure)
 -- Output cap: 10,000 tokens per group
 -- Recommended limits: 20M rows per query, 1,000 distinct groups
 -- Multimodal: Supports images via ObjectRef in STRUCT input (see examples 7-8)
+-- Structured Output: Supports output_schema => 'field_1 TYPE, field_2 TYPE' (example 9)
+-- Error Tolerance: Supports max_error_ratio => FLOAT64 between 0.0 and 1.0 (example 10)
 --
 -- Full reference: ../../RESOURCES.md
 -- Official docs: https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-agg
@@ -184,3 +187,48 @@ FROM
 -- FROM
 --   `PROJECT_ID.DATASET.ai_agg_images` AS docs
 -- GROUP BY folder;
+
+
+-- =============================================================================
+-- Example 9: Structured output with output_schema
+-- =============================================================================
+-- Specify an output_schema argument to return a typed STRUCT conforming to your
+-- schema rather than plain unstructured text.
+WITH sample_data AS (
+  SELECT *
+  FROM UNNEST([
+    STRUCT('author_a' AS author, 'I love building web applications in Python and Rust' AS text),
+    STRUCT('author_a', 'WebAssembly and Rust make frontend tooling blisteringly fast'),
+    STRUCT('author_b', 'Deep learning architectures require massive GPU clusters'),
+    STRUCT('author_b', 'Transformers and attention mechanisms continue to evolve')
+  ])
+)
+SELECT
+  author,
+  AI.AGG(
+    text,
+    'Summarize the topics this author discusses. Keep it concise.',
+    output_schema => 'topics ARRAY<STRUCT<name STRING, explanation STRING>>'
+  ) AS summary
+FROM sample_data
+GROUP BY author;
+
+
+-- =============================================================================
+-- Example 10: Error tolerance with max_error_ratio
+-- =============================================================================
+-- Configure the maximum acceptable ratio of row-level inference failures (0.0 to 1.0).
+-- If the ratio is exceeded, the query fails with descriptive error diagnostics;
+-- otherwise, partial results from successful calls are returned.
+SELECT
+  AI.AGG(
+    review,
+    'Summarize customer reviews into a concise consensus.',
+    max_error_ratio => 0.1
+  ) AS summary
+FROM UNNEST([
+  'Fast delivery but the packaging was crushed.',
+  'Product works great, very happy with it.',
+  'Instructions were confusing but the item itself is solid.'
+]) AS review;
+

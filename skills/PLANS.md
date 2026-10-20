@@ -34,20 +34,37 @@ flowchart TD
 
 A skill is a directory under `skills/<name>/` (symlinked into `.agents/skills/<name>` and `.claude/skills/<name>`):
 
-1. **`SKILL.md` (Lens 1)** — YAML frontmatter (`name` <= 64 chars lowercase/digits/hyphens; `description` <= 1024 chars; `metadata.version: "0.7.0"`) + decision tree + Tool Wrapper & Generator patterns + Reviewer checklist + cross-cutting gotchas + pointers to `reference/*.md` and `syntax/INDEX.md`. Strictly < 500 lines.
+1. **`SKILL.md` (Lens 1)** — YAML frontmatter (`name` <= 64 chars lowercase/digits/hyphens; `description` <= 1024 chars; `metadata.version: "<version>"`) + decision tree + Tool Wrapper & Generator patterns + Reviewer checklist + cross-cutting gotchas + pointers to `reference/*.md` and `syntax/INDEX.md`. Strictly < 500 lines.
 2. **`reference/<bucket>.md` (Lens 2)** — One file per use-case bucket, organized by what the practitioner is trying to accomplish. Each carries a single H1 heading, a `Contents:` TOC in the first 10 lines when > 100 lines, an options table, selection guidance, verified empirical gotchas, a canonical snippet, and relative links into `../syntax/<slug>.md` and `../narrative/<topic>.md`.
 3. **`syntax/<slug>.md` + `syntax/INDEX.md` (Lens 3)** — Auto-generated from `<domain>/reference/*.md` via `uv run bigquery-data-science sync-syntax`. Never hand-edit `syntax/*.md`; edit the source `<domain>/reference/*.md` page and re-run `sync-syntax`. Every card is verified `< 25,000` bytes.
 4. **`narrative/<topic>.md` (Lens 4)** — Auto-generated from `<domain>/{models,functions,workflows,pipelines}/**/*.ipynb` via `uv run bigquery-data-science sync-narratives` (or `convert-notebook`). Strips the HTML tracker header, `def install(*packages):` helper, Colab auth shim, and trailing `## Cleanup` section while prepending a clickable GitHub provenance banner to the source `.ipynb` and `.sql`.
-5. **`skill.manifest.json`** — Generated via `uv run bigquery-data-science manifest --all --version 0.7.0`.
+5. **`skill.manifest.json`** — Generated via `uv run bigquery-data-science manifest --all --version <version>`.
 
 ## Change Types and Checklists
+
+### Semantic Versioning Strategy & Sweep Cadence
+
+This repository, the Python package, and all three agent skills follow a coordinated SemVer structure (`Major.Minor.Patch`):
+
+- **Major (`X.0.0`) — Skills architecture, names & structural contract shifts:**
+  - Changes in skills layout, naming, or hierarchy (`skills/`), packaging changes, or removing/incompatibly changing CLI subcommands, MCP tool schemas, or Python library public exports.
+- **Minor (`X.Y.0`) — Multi-area monthly sweeps & capability rollouts:**
+  - Multi-area updates spanning monthly upstream sweeps: adding new notebooks, workflows, foundation models, options, and synchronized 4-lens skill updates.
+- **Patch (`X.Y.Z`) — Targeted single-area updates & fixes:**
+  - Targeted single-area updates, isolated bug fixes, typo fixes, or individual notebook adjustments.
+
+When bumping versions across the repository:
+1. Update all single-sourced version locations: `pyproject.toml`, `src/bigquery_data_science/__init__.py`, `tests/test_packaging.py`, `plugin.json`, `.claude-plugin/marketplace.json`, `CITATION.cff`, and `CHANGELOG.md`.
+2. Update `metadata.version` in `skills/{bigquery-data-science,bigquery-ml,bigquery-ai}/SKILL.md`.
+3. Run `uv run bigquery-data-science manifest --all --version X.Y.Z` to refresh all `skill.manifest.json` files and hashes.
+4. Re-lock dependencies with `UV_NO_CONFIG=1 uv lock`.
 
 #### Adding or updating a model, function, or workflow
 - [ ] Update the ground-truth notebook/SQL and `<domain>/reference/*.md` in `bigquery-ml/` or `bigquery-ai/`.
 - [ ] Update the corresponding Lens 2 decision guide in `skills/<domain>/reference/<bucket>.md` (and `skills/bigquery-data-science/reference/namespace-matrix.md` if adding a new symbol).
 - [ ] Run `uv run bigquery-data-science sync-syntax` to regenerate Lens 3 syntax cards and `syntax/INDEX.md`.
 - [ ] Run `uv run bigquery-data-science sync-narratives` to regenerate Lens 4 narrative markdown files.
-- [ ] Run `uv run bigquery-data-science manifest --all --version 0.7.0` to refresh `skill.manifest.json`.
+- [ ] Run `uv run bigquery-data-science manifest --all --version <version>` to refresh `skill.manifest.json`.
 - [ ] Run `uv run bigquery-data-science sweep` and confirm all 6 verification stages exit `0`.
 
 #### Adopting or retiring a pinned model version

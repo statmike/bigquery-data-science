@@ -211,6 +211,16 @@ uv run ruff check src tests && \
   ./scripts/check_install.sh
 ```
 
+## Versioning & Release Cadence
+
+`bigquery-data-science` adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html) (`Major.Minor.Patch`):
+
+- **Major (`X.0.0`) — Skills architecture, names & structural contract shifts:** Changes in skills hierarchy/naming (`skills/`), packaging overhauls, or breaking changes to CLI subcommands, MCP tool schemas, or library exports.
+- **Minor (`X.Y.0`) — Multi-area monthly sweeps & capability rollouts:** Scheduled monthly sweeps across BigQuery release notes — introducing new foundation models, options, notebooks, SQL workflows, and synchronized 4-lens skill updates.
+- **Patch (`X.Y.Z`) — Targeted single-area updates & fixes:** Isolated bug fixes, typo corrections, single-notebook adjustments, or targeted hotfixes.
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md#releasing) for the full release process and TestPyPI/PyPI tag flow.
+
 ## License
 
 Apache-2.0 — see [`LICENSE`](LICENSE).
