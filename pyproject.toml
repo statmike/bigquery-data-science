@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bigquery-data-science"
-version = "0.8.1"
+version = "0.8.2"
 description = "BigQuery ML, BigQuery AI, and 4-Lens Agent Skills: 104 live-verified SQL/Python workflows, zero-dependency CLI catalog & skill installer, and stdio MCP server."
 dynamic = ["readme"]
 requires-python = ">=3.11"
@@ -174,7 +174,7 @@ path = "README.md"
 
 # 1. Swap the front-door Mermaid block with its pre-rendered PNG on PyPI
 [[tool.hatch.metadata.hooks.fancy-pypi-readme.substitutions]]
-pattern = '(?s)```mermaid\nflowchart LR\n.*?```'
+pattern = '(?s)```mermaid\nflowchart (?:LR|TD)\n.*?```'
 replacement = '![bigquery-data-science architecture](https://raw.githubusercontent.com/statmike/bigquery-data-science/main/docs/assets/readme_architecture.png)'
 
 # 2. Rewrite relative Markdown image paths to raw.githubusercontent.com

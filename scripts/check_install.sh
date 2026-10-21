@@ -75,6 +75,10 @@ grep -q "bigquery-ml" <<<"$LIST_OUT" || fail "list missing bigquery-ml"
 grep -q "bigquery-ai" <<<"$LIST_OUT" || fail "list missing bigquery-ai"
 
 "$BIN/bigquery-data-science" bump-version --check --repo-root "$REPO_ROOT" >/dev/null || fail "bump-version --check failed"
+"$BIN/bigquery-data-science" check-status-labels "$REPO_ROOT/skills" --repo-root "$REPO_ROOT" >/dev/null || fail "check-status-labels failed"
+"$BIN/bigquery-data-science" check-crossrefs --repo-root "$REPO_ROOT" >/dev/null || fail "check-crossrefs failed"
+"$BIN/bigquery-data-science" check-notebook-claims "$REPO_ROOT" --repo-root "$REPO_ROOT" >/dev/null || fail "check-notebook-claims failed"
+"$BIN/bigquery-data-science" check-markdown --repo-root "$REPO_ROOT" >/dev/null || fail "check-markdown failed"
 
 TARGET_DIR="$WORK/installed-skills"
 "$BIN/bigquery-data-science" install --target "$TARGET_DIR" >/dev/null || fail "install failed"

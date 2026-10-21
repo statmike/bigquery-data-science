@@ -12,16 +12,15 @@
 `104 live-verified notebooks` · `87 SQL scripts` · `3 Agent Skills` · `137 <25 KB syntax cards` · `zero-dependency CLI & stdio MCP`
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph GT["1. Ground-Truth Notebooks & SQL (GitHub)"]
-        direction TB
+        direction LR
         BQML["bigquery-ml/ (61 Notebooks · 58 SQL)<br/>23 Models · 12 Functions<br/>18 Workflows · 8 Pipelines"]
         BQAI["bigquery-ai/ (43 Notebooks · 29 SQL)<br/>29 AI.* & ML.* Functions<br/>14 Multi-Function Workflows"]
         REFS["13 Deep Reference Guides<br/>bigquery-ml/reference/ (5) · bigquery-ai/reference/ (8)<br/>Options · Gotchas · Pinned Models"]
-        BQML --- BQAI --- REFS
     end
     subgraph SYNC["2. Distillation & Verification"]
-        direction TB
+        direction LR
         SWEEP["bigquery-data-science sweep<br/>sync-syntax (H2 Slicer)<br/>convert-notebook (Clean MD)<br/>6-Gate CI & Link Audit"]
         CLI["Zero-Dependency CLI & MCP<br/>uvx bigquery-data-science<br/>install · triage · lookup · search · mcp"]
         SWEEP --> CLI

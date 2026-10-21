@@ -43,7 +43,7 @@
 These are higher-level "managed" AI functions that provide **simplified interfaces** and **automatic prompt optimization** for common tasks. Unlike the general-purpose functions, these functions automatically structure your prompts to improve output quality and return simple scalar values rather than full model response structs.
 
 **Key characteristics:**
-- All are in **Preview** status.
+- `AI.AGG` is **GA**; `AI.IF`, `AI.SCORE`, and `AI.CLASSIFY` are in **Preview** status.
 - `AI.IF`, `AI.SCORE`, and `AI.CLASSIFY` are **scalar functions** returning simple types (BOOL, FLOAT64, STRING/ARRAY\<STRING\>).
 - `AI.AGG` is an **aggregate function** (like `SUM`, `COUNT`) that returns STRING -- one result per GROUP BY group.
 - All use **dynamic shared quota (DSQ)** only -- no Provisioned Throughput support.
