@@ -36,10 +36,21 @@ They are also the least accurately documented family in this project, which is m
 Set your project, location, and bucket, authenticate, create the shared dataset — then deal with the reservation requirement, which is the part no other `functions/` notebook has.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 DATASET_ID = 'bq_ml'  # Shared dataset across all bigquery-ml notebooks
-BUCKET = 'statmike-mlops-349915'  # <-- Replace with your GCS bucket (same location as DATASET_ID)
+BUCKET = PROJECT_ID  # <-- Replace with your GCS bucket (same location as DATASET_ID)
 CONNECTION_ID = 'bq_ml_image_demo'  # Cloud Resource Connection for the object table in Step 8
 RESERVATION_ID = 'bqml-image-temp'  # Temporary reservation name (Setup creates it, Cleanup removes it)
 ```
@@ -759,7 +770,7 @@ SELECT
   ML.DECODE_IMAGE(data).dimensions                                        AS source_dimensions,
   ML.RESIZE_IMAGE(ML.DECODE_IMAGE(data), 4, 4, FALSE).dimensions          AS resized_dimensions,
   ML.CONVERT_IMAGE_TYPE(ML.DECODE_IMAGE(data)).values[OFFSET(0)]          AS first_pixel_red
-FROM `statmike-mlops-349915.bq_ml.image_object_table`
+FROM `bq_ml.image_object_table`
 ORDER BY file
 ```
 

@@ -43,7 +43,18 @@ This function needs three resources: a **Cloud Resource connection** whose servi
 > See the `setup` (Setup Reference) for connections, object tables and remote models in general, and `reference/cloud-ai-service-models.md` (Cloud AI Service Models) for this family in particular.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location — this family runs in US or EU
 DATASET_ID = 'bq_ai_functions'  # Shared dataset across all notebooks
 CONNECTION_ID = 'bq_ai_functions'  # Shared connection
@@ -636,8 +647,8 @@ SELECT
   STRING(annotation.description) AS label,
   ROUND(FLOAT64(annotation.score), 3) AS score
 FROM ML.ANNOTATE_IMAGE(
-  MODEL `statmike-mlops-349915.bq_ai_functions.ml_annotate_image_model`,
-  TABLE `statmike-mlops-349915.bq_ai_functions.ml_annotate_image_photos`,
+  MODEL `bq_ai_functions.ml_annotate_image_model`,
+  TABLE `bq_ai_functions.ml_annotate_image_photos`,
   STRUCT(['LABEL_DETECTION'] AS vision_features)) AS annotated,
 UNNEST(JSON_QUERY_ARRAY(annotated.ml_annotate_image_result.label_annotations)) AS annotation
 QUALIFY ROW_NUMBER() OVER (PARTITION BY image ORDER BY FLOAT64(annotation.score) DESC) = 1

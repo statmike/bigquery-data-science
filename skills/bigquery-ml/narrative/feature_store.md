@@ -29,7 +29,18 @@ Two model-free table-valued functions that answer *"what did we know about this 
 Set your project and location, authenticate, and create a shared dataset. No connection needed — both functions run entirely inside BigQuery.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 DATASET_ID = 'bq_ml'  # Shared dataset across all bigquery-ml notebooks
 ```
@@ -613,10 +624,10 @@ That matters because the dropped rows are not a random sample. They are precisel
 The `%%bigquery` cell magic runs SQL directly and assigns the result to a pandas DataFrame — convenient for interactive work. Note that the magic does not interpolate Python variables into the SQL, so the identifiers are written out in full.
 
 ```sql
-%%bigquery serving_vectors --project statmike-mlops-349915
+%%bigquery serving_vectors --project {PROJECT_ID}
 SELECT entity_id, lifetime_orders, lifetime_spend, last_ship_lag_h, last_delivery_lag_h
 FROM ML.FEATURES_AT_TIME(
-  TABLE `statmike-mlops-349915.bq_ml.fs_sparse`,
+  TABLE `bq_ml.fs_sparse`,
   time => TIMESTAMP '2024-01-01',
   num_rows => 1,
   ignore_feature_nulls => TRUE)

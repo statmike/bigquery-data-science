@@ -5,6 +5,21 @@ All notable changes to `bigquery-data-science` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-10-21
+
+### Added
+- **Notebook-Led `.ipynb` $\to$ `.sql` Companion Parity & Self-Audit Gate (`P4.2` & `P4.3`):**
+  - Added `src/bigquery_data_science/tooling/sql_companions.py` and the `bigquery-data-science check-sql-companions` CLI subcommand (integrated into `bigquery-data-science sweep` Stage 7) to verify that every function/model notebook has a paired `.sql` companion covering its primary SQL symbols and that all 87 `.sql` files in `bigquery-ml/` and `bigquery-ai/` pass `review-sql` with zero unexpected errors.
+  - Added `sanitize_notebook_outputs` and automatic `.env` loading to `src/bigquery_data_science/tooling/run_notebook.py` so `bigquery-data-science run-notebook` automatically detects the local GCP project from `.env`, `GOOGLE_CLOUD_PROJECT`, or ADC while scrubbing runtime project IDs back to `'your-gcp-project-id'` in saved cell outputs.
+
+### Changed
+- **Auto-Detected `PROJECT_ID` Across All 107 Notebooks & 104 Narratives (`P4.1`):**
+  - Updated all 107 `.ipynb` setup cells to leave `PROJECT_ID = 'your-gcp-project-id'` in git and auto-detect the active project at runtime from `.env`, `GOOGLE_CLOUD_PROJECT`, or `google.auth.default()[1]`.
+  - Updated 61 `%%bigquery --project {PROJECT_ID}` magic cells to use two-part `bq_ml.*` and `bq_ai_functions.*` table/model identifiers (and `@@project_id` in `EXPORT MODEL`), scrubbed all 259 rendered cell outputs to `'your-gcp-project-id'`, and regenerated all 104 `skills/*/narrative/*.md` files.
+- **Single-Source `skills/pinned-models.json` & Comment-Aware `review_sql` (`P4.3` & `P4.4`):**
+  - Removed the duplicate `_DEFAULT_ALLOWED_MODELS` set from `src/bigquery_data_science/catalog.py` so `review_sql` reads directly from `skills/pinned-models.json` (`_skills/pinned-models.json` in wheels).
+  - Updated `review_sql` to strip `--` and `/* ... */` SQL comments before scanning and ignore syntax placeholders and Vertex/Document AI resource paths (`projects/...`, `https://...`).
+
 ## [0.9.0] - 2026-10-21
 
 ### Added

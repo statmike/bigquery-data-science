@@ -17,7 +17,18 @@ The same drift-check → conditional-retrain → report logic as `pipelines/sql_
 Set your project and location, authenticate, and create a shared dataset. No BigQuery connection needed.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 DATASET_ID = 'bq_ml'  # Shared dataset across all bigquery-ml notebooks
 WORKFLOWS_LOCATION = 'us-central1'  # Cloud Workflows requires a specific region, not the 'US' multi-region

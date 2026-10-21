@@ -19,7 +19,18 @@ Segment customers into actionable business groups using **RFM (Recency/Frequency
 Set your project and location, authenticate, and create a shared dataset. No connection needed.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 DATASET_ID = 'bq_ml'  # Shared dataset across all bigquery-ml notebooks
 ```
@@ -203,7 +214,7 @@ The same operations using IPython magic commands — write SQL directly in cells
 %%bigquery --project {PROJECT_ID}
 
 SELECT centroid_id, feature, ROUND(numerical_value, 3) AS numerical_value
-FROM ML.CENTROIDS(MODEL `statmike-mlops-349915.bq_ml.customer_segmentation_kmeans`)
+FROM ML.CENTROIDS(MODEL `bq_ml.customer_segmentation_kmeans`)
 ORDER BY centroid_id, feature
 ```
 

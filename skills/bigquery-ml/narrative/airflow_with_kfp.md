@@ -19,13 +19,24 @@ The "meta-orchestration" pairing: an Airflow DAG on the **same live Managed Airf
 Set your project and location, authenticate, and create a shared dataset.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 DATASET_ID = 'bq_ml'  # Shared dataset across all bigquery-ml notebooks
 COMPOSER_REGION = 'us-central1'  # Cloud Composer requires a specific region, not the 'US' multi-region
 COMPOSER_ENVIRONMENT = 'bq-ml-composer'  # Shared with pipelines/composer_airflow/
 VERTEX_REGION = 'us-central1'  # Vertex AI Pipelines region
-BUCKET = 'statmike-mlops-349915'  # GCS bucket for the compiled pipeline spec + pipeline_root
+BUCKET = PROJECT_ID  # GCS bucket for the compiled pipeline spec + pipeline_root
 ```
 
 ### Environment

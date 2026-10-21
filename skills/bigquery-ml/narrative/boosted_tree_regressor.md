@@ -27,10 +27,21 @@ Set your project and location, authenticate, and create a shared dataset for the
 > Boosted trees train on data already in BigQuery — no connection or remote model required. The model is created with `CREATE MODEL` and stored in your dataset. See the `setup` (Setup Reference) for details.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 DATASET_ID = 'bq_ml'  # Shared dataset across all bigquery-ml notebooks
-BUCKET = 'statmike-mlops-349915'  # <-- Replace with your GCS bucket (same location as DATASET_ID) -- used in Step 6 to export/visualize a tree
+BUCKET = PROJECT_ID  # <-- Replace with your GCS bucket (same location as DATASET_ID) -- used in Step 6 to export/visualize a tree
 ```
 
 ### Environment
@@ -364,7 +375,7 @@ The same operations using IPython magic commands — write SQL directly in cells
 %%bigquery --project {PROJECT_ID}
 
 SELECT *
-FROM ML.EVALUATE(MODEL `statmike-mlops-349915.bq_ml.boosted_tree_regressor_penguins`)
+FROM ML.EVALUATE(MODEL `bq_ml.boosted_tree_regressor_penguins`)
 ```
 
 ---

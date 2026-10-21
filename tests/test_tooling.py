@@ -42,7 +42,14 @@ from bigquery_data_science.tooling.pinned_models import (
     load_allow_list,
 )
 from bigquery_data_science.tooling.reference_structure import check_reference
-from bigquery_data_science.tooling.run_notebook import execute_notebook
+from bigquery_data_science.tooling.run_notebook import (
+    execute_notebook,
+    sanitize_notebook_outputs,
+)
+from bigquery_data_science.tooling.sql_companions import (
+    check_sql_companions,
+    extract_sql_symbols,
+)
 from bigquery_data_science.tooling.status_labels import (
     check_status_labels,
     normalize_status,
@@ -545,6 +552,144 @@ def test_run_notebook_executes_headlessly_and_catches_errors(
     err_path = tmp_path / "failing.ipynb"
     nb_mod.write(err_nb, err_path)
     assert main(["run-notebook", str(err_path), "--kernel", "python3"]) == 1
+
+
+def test_run_notebook_loads_dotenv_and_sanitizes_project_id_outputs(
+    tmp_path: Path,
+) -> None:
+    import nbformat
+
+    nb_mod = nbformat
+    (tmp_path / ".env").write_text(
+        "GOOGLE_CLOUD_PROJECT=my-secret-test-proj-999\n",
+        encoding="utf-8",
+    )
+    nb = nb_mod.v4.new_notebook()
+    nb.cells = [
+        nb_mod.v4.new_code_cell(
+            "import os\n"
+            "proj = os.environ.get('GOOGLE_CLOUD_PROJECT', 'unset')\n"
+            "print(f'Active project: {proj}.bq_ml')\n"
+            "f'table: {proj}.bq_ml.sample'"
+        )
+    ]
+    nb_path = tmp_path / "dotenv_sanitize.ipynb"
+    nb_mod.write(nb, nb_path)
+
+    res = execute_notebook(nb_path, kernel_name="python3", timeout_seconds=60)
+    assert res.ok
+    assert res.sanitized_outputs >= 1
+
+    saved_text = nb_path.read_text(encoding="utf-8")
+    assert "my-secret-test-proj-999" not in saved_text
+    assert "your-gcp-project-id.bq_ml" in saved_text
+
+    # Direct unit test of sanitize_notebook_outputs on error + display_data
+    err_nb = nb_mod.v4.new_notebook()
+    cell = nb_mod.v4.new_code_cell("pass")
+    cell.outputs = [
+        nb_mod.v4.new_output(
+            "display_data",
+            data={"text/html": "<div>proj-123-abc.bq_ml</div>"},
+        ),
+        nb_mod.v4.new_output(
+            "error",
+            ename="NotFound",
+            evalue="Project proj-123-abc not found",
+            traceback=["File 'x.py': proj-123-abc failed"],
+        ),
+    ]
+    err_nb.cells = [cell]
+    count = sanitize_notebook_outputs(err_nb, ["proj-123-abc"])
+    assert count == 2
+    dumped = nb_mod.writes(err_nb)
+    assert "proj-123-abc" not in dumped
+    assert "your-gcp-project-id" in dumped
+
+
+def test_sql_companions_and_single_source_pinned_models(
+    tmp_path: Path,
+) -> None:
+    from bigquery_data_science import catalog
+
+    # P4.4: Single-source pinned-models.json (no duplicate _DEFAULT_ALLOWED_MODELS)
+    assert not hasattr(catalog, "_DEFAULT_ALLOWED_MODELS")
+
+    # P4.3: SQL comment stripping and placeholder filtering in review_sql
+    commented_sql = (
+        "-- Note: there is no standalone HYBRID_SEARCH TVF\n"
+        "/* Also ignore AI.PARSE_DOCUMENT inside block comments */\n"
+        "SELECT * FROM AI.FORECAST(\n"
+        "  TABLE `bq_ai_functions.sales`,\n"
+        "  data_col => 'sales',\n"
+        "  timestamp_col => 'dt',\n"
+        "  model => 'TimesFM 2.5'\n"
+        ")\n"
+    )
+    rev = catalog.review_sql(commented_sql, skills_dir=SKILLS_ROOT)
+    assert rev.ok
+    assert "HYBRID_SEARCH" not in rev.detected_symbols
+
+    # P4.2 & P4.3: Repo-wide check-sql-companions passes across all 87 .sql files
+    assert check_sql_companions(REPO_ROOT, SKILLS_ROOT) == []
+    assert (
+        main(
+            [
+                "check-sql-companions",
+                str(SKILLS_ROOT),
+                "--repo-root",
+                str(REPO_ROOT),
+            ]
+        )
+        == 0
+    )
+
+    # Synthetic failure cases: missing .sql companion, missing primary symbol, retired SQL
+    fn_dir = tmp_path / "bigquery-ai" / "functions" / "ai_forecast"
+    fn_dir.mkdir(parents=True)
+    nb_payload = {
+        "cells": [
+            {
+                "cell_type": "code",
+                "source": [
+                    "SELECT * FROM AI.FORECAST(TABLE `t`, data_col => 'y', "
+                    "timestamp_col => 'ts', model => 'TimesFM 2.5')"
+                ],
+                "outputs": [],
+            }
+        ]
+    }
+    nb_file = fn_dir / "ai_forecast.ipynb"
+    nb_file.write_text(json.dumps(nb_payload), encoding="utf-8")
+
+    # 1. Missing .sql companion
+    errs_missing = check_sql_companions(tmp_path, SKILLS_ROOT)
+    assert any("missing paired SQL companion" in e for e in errs_missing)
+
+    # 2. Present .sql companion but missing primary symbol AI.FORECAST and using retired function
+    sql_file = fn_dir / "ai_forecast.sql"
+    sql_file.write_text(
+        "SELECT * FROM AI.PARSE_DOCUMENT(TABLE `docs`);\n",
+        encoding="utf-8",
+    )
+    errs_bad_sql = check_sql_companions(tmp_path, SKILLS_ROOT)
+    assert any("RETIRED_FUNCTION" in e for e in errs_bad_sql)
+    assert any("missing primary symbol 'AI.FORECAST'" in e for e in errs_bad_sql)
+    assert (
+        main(
+            [
+                "check-sql-companions",
+                str(SKILLS_ROOT),
+                "--repo-root",
+                str(tmp_path),
+            ]
+        )
+        == 1
+    )
+    assert "AI.FORECAST" in extract_sql_symbols(
+        "SELECT * FROM AI.FORECAST(TABLE `t`)"
+    )
+
 
 
 

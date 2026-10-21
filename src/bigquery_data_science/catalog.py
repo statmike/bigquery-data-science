@@ -12,6 +12,7 @@ from bigquery_data_science.installer import get_skills_dir
 from bigquery_data_science.tooling.markdown_anchors import headings
 from bigquery_data_science.tooling.pinned_models import (
     find_allow_file,
+    is_placeholder,
     load_allow_list,
 )
 from bigquery_data_science.tooling.sync_syntax import syntax_slug
@@ -1187,43 +1188,24 @@ class SqlReviewResult:
         return "\n".join(lines)
 
 
+_SQL_COMMENT_RE = re.compile(r"--[^\n]*|/\*.*?\*/", re.DOTALL)
 _SQL_FN_TOKEN_RE = re.compile(
-    r"\b(AI\.[A-Z0-9_]+|ML\.[A-Z0-9_]+|OBJ\.[A-Z0-9_]+|VECTOR_SEARCH|HYBRID_SEARCH)\b",
+    r"\b(AI\.[A-Z0-9_]+|ML\.[A-Z0-9_]+|OBJ\.[A-Z0-9_]+|VECTOR_SEARCH|HYBRID_SEARCH)\s*\(",
     re.IGNORECASE,
 )
 _MODEL_TYPE_SQL_RE = re.compile(
     r"\bMODEL_TYPE\s*=\s*['\"]([A-Za-z0-9_]+)['\"]",
     re.IGNORECASE,
 )
-_DEFAULT_ALLOWED_MODELS: frozenset[str] = frozenset(
-    {
-        "text-embedding-005",
-        "text-multilingual-embedding-002",
-        "gemini-embedding-001",
-        "gemini-embedding-2",
-        "multimodalembedding@001",
-        "embeddinggemma-300m",
-        "gemini-2.5-flash",
-        "gemini-2.5-pro",
-        "gemini-2.5-flash-lite",
-        "gemini-3.1-flash-lite",
-        "gemini-3.5-flash",
-        "gemini-3.5-flash-lite",
-        "gemini-3.6-flash",
-        "gemini-3.7-flash",
-        "gemini-3.8-flash",
-        "gemini-4-argon",
-        "TimesFM 2.5",
-        "TimesFM 3.0",
-        "claude-sonnet-4-20250514",
-    }
-)
-
-
 _ENDPOINT_ARG_RE = re.compile(
     r"\b(?:endpoint|model)\s*(?:=>|=)\s*['\"]([^'\"]+)['\"]",
     re.IGNORECASE,
 )
+
+
+def strip_sql_comments(sql: str) -> str:
+    """Remove `--` line comments and `/* ... */` block comments from `sql`."""
+    return _SQL_COMMENT_RE.sub("", sql)
 
 
 def review_sql(
@@ -1233,14 +1215,15 @@ def review_sql(
     """Statically review a BigQuery SQL query for prerequisites and empirical gotchas."""
     root = skills_dir if skills_dir is not None else get_skills_dir()
     cleaned = sql.strip()
-    sql_upper = cleaned.upper()
+    uncommented = strip_sql_comments(cleaned)
+    sql_upper = uncommented.upper()
 
     detected: list[str] = []
-    for match in _SQL_FN_TOKEN_RE.finditer(cleaned):
+    for match in _SQL_FN_TOKEN_RE.finditer(uncommented):
         sym = match.group(1).upper()
         if sym not in detected:
             detected.append(sym)
-    for match in _MODEL_TYPE_SQL_RE.finditer(cleaned):
+    for match in _MODEL_TYPE_SQL_RE.finditer(uncommented):
         mtype = match.group(1).upper()
         canonical = _SYMBOL_ALIASES.get(mtype, mtype)
         if canonical not in detected:
@@ -1285,17 +1268,22 @@ def review_sql(
             )
         )
 
-    allow_file = find_allow_file(root)
+    allow_file = find_allow_file(root) or find_allow_file(get_skills_dir())
+    allowed_models: set[str] = set()
     if allow_file is not None and allow_file.is_file():
         allowed_models = load_allow_list(allow_file, "bigquery-ai") | load_allow_list(
             allow_file, "bigquery-ml"
         )
-    else:
-        allowed_models = set(_DEFAULT_ALLOWED_MODELS)
 
-    for ep_match in _ENDPOINT_ARG_RE.finditer(cleaned):
+    for ep_match in _ENDPOINT_ARG_RE.finditer(uncommented):
         val = ep_match.group(1).strip()
-        if val and val not in allowed_models:
+        if (
+            val
+            and allowed_models
+            and not is_placeholder(val)
+            and not val.startswith(("projects/", "https://"))
+            and val not in allowed_models
+        ):
             findings.append(
                 ReviewFinding(
                     severity="ERROR",
@@ -1320,7 +1308,7 @@ def review_sql(
         "AI.GENERATE_TABLE",
     }
     if any(fn in detected for fn in gen_fns) and not re.search(
-        r"\bendpoint\s*=>", cleaned, re.IGNORECASE
+        r"\bendpoint\s*=>", uncommented, re.IGNORECASE
     ):
         findings.append(
             ReviewFinding(
@@ -1335,7 +1323,9 @@ def review_sql(
         )
 
     if "AI.FORECAST" in detected:
-        has_model_arg = re.search(r"\bmodel\s*=>", cleaned, re.IGNORECASE) is not None
+        has_model_arg = (
+            re.search(r"\bmodel\s*=>", uncommented, re.IGNORECASE) is not None
+        )
         has_3_0_cols = any(
             col in sql_upper
             for col in ("TARGET_COLS", "PAST_COVARIATE_COLS", "FUTURE_COVARIATE_COLS")

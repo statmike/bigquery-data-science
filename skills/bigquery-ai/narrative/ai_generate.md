@@ -32,7 +32,18 @@ Set your project and location, authenticate, and create a temporary dataset for 
 > `AI.GENERATE` doesn't require a connection or model — it uses end-user credentials and defaults to `gemini-2.5-flash`. The [multimodal examples](#examples--multimodal-with-objectref) later in this notebook add a connection for GCS access. See the `setup` (Setup Reference) for details.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 DATASET_ID = 'bq_ai_functions'  # Shared dataset across all notebooks
 CONNECTION_ID = 'bq_ai_functions'  # Cloud resource connection (used by multimodal examples)

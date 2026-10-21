@@ -57,6 +57,7 @@ from bigquery_data_science.tooling.run_notebook import (
     DEFAULT_CELL_TIMEOUT_SECONDS,
     execute_notebook,
 )
+from bigquery_data_science.tooling.sql_companions import check_sql_companions
 from bigquery_data_science.tooling.status_labels import check_status_labels
 from bigquery_data_science.tooling.sync_syntax import (
     check_syntax_sync,
@@ -512,6 +513,18 @@ def _cmd_check_markdown(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_check_sql_companions(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    skills_root = Path(args.skills_root).resolve()
+    errors = check_sql_companions(repo_root=repo_root, skills_root=skills_root)
+    if errors:
+        for err in errors:
+            print(f"FAIL: {err}", file=sys.stderr)
+        return 1
+    print("OK: all .ipynb -> .sql companions in sync and passed static SQL review")
+    return 0
+
+
 def _cmd_sweep(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
     skills_root_arg = str(
@@ -643,6 +656,18 @@ def _cmd_sweep(args: argparse.Namespace) -> int:
             failed = True
         if not md_errors:
             print("  [OK] Markdown fences, GFM tables, and vertical Mermaid diagrams valid")
+
+        sql_comp_errors = check_sql_companions(
+            repo_root=repo_root,
+            skills_root=skills_root,
+        )
+        for err in sql_comp_errors:
+            print(f"  ERR (sql-companions): {err}", file=sys.stderr)
+            failed = True
+        if not sql_comp_errors:
+            print(
+                "  [OK] .ipynb -> .sql companions in sync and passed static SQL review"
+            )
 
     return 1 if failed else 0
 
@@ -1120,6 +1145,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root directory (default: .).",
     )
     p_md.set_defaults(func=_cmd_check_markdown)
+
+    p_sql_comp = sub.add_parser(
+        "check-sql-companions",
+        help=(
+            "Verify .ipynb -> .sql companion coverage and run review-sql across "
+            "all .sql files."
+        ),
+    )
+    p_sql_comp.add_argument(
+        "skills_root",
+        nargs="?",
+        default="skills",
+        help="Skills root directory (default: skills).",
+    )
+    p_sql_comp.add_argument(
+        "--repo-root",
+        default=".",
+        help="Repository root directory (default: .).",
+    )
+    p_sql_comp.set_defaults(func=_cmd_check_sql_companions)
 
     p_sweep = sub.add_parser(
         "sweep",

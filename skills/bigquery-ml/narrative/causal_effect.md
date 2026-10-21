@@ -40,7 +40,18 @@ Step 8 runs three of them on this one dataset and they do **not** agree on magni
 Set your project and location, authenticate, and create a shared dataset.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 DATASET_ID = 'bq_ml'  # Shared dataset across all bigquery-ml notebooks
 ```
@@ -759,7 +770,7 @@ The same summary call using IPython magic commands.
 SELECT absolute_effect, relative_effect, p_value, prob_causal_effect
 FROM AI.CAUSAL_EFFECT(
   (SELECT TIMESTAMP(wk) AS wk_ts, rate
-   FROM `statmike-mlops-349915.bq_ml.causal_effect_panel`
+   FROM `bq_ml.causal_effect_panel`
    WHERE subregion1_code = 'TX'),
   timestamp_col          => 'wk_ts',
   data_col               => 'rate',

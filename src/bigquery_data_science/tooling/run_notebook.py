@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import queue
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,7 @@ from bigquery_data_science.installer import (
 from bigquery_data_science.tooling.narrative_drift import sync_all_narratives
 
 DEFAULT_CELL_TIMEOUT_SECONDS = 600
+DEFAULT_PROJECT_PLACEHOLDER = "your-gcp-project-id"
 _IOPUB_POLL_SECONDS = 1.0
 
 
@@ -26,6 +28,7 @@ class NotebookRunResult:
     executed_cells: int
     error_cells: list[tuple[int, str, str]]
     synced_narratives: int = 0
+    sanitized_outputs: int = 0
 
     @property
     def ok(self) -> bool:
@@ -33,15 +36,122 @@ class NotebookRunResult:
         return not self.error_cells
 
 
-def _build_execution_env() -> dict[str, str]:
-    """Build environment variables with mTLS disabled and `~/.local/bin` on `PATH`."""
+def _load_dotenv_into_env(env: dict[str, str], start_dir: Path) -> None:
+    """Load `KEY=VALUE` pairs from the nearest ancestor `.env` into `env`."""
+    for candidate_dir in [start_dir.resolve(), *start_dir.resolve().parents]:
+        dotenv_path = candidate_dir / ".env"
+        if not dotenv_path.is_file():
+            continue
+        for raw_line in dotenv_path.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, val = line.split("=", 1)
+            clean_key = key.strip()
+            clean_val = val.strip().strip("'\"")
+            if clean_key and clean_val:
+                env.setdefault(clean_key, clean_val)
+        break
+
+
+def _build_execution_env(cwd: Path | None = None) -> dict[str, str]:
+    """Build environment variables with `.env`, mTLS disabled, and `~/.local/bin` on `PATH`."""
     env = dict(os.environ)
+    _load_dotenv_into_env(env, cwd if cwd is not None else Path.cwd())
     env["GOOGLE_API_USE_CLIENT_CERTIFICATE"] = "false"
     local_bin = str(Path.home() / ".local" / "bin")
     current_path = env.get("PATH", "")
     if local_bin not in current_path.split(os.pathsep):
         env["PATH"] = f"{local_bin}{os.pathsep}{current_path}" if current_path else local_bin
     return env
+
+
+def _detect_runtime_project_ids(env: Mapping[str, str]) -> set[str]:
+    """Collect candidate runtime GCP project IDs from `env` and ADC for output scrubbing."""
+    candidates: set[str] = set()
+    for env_key in ("GOOGLE_CLOUD_PROJECT", "GCLOUD_PROJECT", "GCP_PROJECT"):
+        val = env.get(env_key, "").strip()
+        if val and val != DEFAULT_PROJECT_PLACEHOLDER:
+            candidates.add(val)
+    try:
+        import google.auth
+
+        _, adc_proj = google.auth.default()
+        if adc_proj and str(adc_proj) != DEFAULT_PROJECT_PLACEHOLDER:
+            candidates.add(str(adc_proj))
+    except Exception:
+        pass
+    return candidates
+
+
+def sanitize_notebook_outputs(
+    notebook: Any,
+    project_ids: Iterable[str],
+    placeholder: str = DEFAULT_PROJECT_PLACEHOLDER,
+) -> int:
+    """Replace any occurrence of `project_ids` in cell outputs with `placeholder`."""
+    targets = [
+        pid for pid in dict.fromkeys(project_ids) if pid and pid != placeholder
+    ]
+    if not targets:
+        return 0
+
+    sanitized_count = 0
+    for cell in getattr(notebook, "cells", []):
+        if getattr(cell, "cell_type", None) != "code":
+            continue
+        for out in getattr(cell, "outputs", []):
+            changed = False
+            if "text" in out and isinstance(out["text"], str):
+                orig = out["text"]
+                new_text = orig
+                for pid in targets:
+                    new_text = new_text.replace(pid, placeholder)
+                if new_text != orig:
+                    out["text"] = new_text
+                    changed = True
+
+            data = out.get("data")
+            if isinstance(data, dict):
+                for mime, val in list(data.items()):
+                    if isinstance(val, str):
+                        orig = val
+                        new_val = orig
+                        for pid in targets:
+                            new_val = new_val.replace(pid, placeholder)
+                        if new_val != orig:
+                            data[mime] = new_val
+                            changed = True
+
+            if "evalue" in out and isinstance(out["evalue"], str):
+                orig = out["evalue"]
+                new_eval = orig
+                for pid in targets:
+                    new_eval = new_eval.replace(pid, placeholder)
+                if new_eval != orig:
+                    out["evalue"] = new_eval
+                    changed = True
+
+            tb = out.get("traceback")
+            if isinstance(tb, list):
+                new_tb: list[str] = []
+                for frame in tb:
+                    if isinstance(frame, str):
+                        new_frame = frame
+                        for pid in targets:
+                            new_frame = new_frame.replace(pid, placeholder)
+                        if new_frame != frame:
+                            changed = True
+                        new_tb.append(new_frame)
+                    else:
+                        new_tb.append(frame)
+                if changed:
+                    out["traceback"] = new_tb
+
+            if changed:
+                sanitized_count += 1
+
+    return sanitized_count
 
 
 def _resolve_kernel_name(requested: str) -> str:
@@ -66,6 +176,7 @@ def execute_notebook(
     sync_narratives: bool = False,
     repo_root: Path | None = None,
     skills_root: Path | None = None,
+    sanitize_outputs: bool = True,
 ) -> NotebookRunResult:
     """Execute `notebook_path` in-place with `cwd` set to its parent folder."""
     import jupyter_client
@@ -80,7 +191,7 @@ def execute_notebook(
 
     notebook = nb_mod.read(resolved_nb, as_version=4)
     effective_kernel = _resolve_kernel_name(kernel_name)
-    env = _build_execution_env()
+    env = _build_execution_env(cwd=resolved_nb.parent)
 
     km = jc_mod.KernelManager(kernel_name=effective_kernel)
     km.start_kernel(cwd=str(resolved_nb.parent), env=env)
@@ -174,6 +285,13 @@ def execute_notebook(
     notebook.metadata["kernelspec"]["display_name"] = DEFAULT_KERNEL_DISPLAY_NAME
     notebook.metadata["kernelspec"]["language"] = "python"
 
+    sanitized = 0
+    if sanitize_outputs:
+        sanitized = sanitize_notebook_outputs(
+            notebook,
+            _detect_runtime_project_ids(env),
+        )
+
     nb_mod.write(notebook, resolved_nb)
 
     synced = 0
@@ -196,4 +314,5 @@ def execute_notebook(
         executed_cells=executed_cells,
         error_cells=error_cells,
         synced_narratives=synced,
+        sanitized_outputs=sanitized,
     )
