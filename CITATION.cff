@@ -9,8 +9,8 @@ authors:
 repository-code: "https://github.com/statmike/bigquery-data-science"
 url: "https://github.com/statmike/bigquery-data-science"
 license: Apache-2.0
-version: "0.8.0"
-date-released: "2026-10-20"
+version: "0.8.1"
+date-released: "2026-10-21"
 keywords:
   - google-cloud
   - bigquery

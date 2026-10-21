@@ -38,7 +38,16 @@ A skill is a directory under `skills/<name>/` (symlinked into `.agents/skills/<n
 2. **`reference/<bucket>.md` (Lens 2)** — One file per use-case bucket, organized by what the practitioner is trying to accomplish. Each carries a single H1 heading, a `Contents:` TOC in the first 10 lines when > 100 lines, an options table, selection guidance, verified empirical gotchas, a canonical snippet, and relative links into `../syntax/<slug>.md` and `../narrative/<topic>.md`.
 3. **`syntax/<slug>.md` + `syntax/INDEX.md` (Lens 3)** — Auto-generated from `<domain>/reference/*.md` via `uv run bigquery-data-science sync-syntax`. Never hand-edit `syntax/*.md`; edit the source `<domain>/reference/*.md` page and re-run `sync-syntax`. Every card is verified `< 25,000` bytes.
 4. **`narrative/<topic>.md` (Lens 4)** — Auto-generated from `<domain>/{models,functions,workflows,pipelines}/**/*.ipynb` via `uv run bigquery-data-science sync-narratives` (or `convert-notebook`). Strips the HTML tracker header, `def install(*packages):` helper, Colab auth shim, and trailing `## Cleanup` section while prepending a clickable GitHub provenance banner to the source `.ipynb` and `.sql`.
-5. **`skill.manifest.json`** — Generated via `uv run bigquery-data-science manifest --all --version <version>`.
+5. **`skill.manifest.json`** — Generated via `uv run bigquery-data-science manifest --all --version <version>` (or stamped alongside all lockstep files via `uv run bigquery-data-science bump-version <version>`).
+
+### Readability, Visual & Compatibility Standards
+
+All skill markdown, domain reference guides, notebooks, and maintainer Python code adhere to four repository-wide standards:
+
+1. **100% Additive & Backward-Compatible**: Existing CLI commands, positional arguments, flags, MCP tool names/schemas, Python exports, and skill paths are never incompatibly altered in `0.x` minor or patch releases. New modes use opt-in flags, and new BigQuery features are appended as new numbered examples.
+2. **Simple Code & Simple English**: Python modules use flat control flow, named constants instead of magic literals, and strict `mypy` typing. Prose opens with a plain-English summary (*what it does, when to use it, and what it requires*) and uses scannable tables over dense paragraphs.
+3. **Vertical-First Mermaid Diagrams (`flowchart TD`)**: Orient the longest flow vertically (`flowchart TD`), cap horizontal width at $\le 3$ nodes per rank (stacking wider sets into vertical `subgraph` blocks) so GitHub never shrinks diagram fonts, wrap text at ~35–45 chars with `<br/>`, and quote labels containing special characters (`id["Label (Detail)"]`).
+4. **Clean Markdown & Table Compilation**: Every `.md` file and `.ipynb` markdown cell must compile cleanly with balanced code fences, consistent GFM table column counts across every row, no unescaped `|` characters in cells, and 100% verified relative links and `#anchors`.
 
 ## Change Types and Checklists
 
@@ -54,10 +63,9 @@ This repository, the Python package, and all three agent skills follow a coordin
   - Targeted single-area updates, isolated bug fixes, typo fixes, or individual notebook adjustments.
 
 When bumping versions across the repository:
-1. Update all single-sourced version locations: `pyproject.toml`, `src/bigquery_data_science/__init__.py`, `tests/test_packaging.py`, `plugin.json`, `.claude-plugin/marketplace.json`, `CITATION.cff`, and `CHANGELOG.md`.
-2. Update `metadata.version` in `skills/{bigquery-data-science,bigquery-ml,bigquery-ai}/SKILL.md`.
-3. Run `uv run bigquery-data-science manifest --all --version X.Y.Z` to refresh all `skill.manifest.json` files and hashes.
-4. Re-lock dependencies with `UV_NO_CONFIG=1 uv lock`.
+1. Run `uv run bigquery-data-science bump-version X.Y.Z` to stamp `pyproject.toml`, `src/bigquery_data_science/__init__.py`, `CITATION.cff`, `plugin.json`, `.claude-plugin/marketplace.json`, `skills/*/SKILL.md`, `skills/*/skill.manifest.json`, and `tests/test_packaging.py` in lockstep.
+2. Add the `## [X.Y.Z] - YYYY-MM-DD` release section to `CHANGELOG.md`.
+3. Verify parity with `uv run bigquery-data-science bump-version --check` and re-lock dependencies with `UV_NO_CONFIG=1 uv lock`.
 
 #### Adding or updating a model, function, or workflow
 - [ ] Update the ground-truth notebook/SQL and `<domain>/reference/*.md` in `bigquery-ml/` or `bigquery-ai/`.

@@ -8,7 +8,13 @@ from datetime import date
 from pathlib import Path
 
 MANIFEST_FILENAME = "skill.manifest.json"
-DEFAULT_VERSION = "0.7.0"
+
+
+def _default_version() -> str:
+    """Return the package `__version__` as the fallback manifest version."""
+    import bigquery_data_science
+
+    return bigquery_data_science.__version__
 
 
 def _git_short_hash(cwd: Path) -> str | None:
@@ -34,8 +40,8 @@ def build_manifest(
     """Build a manifest dictionary for `skill_dir`.
 
     Passing `None` for `version` or `source_project` preserves the existing
-    manifest's value, falling back to `DEFAULT_VERSION` ("0.7.0") for a new
-    skill.
+    manifest's value, falling back to `bigquery_data_science.__version__` for a
+    new skill.
     """
     reference_dir = skill_dir / "reference"
     syntax_dir = skill_dir / "syntax"
@@ -71,7 +77,7 @@ def build_manifest(
     resolved_version = (
         version
         if version is not None
-        else str(existing.get("version", DEFAULT_VERSION))
+        else str(existing.get("version", _default_version()))
     )
     resolved_source_project = (
         source_project

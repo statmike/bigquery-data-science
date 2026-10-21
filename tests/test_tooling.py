@@ -6,6 +6,12 @@ import json
 import shutil
 from pathlib import Path
 
+from bigquery_data_science.cli import main
+from bigquery_data_science.tooling.bump_version import (
+    bump_version,
+    check_version_lockstep,
+    validate_semver,
+)
 from bigquery_data_science.tooling.convert_notebook import convert_notebook
 from bigquery_data_science.tooling.link_policy import check_project
 from bigquery_data_science.tooling.manifest import (
@@ -295,4 +301,62 @@ def test_manifest_generation_and_verification(tmp_path: Path) -> None:
     generated = build_manifest(tmp_skill, version="0.7.0")
     assert generated["syntax_files"] == committed["syntax_files"]
     assert generated["narrative_files"] == committed["narrative_files"]
+
+
+def test_bump_version_and_lockstep_parity_check(tmp_path: Path) -> None:
+    assert check_version_lockstep(REPO_ROOT) == []
+    assert validate_semver("0.8.1") == "0.8.1"
+    assert validate_semver("0.8.1rc1") == "0.8.1rc1"
+
+    try:
+        validate_semver("not-a-semver")
+        raise AssertionError("Expected ValueError on invalid SemVer string")
+    except ValueError as exc:
+        assert "Invalid semantic version" in str(exc)
+
+    # Copy lockstep files into an isolated tmp_path repo fixture
+    for rel_file in (
+        "pyproject.toml",
+        "CITATION.cff",
+        "plugin.json",
+        ".claude-plugin/marketplace.json",
+        "src/bigquery_data_science/__init__.py",
+        "tests/test_packaging.py",
+    ):
+        dest = tmp_path / rel_file
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(REPO_ROOT / rel_file, dest)
+
+    for skill_name in ("bigquery-data-science", "bigquery-ml", "bigquery-ai"):
+        skill_dest = tmp_path / "skills" / skill_name
+        skill_dest.mkdir(parents=True, exist_ok=True)
+        for fname in ("SKILL.md", "skill.manifest.json"):
+            shutil.copy2(
+                REPO_ROOT / "skills" / skill_name / fname,
+                skill_dest / fname,
+            )
+
+    assert check_version_lockstep(tmp_path) == []
+
+    updated = bump_version(tmp_path, "1.2.3", release_date="2026-10-21")
+    assert len(updated) == 12
+    assert check_version_lockstep(tmp_path, expected_version="1.2.3") == []
+    assert (
+        'date-released: "2026-10-21"'
+        in (tmp_path / "CITATION.cff").read_text(encoding="utf-8")
+    )
+
+    # Introduce drift in plugin.json and verify CLI --check fails
+    (tmp_path / "plugin.json").write_text(
+        json.dumps({"name": "bigquery-data-science", "version": "0.0.1"}),
+        encoding="utf-8",
+    )
+    drift_errors = check_version_lockstep(tmp_path)
+    assert any("plugin.json" in err for err in drift_errors)
+    assert main(["bump-version", "--check", "--repo-root", str(tmp_path)]) == 1
+
+    # Re-stamp via CLI and verify --check passes
+    assert main(["bump-version", "1.2.4", "--repo-root", str(tmp_path)]) == 0
+    assert main(["bump-version", "--check", "--repo-root", str(tmp_path)]) == 0
+
 

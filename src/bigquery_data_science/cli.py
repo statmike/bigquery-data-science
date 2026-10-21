@@ -23,6 +23,10 @@ from bigquery_data_science.installer import (
     list_bundled_skills,
 )
 from bigquery_data_science.mcp_server import serve_stdio
+from bigquery_data_science.tooling.bump_version import (
+    bump_version,
+    check_version_lockstep,
+)
 from bigquery_data_science.tooling.convert_notebook import (
     convert_notebook,
     convert_notebook_to_file,
@@ -336,6 +340,48 @@ def _cmd_manifest(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_bump_version(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    if args.check:
+        try:
+            errors = check_version_lockstep(
+                repo_root=repo_root,
+                expected_version=args.version,
+            )
+        except ValueError as exc:
+            print(f"ERROR: {exc}", file=sys.stderr)
+            return 1
+        if errors:
+            for err in errors:
+                print(f"FAIL: {err}", file=sys.stderr)
+            return 1
+        print("OK: all version locations in lockstep")
+        return 0
+
+    if not args.version:
+        print(
+            "ERROR: version argument is required unless --check is passed.",
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        updated = bump_version(
+            repo_root=repo_root,
+            new_version=str(args.version),
+            release_date=args.date,
+        )
+    except ValueError as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    for path in updated:
+        rel = path.relative_to(repo_root) if path.is_relative_to(repo_root) else path
+        print(f"Updated {rel}")
+    print(f"OK: stamped version {args.version} across {len(updated)} file(s)")
+    return 0
+
+
 def _cmd_sweep(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
     skills_root_arg = str(
@@ -352,13 +398,15 @@ def _cmd_sweep(args: argparse.Namespace) -> int:
         if not vres.ok:
             failed = True
 
-    print("2. Checking skill manifests...")
+    print("2. Checking skill manifests and lockstep version parity...")
     manifest_errors = check_all_manifests(skills_root)
+    if (repo_root / "pyproject.toml").is_file():
+        manifest_errors.extend(check_version_lockstep(repo_root))
     for err in manifest_errors:
         print(f"  ERR: {err}", file=sys.stderr)
         failed = True
     if not manifest_errors:
-        print("  [OK] all skill.manifest.json files in sync")
+        print("  [OK] all skill.manifest.json and version lockstep files in sync")
 
     print("3. Checking Lens 3 syntax card synchronization...")
     syn_errors = check_syntax_sync(skills_root=skills_root, repo_root=repo_root)
@@ -744,6 +792,33 @@ def build_parser() -> argparse.ArgumentParser:
         help="Verify manifests without writing.",
     )
     p_mf.set_defaults(func=_cmd_manifest)
+
+    p_bump = sub.add_parser(
+        "bump-version",
+        help="Stamp or verify lockstep Semantic Version across package, plugin, and skill files.",
+    )
+    p_bump.add_argument(
+        "version",
+        nargs="?",
+        default=None,
+        help="Target Semantic Version string (e.g. '0.8.1'). Optional when --check is passed.",
+    )
+    p_bump.add_argument(
+        "--check",
+        action="store_true",
+        help="Verify lockstep version parity across all files without writing.",
+    )
+    p_bump.add_argument(
+        "--date",
+        default=None,
+        help="Release date string (YYYY-MM-DD) for CITATION.cff (defaults to today).",
+    )
+    p_bump.add_argument(
+        "--repo-root",
+        default=".",
+        help="Repository root directory (default: .).",
+    )
+    p_bump.set_defaults(func=_cmd_bump_version)
 
     p_sweep = sub.add_parser(
         "sweep",

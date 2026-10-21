@@ -631,7 +631,7 @@ Four `ML.*` functions that call a pre-trained Google API through a remote model.
 
 **Purpose.** Close this round of building so the next one, scheduled **2026-10-15**, only has to cover what shipped in between. Everything below came out of one sweep on 2026-09-15: the 13 reference pages re-read against what we publish, plus a live probe set. It is split into what the sweep *settles*, what it *adds*, and the one build it *triggers*.
 
-**Nothing here is inferred from a release note.** Every capability claim in this phase was run against `statmike-mlops-349915.bq_ai_functions` on 2026-09-15 with `--nouse_cache`, on a `tmpprobe_objref` object table over 205 public cymbal-pets PNGs and on one private-bucket PDF. The probe table was dropped the same day.
+**Nothing here is inferred from a release note.** Every capability claim in this phase was run against `your-gcp-project-id.bq_ai_functions` on 2026-09-15 with `--nouse_cache`, on a `tmpprobe_objref` object table over 205 public cymbal-pets PNGs and on one private-bucket PDF. The probe table was dropped the same day.
 
 #### 12a. The headline: the reference pages now document bare `ObjectRef` input
 

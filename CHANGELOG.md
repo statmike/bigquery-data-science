@@ -5,6 +5,22 @@ All notable changes to `bigquery-data-science` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.1] - 2026-10-21
+
+### Added
+- **Lockstep Version Stamper (`bigquery-data-science bump-version`):**
+  - Added `src/bigquery_data_science/tooling/bump_version.py` and the `bigquery-data-science bump-version [<version>] [--check]` CLI command to stamp or verify Semantic Version parity across `pyproject.toml`, `src/bigquery_data_science/__init__.py`, `CITATION.cff`, `plugin.json`, `.claude-plugin/marketplace.json`, `skills/*/SKILL.md`, `skills/*/skill.manifest.json`, and `tests/test_packaging.py` in a single step.
+  - Integrated `check_version_lockstep` into `bigquery-data-science sweep`.
+- **Authoring, Readability & Visual Standards (`CONTRIBUTING.md` & `skills/PLANS.md`):**
+  - Codified the 100% additive/backward-compatible contract, simple Python/SQL and plain-English guidelines, vertical-first `flowchart TD` Mermaid diagram layout rules ($\le 3$ columns wide), and clean Markdown/table compilation standards.
+
+### Changed
+- **GitHub Actions Runner & Node 24 Modernization (`.github/workflows/ci.yml` & `release.yml`):**
+  - Pinned `runs-on: ubuntu-24.04` and enabled `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"` across CI and Release workflows.
+- **Pre-Commit Hook & Version Fallback Hygiene:**
+  - Updated `.pre-commit-config.yaml` to use generic internal-domain regex detection.
+  - Replaced hardcoded `"0.7.0"` fallback strings in `src/bigquery_data_science/installer.py` and `src/bigquery_data_science/tooling/manifest.py` with `bigquery_data_science.__version__`.
+
 ## [0.8.0] - 2026-10-20
 
 ### Added

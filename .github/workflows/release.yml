@@ -8,10 +8,13 @@ on:
 permissions:
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     name: Build sdist & wheel + smoke test
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
@@ -63,7 +66,7 @@ jobs:
     name: Publish to TestPyPI (pre-release tags only)
     needs: build
     if: contains(github.ref_name, 'rc')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: testpypi
       url: https://test.pypi.org/p/bigquery-data-science
@@ -82,7 +85,7 @@ jobs:
     name: Publish to PyPI (stable tags)
     needs: build
     if: "!contains(github.ref_name, 'rc')"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: pypi
       url: https://pypi.org/p/bigquery-data-science
@@ -99,7 +102,7 @@ jobs:
     name: Create GitHub Release
     needs: publish-pypi
     if: "!contains(github.ref_name, 'rc')"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: write
     steps:

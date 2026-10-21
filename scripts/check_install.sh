@@ -68,11 +68,13 @@ BIN="$WORK/venv/bin"
 
 [[ -x "$BIN/bigquery-data-science" ]] || fail "bigquery-data-science console script missing in venv"
 
-echo "4. Verifying CLI commands (list, install, lookup, triage)..."
+echo "4. Verifying CLI commands (list, install, lookup, triage, bump-version --check)..."
 LIST_OUT="$("$BIN/bigquery-data-science" list)" || fail "bigquery-data-science list failed"
 grep -q "bigquery-data-science" <<<"$LIST_OUT" || fail "list missing bigquery-data-science"
 grep -q "bigquery-ml" <<<"$LIST_OUT" || fail "list missing bigquery-ml"
 grep -q "bigquery-ai" <<<"$LIST_OUT" || fail "list missing bigquery-ai"
+
+"$BIN/bigquery-data-science" bump-version --check --repo-root "$REPO_ROOT" >/dev/null || fail "bump-version --check failed"
 
 TARGET_DIR="$WORK/installed-skills"
 "$BIN/bigquery-data-science" install --target "$TARGET_DIR" >/dev/null || fail "install failed"
