@@ -31,22 +31,30 @@ from bigquery_data_science.tooling.convert_notebook import (
     convert_notebook,
     convert_notebook_to_file,
 )
+from bigquery_data_science.tooling.crossrefs import check_crossrefs
 from bigquery_data_science.tooling.link_policy import check_project
 from bigquery_data_science.tooling.manifest import (
     check_all_manifests,
     source_projects,
     write_manifest,
 )
+from bigquery_data_science.tooling.markdown_check import check_markdown_files
 from bigquery_data_science.tooling.narrative_drift import (
     check_all_narratives,
     sync_all_narratives,
 )
+from bigquery_data_science.tooling.notebook_claims import check_notebook_claims
 from bigquery_data_science.tooling.pinned_models import (
     check_pinned_models,
     find_allow_file,
     load_allow_list,
 )
 from bigquery_data_science.tooling.reference_structure import check_reference
+from bigquery_data_science.tooling.run_notebook import (
+    DEFAULT_CELL_TIMEOUT_SECONDS,
+    execute_notebook,
+)
+from bigquery_data_science.tooling.status_labels import check_status_labels
 from bigquery_data_science.tooling.sync_syntax import (
     check_syntax_sync,
     sync_all_syntax,
@@ -382,6 +390,85 @@ def _cmd_bump_version(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_check_status_labels(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    skills_root = Path(args.skills_root).resolve()
+    errors = check_status_labels(repo_root=repo_root, skills_root=skills_root)
+    if errors:
+        for err in errors:
+            print(f"FAIL: {err}", file=sys.stderr)
+        return 1
+    print("OK: all Preview/GA status labels in sync")
+    return 0
+
+
+def _cmd_check_crossrefs(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    errors = check_crossrefs(repo_root=repo_root)
+    if errors:
+        for err in errors:
+            print(f"FAIL: {err}", file=sys.stderr)
+        return 1
+    print("OK: all workflow <-> function/model cross-references in sync")
+    return 0
+
+
+def _cmd_run_notebook(args: argparse.Namespace) -> int:
+    nb_path = Path(args.notebook).resolve()
+    repo_root = Path(args.repo_root).resolve()
+    skills_root = Path(args.skills_root).resolve()
+    try:
+        res = execute_notebook(
+            notebook_path=nb_path,
+            kernel_name=str(args.kernel),
+            timeout_seconds=int(args.timeout),
+            allow_errors=bool(args.allow_errors),
+            sync_narratives=bool(args.sync_narratives),
+            repo_root=repo_root,
+            skills_root=skills_root,
+        )
+    except Exception as exc:
+        print(f"ERROR: {exc}", file=sys.stderr)
+        return 1
+
+    status = "OK" if res.ok else "FAIL"
+    print(
+        f"[{status}] {res.notebook_path.name} "
+        f"({res.executed_cells} code cells executed)"
+    )
+    for cell_idx, ename, evalue in res.error_cells:
+        print(
+            f"  ERR (cell {cell_idx}): {ename}: {evalue}",
+            file=sys.stderr,
+        )
+    if res.synced_narratives:
+        print(f"  Synced {res.synced_narratives} narrative file(s)")
+    return 0 if (res.ok or args.allow_errors) else 1
+
+
+def _cmd_check_notebook_claims(args: argparse.Namespace) -> int:
+    target = Path(args.target).resolve()
+    repo_root = Path(args.repo_root).resolve()
+    errors = check_notebook_claims(target=target, repo_root=repo_root)
+    if errors:
+        for err in errors:
+            print(f"FAIL: {err}", file=sys.stderr)
+        return 1
+    print("OK: all high-precision notebook prose claims verified against outputs")
+    return 0
+
+
+def _cmd_check_markdown(args: argparse.Namespace) -> int:
+    repo_root = Path(args.repo_root).resolve()
+    errors = check_markdown_files(repo_root=repo_root)
+    if errors:
+        for err in errors:
+            print(f"FAIL: {err}", file=sys.stderr)
+        return 1
+    print("OK: all Markdown fences, GFM tables, and vertical Mermaid diagrams valid")
+    return 0
+
+
 def _cmd_sweep(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
     skills_root_arg = str(
@@ -481,6 +568,38 @@ def _cmd_sweep(args: argparse.Namespace) -> int:
             failed = True
         else:
             print("  [OK] sync_headers.py --check passed")
+
+    if len(project_paths) == 2:
+        print(
+            "7. Checking status labels, cross-references, numeric claims, and Markdown/Mermaid..."
+        )
+        status_errors = check_status_labels(repo_root=repo_root, skills_root=skills_root)
+        for err in status_errors:
+            print(f"  ERR (status-labels): {err}", file=sys.stderr)
+            failed = True
+        if not status_errors:
+            print("  [OK] Preview vs GA status labels consistent")
+
+        xref_errors = check_crossrefs(repo_root=repo_root)
+        for err in xref_errors:
+            print(f"  ERR (crossrefs): {err}", file=sys.stderr)
+            failed = True
+        if not xref_errors:
+            print("  [OK] bidirectional notebook cross-references verified")
+
+        claim_errors = check_notebook_claims(target=repo_root, repo_root=repo_root)
+        for err in claim_errors:
+            print(f"  ERR (notebook-claims): {err}", file=sys.stderr)
+            failed = True
+        if not claim_errors:
+            print("  [OK] high-precision notebook prose claims verified")
+
+        md_errors = check_markdown_files(repo_root=repo_root)
+        for err in md_errors:
+            print(f"  ERR (markdown): {err}", file=sys.stderr)
+            failed = True
+        if not md_errors:
+            print("  [OK] Markdown fences, GFM tables, and vertical Mermaid diagrams valid")
 
     return 1 if failed else 0
 
@@ -819,6 +938,103 @@ def build_parser() -> argparse.ArgumentParser:
         help="Repository root directory (default: .).",
     )
     p_bump.set_defaults(func=_cmd_bump_version)
+
+    p_stat = sub.add_parser(
+        "check-status-labels",
+        help=(
+            "Verify Preview vs GA status label consistency across READMEs, "
+            "references, and skills."
+        ),
+    )
+    p_stat.add_argument(
+        "skills_root",
+        nargs="?",
+        default="skills",
+        help="Skills root directory (default: skills).",
+    )
+    p_stat.add_argument(
+        "--repo-root",
+        default=".",
+        help="Repository root directory (default: .).",
+    )
+    p_stat.set_defaults(func=_cmd_check_status_labels)
+
+    p_xref = sub.add_parser(
+        "check-crossrefs",
+        help="Verify bidirectional Functions/Models used <-> Featured in notebook links.",
+    )
+    p_xref.add_argument(
+        "--repo-root",
+        default=".",
+        help="Repository root directory (default: .).",
+    )
+    p_xref.set_defaults(func=_cmd_check_crossrefs)
+
+    p_run_nb = sub.add_parser(
+        "run-notebook",
+        help="Execute a Jupyter notebook headlessly with cwd and mTLS environment configured.",
+    )
+    p_run_nb.add_argument("notebook", help="Path to the .ipynb file to execute.")
+    p_run_nb.add_argument(
+        "--kernel",
+        default=DEFAULT_KERNEL_NAME,
+        help=f"Jupyter kernel name (default: {DEFAULT_KERNEL_NAME}).",
+    )
+    p_run_nb.add_argument(
+        "--timeout",
+        type=int,
+        default=DEFAULT_CELL_TIMEOUT_SECONDS,
+        help=f"Per-cell timeout in seconds (default: {DEFAULT_CELL_TIMEOUT_SECONDS}).",
+    )
+    p_run_nb.add_argument(
+        "--allow-errors",
+        action="store_true",
+        help="Continue executing remaining cells when a cell raises an error.",
+    )
+    p_run_nb.add_argument(
+        "--sync-narratives",
+        action="store_true",
+        help="Regenerate skills/*/narrative/*.md after successful execution.",
+    )
+    p_run_nb.add_argument(
+        "--repo-root",
+        default=".",
+        help="Repository root directory (default: .).",
+    )
+    p_run_nb.add_argument(
+        "--skills-root",
+        default="skills",
+        help="Skills root directory (default: skills).",
+    )
+    p_run_nb.set_defaults(func=_cmd_run_notebook)
+
+    p_claims = sub.add_parser(
+        "check-notebook-claims",
+        help="Audit high-precision decimal claims in notebook prose against cell outputs.",
+    )
+    p_claims.add_argument(
+        "target",
+        nargs="?",
+        default=".",
+        help="Notebook path or directory root to audit (default: .).",
+    )
+    p_claims.add_argument(
+        "--repo-root",
+        default=".",
+        help="Repository root directory (default: .).",
+    )
+    p_claims.set_defaults(func=_cmd_check_notebook_claims)
+
+    p_md = sub.add_parser(
+        "check-markdown",
+        help="Verify code fences, GFM table compilation, and vertical-first Mermaid layout.",
+    )
+    p_md.add_argument(
+        "--repo-root",
+        default=".",
+        help="Repository root directory (default: .).",
+    )
+    p_md.set_defaults(func=_cmd_check_markdown)
 
     p_sweep = sub.add_parser(
         "sweep",

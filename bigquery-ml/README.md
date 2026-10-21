@@ -166,11 +166,18 @@ flowchart TD
     DATA["DATA (BigQuery Table or Query)"] --> PREP["Model-Free ML.* Preprocessing & Point-in-Time Features<br/>ML.STANDARD_SCALER · ML.BUCKETIZE · ML.ONE_HOT_ENCODER<br/>ML.IMPUTER · ML.FEATURE_CROSS · ML.ENTITY_FEATURES_AT_TIME<br/>(Standalone in SELECT/FROM, or embedded inside TRANSFORM)"]
     PREP --> MODEL["CREATE MODEL<br/>Trains & stores a model in your dataset (+ optional TRANSFORM & NUM_TRIALS)<br/>LOGISTIC_REG · LINEAR_REG · BOOSTED_TREE_* · RANDOM_FOREST_*<br/>DNN_* · WIDE_AND_DEEP_* · AUTOML_* · ARIMA_PLUS · ARIMA_PLUS_XREG<br/>KMEANS · PCA · AUTOENCODER · MATRIX_FACTORIZATION · CONTRIBUTION_ANALYSIS"]
 
-    MODEL --> EVAL["Evaluation<br/>ML.EVALUATE · ML.METRICS<br/>ML.CONFUSION_MATRIX<br/>ML.ROC_CURVE · ML.ARIMA_EVALUATE"]
-    MODEL --> INFER["Inference & Scoring<br/>ML.PREDICT · ML.FORECAST<br/>ML.RECOMMEND · ML.DETECT_ANOMALIES<br/>ML.GET_INSIGHTS · ML.TRANSFORM"]
-    MODEL --> LOCAL_EXP["Local Explainability<br/>ML.EXPLAIN_PREDICT<br/>ML.EXPLAIN_FORECAST<br/>(Per-row feature attributions)"]
-    MODEL --> GLOBAL_EXP["Global Explainability & Weights<br/>ML.GLOBAL_EXPLAIN · ML.FEATURE_IMPORTANCE<br/>ML.WEIGHTS · ML.ADVANCED_WEIGHTS<br/>ML.CENTROIDS · ML.PRINCIPAL_COMPONENTS"]
-    MODEL --> META["Training & Tuning Metadata<br/>ML.TRAINING_INFO · ML.FEATURE_INFO<br/>ML.TRIAL_INFO · ML.HOLIDAY_INFO"]
+    subgraph SCORE["Evaluate & Score (Model Lifecycle)"]
+        direction LR
+        EVAL["Evaluation<br/>ML.EVALUATE · ML.METRICS<br/>ML.CONFUSION_MATRIX<br/>ML.ROC_CURVE · ML.ARIMA_EVALUATE"]
+        INFER["Inference & Scoring<br/>ML.PREDICT · ML.FORECAST<br/>ML.RECOMMEND · ML.DETECT_ANOMALIES<br/>ML.GET_INSIGHTS · ML.TRANSFORM"]
+    end
+
+    subgraph EXPLAIN["Explainability, Weights & Training Metadata"]
+        direction LR
+        LOCAL_EXP["Local Explainability<br/>ML.EXPLAIN_PREDICT<br/>ML.EXPLAIN_FORECAST<br/>(Per-row feature attributions)"]
+        GLOBAL_EXP["Global Explainability & Weights<br/>ML.GLOBAL_EXPLAIN · ML.FEATURE_IMPORTANCE<br/>ML.WEIGHTS · ML.ADVANCED_WEIGHTS<br/>ML.CENTROIDS · ML.PRINCIPAL_COMPONENTS"]
+        META["Training & Tuning Metadata<br/>ML.TRAINING_INFO · ML.FEATURE_INFO<br/>ML.TRIAL_INFO · ML.HOLIDAY_INFO"]
+    end
 
     subgraph MGMT["Model Portability, Remote Serving & Monitoring"]
         direction LR
@@ -183,12 +190,7 @@ flowchart TD
         PIPE["Scheduled Retrain, Drift Gate & Scoring<br/>SQL Scripting · Scheduled Queries · Dataform · dbt<br/>Cloud Workflows · Managed Airflow (Composer Gen 3) · Vertex AI Pipelines (KFP)"]
     end
 
-    EVAL --> MGMT
-    INFER --> MGMT
-    LOCAL_EXP --> MGMT
-    GLOBAL_EXP --> MGMT
-    META --> MGMT
-    MGMT --> OPS
+    MODEL --> SCORE --> EXPLAIN --> MGMT --> OPS
 
     classDef data fill:#E8F0FE,stroke:#4285F4,stroke-width:2px,color:#174EA6
     classDef config fill:#FEF7E0,stroke:#F9AB00,stroke-width:2px,color:#7A5A00

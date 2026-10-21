@@ -5,6 +5,25 @@ All notable changes to `bigquery-data-science` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.2] - 2026-10-21
+
+### Added
+- **Maintainer Verification & Execution Gates (`P2.1`–`P2.5`):**
+  - `bigquery-data-science check-status-labels`: Verifies `Preview` vs `GA` status label consistency across `bigquery-ai/README.md`, `bigquery-ml/README.md`, `<domain>/reference/*.md`, and `skills/bigquery-data-science/reference/namespace-matrix.md`.
+  - `bigquery-data-science check-crossrefs`: Verifies bidirectional link symmetry between workflow notebooks (`**Functions/Models used:**`) and function/model notebooks (`**Featured in:**`).
+  - `bigquery-data-science run-notebook`: Headless Jupyter notebook runner wrapping `jupyter_client` and `nbformat` with automatic working-directory resolution, mTLS certificate configuration, `bigquery-data-science` kernelspec stamping, and optional `--sync-narratives`.
+  - `bigquery-data-science check-notebook-claims`: Audits high-precision decimal claims in notebook markdown prose against code cells and rendered cell outputs.
+  - `bigquery-data-science check-markdown`: Verifies balanced code fences, GFM table column consistency (including zero unescaped `|` pipes inside inline code in table cells), and vertical-first `flowchart TD` Mermaid diagram layout ($\le 3$ parallel horizontal nodes per rank).
+  - Integrated `check-status-labels`, `check-crossrefs`, `check-notebook-claims`, and `check-markdown` into `bigquery-data-science sweep` (Stage 7).
+
+### Changed
+- **Vertical-First Mermaid Diagram Refactor (`README.md` & `bigquery-ml/README.md`):**
+  - Refactored `README.md` architecture diagram from `flowchart LR` to vertical `flowchart TD` and updated `pyproject.toml` `hatch-fancy-pypi-readme` pattern.
+  - Refactored `bigquery-ml/README.md` lifecycle diagram to stack `SCORE` (`Evaluate & Score`) and `EXPLAIN` (`Explainability, Weights & Training Metadata`) vertically (`<= 3` nodes wide per rank) for maximum font legibility on GitHub.
+- **Status Label & Table Alignment (`namespace-matrix.md`, `managed-functions.md`, `preprocessing-functions.md`):**
+  - Synchronized `AI.AGG`, `AI.IF`, `AI.SCORE`, `AI.CLASSIFY`, `AI.EMBED`, `AI.SIMILARITY`, `AI.SEARCH`, and `ML.DECODE_IMAGE` family status labels in `skills/bigquery-data-science/reference/namespace-matrix.md`.
+  - Replaced unescaped `||vector||_p` pipe syntax inside the `ML.NORMALIZER` GFM table row in `skills/bigquery-ml/reference/preprocessing-functions.md` with `ML.LP_NORM(vector, p)`.
+
 ## [0.8.1] - 2026-10-21
 
 ### Added

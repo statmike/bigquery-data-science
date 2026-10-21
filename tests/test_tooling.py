@@ -13,6 +13,7 @@ from bigquery_data_science.tooling.bump_version import (
     validate_semver,
 )
 from bigquery_data_science.tooling.convert_notebook import convert_notebook
+from bigquery_data_science.tooling.crossrefs import check_crossrefs
 from bigquery_data_science.tooling.link_policy import check_project
 from bigquery_data_science.tooling.manifest import (
     build_manifest,
@@ -25,10 +26,15 @@ from bigquery_data_science.tooling.markdown_anchors import (
     headings,
     slugify,
 )
+from bigquery_data_science.tooling.markdown_check import (
+    check_markdown_files,
+    check_markdown_text,
+)
 from bigquery_data_science.tooling.narrative_drift import (
     check_all_narratives,
     check_skill_narratives,
 )
+from bigquery_data_science.tooling.notebook_claims import check_notebook_claims
 from bigquery_data_science.tooling.pinned_models import (
     check_pinned_models,
     find_allow_file,
@@ -36,6 +42,11 @@ from bigquery_data_science.tooling.pinned_models import (
     load_allow_list,
 )
 from bigquery_data_science.tooling.reference_structure import check_reference
+from bigquery_data_science.tooling.run_notebook import execute_notebook
+from bigquery_data_science.tooling.status_labels import (
+    check_status_labels,
+    normalize_status,
+)
 from bigquery_data_science.tooling.sync_syntax import (
     MAX_SYNTAX_CARD_BYTES,
     check_syntax_sync,
@@ -358,5 +369,182 @@ def test_bump_version_and_lockstep_parity_check(tmp_path: Path) -> None:
     # Re-stamp via CLI and verify --check passes
     assert main(["bump-version", "1.2.4", "--repo-root", str(tmp_path)]) == 0
     assert main(["bump-version", "--check", "--repo-root", str(tmp_path)]) == 0
+
+
+def test_status_labels_passes_on_repo_and_detects_drift(tmp_path: Path) -> None:
+    assert normalize_status("GA (GA announced 2025-05-12; Preview since 2024-09)") == "GA"
+    assert normalize_status("GA (`mode` Preview)") == "GA / Preview"
+    assert normalize_status("Preview (⚠️ offline)") == "Retired"
+    assert check_status_labels(REPO_ROOT, SKILLS_ROOT) == []
+    assert main(["check-status-labels", "--repo-root", str(REPO_ROOT)]) == 0
+
+    # Negative fixture with Preview vs GA mismatch
+    matrix_dir = tmp_path / "skills" / "bigquery-data-science" / "reference"
+    matrix_dir.mkdir(parents=True)
+    (matrix_dir / "namespace-matrix.md").write_text(
+        "| Symbol | Skill | Category | Connection | Reservation | Status | Walkthrough |\n"
+        "| --- | --- | --- | --- | --- | --- | --- |\n"
+        "| `AI.AGG` | `bigquery-ai` | Managed | None | OK | Preview | `ai_agg.md` |\n",
+        encoding="utf-8",
+    )
+    ai_dir = tmp_path / "bigquery-ai"
+    ai_dir.mkdir(parents=True)
+    (ai_dir / "README.md").write_text(
+        "| Function | Examples | Type | Status | What It Does |\n"
+        "| --- | --- | --- | --- | --- |\n"
+        "| `AI.AGG` | [nb](a) | Aggregate | GA | Aggregate |\n",
+        encoding="utf-8",
+    )
+    errs = check_status_labels(tmp_path)
+    assert any("AI.AGG" in err for err in errs)
+    assert (
+        main(
+            [
+                "check-status-labels",
+                str(tmp_path / "skills"),
+                "--repo-root",
+                str(tmp_path),
+            ]
+        )
+        == 1
+    )
+
+
+def test_crossrefs_passes_on_repo_and_detects_missing_backlink(tmp_path: Path) -> None:
+    assert check_crossrefs(REPO_ROOT) == []
+    assert main(["check-crossrefs", "--repo-root", str(REPO_ROOT)]) == 0
+
+    wf_dir = tmp_path / "bigquery-ai" / "workflows" / "demo_wf"
+    fn_dir = tmp_path / "bigquery-ai" / "functions" / "ai_generate"
+    wf_dir.mkdir(parents=True)
+    fn_dir.mkdir(parents=True)
+    (wf_dir / "demo_wf.ipynb").write_text(
+        json.dumps(
+            {
+                "cells": [
+                    {
+                        "cell_type": "markdown",
+                        "source": [
+                            "**Functions used:** "
+                            "[`AI.GENERATE`](../../functions/ai_generate/ai_generate.ipynb)\n"
+                        ],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (fn_dir / "ai_generate.ipynb").write_text(
+        json.dumps(
+            {
+                "cells": [
+                    {
+                        "cell_type": "markdown",
+                        "source": ["# `AI.GENERATE`\n"],
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    errs = check_crossrefs(tmp_path)
+    assert any("missing back-link" in err for err in errs)
+    assert main(["check-crossrefs", "--repo-root", str(tmp_path)]) == 1
+
+
+def test_notebook_claims_passes_on_repo_and_detects_unbacked_float(
+    tmp_path: Path,
+) -> None:
+    assert check_notebook_claims(REPO_ROOT, REPO_ROOT) == []
+    assert main(["check-notebook-claims", str(REPO_ROOT), "--repo-root", str(REPO_ROOT)]) == 0
+
+    bad_nb = tmp_path / "unbacked.ipynb"
+    bad_nb.write_text(
+        json.dumps(
+            {
+                "cells": [
+                    {
+                        "cell_type": "markdown",
+                        "source": ["Measured accuracy was 0.9182736 on the test set.\n"],
+                    },
+                    {
+                        "cell_type": "code",
+                        "source": ["print(0.5000000)\n"],
+                        "outputs": [{"output_type": "stream", "text": ["0.5000000\n"]}],
+                    },
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    errs = check_notebook_claims(bad_nb, tmp_path)
+    assert any("0.9182736" in err for err in errs)
+    assert main(["check-notebook-claims", str(bad_nb), "--repo-root", str(tmp_path)]) == 1
+
+
+def test_markdown_check_passes_on_repo_and_rejects_bad_table_fence_and_mermaid(
+    tmp_path: Path,
+) -> None:
+    assert check_markdown_files(REPO_ROOT) == []
+    assert main(["check-markdown", "--repo-root", str(REPO_ROOT)]) == 0
+
+    bad_md = (
+        "# Sample\n\n"
+        "| Col A | Col B |\n"
+        "| --- | --- |\n"
+        "| `a | b` | extra | third |\n\n"
+        "```mermaid\n"
+        "flowchart LR\n"
+        "    A[Unquoted (Label)] --> B1\n"
+        "    A --> B2\n"
+        "    A --> B3\n"
+        "    A --> B4\n"
+        "    subgraph S1\n"
+        "```\n\n"
+        "```python\n"
+        "x = 1\n"
+    )
+    issues = check_markdown_text(bad_md, "bad.md")
+    assert any("unescaped '|'" in iss for iss in issues)
+    assert any("GFM table row has 3 columns, expected 2" in iss for iss in issues)
+    assert any("flowchart LR" in iss for iss in issues)
+    assert any("unquoted parentheses" in iss for iss in issues)
+    assert any("exceeding max horizontal width" in iss for iss in issues)
+    assert any("unbalanced 'subgraph ... end'" in iss for iss in issues)
+    assert any("unclosed code fence" in iss for iss in issues)
+
+    (tmp_path / "bad.md").write_text(bad_md, encoding="utf-8")
+    assert main(["check-markdown", "--repo-root", str(tmp_path)]) == 1
+
+
+def test_run_notebook_executes_headlessly_and_catches_errors(
+    tmp_path: Path,
+) -> None:
+    import nbformat
+
+    nb_mod = nbformat
+    nb = nb_mod.v4.new_notebook()
+    nb.cells = [
+        nb_mod.v4.new_markdown_cell("# Test Notebook"),
+        nb_mod.v4.new_code_cell("import os\nprint('cwd:', os.getcwd())\n2 + 2"),
+    ]
+    nb_path = tmp_path / "sample.ipynb"
+    nb_mod.write(nb, nb_path)
+
+    res = execute_notebook(nb_path, kernel_name="python3", timeout_seconds=60)
+    assert res.ok and res.executed_cells == 1
+    assert main(["run-notebook", str(nb_path), "--kernel", "python3"]) == 0
+
+    executed = nb_mod.read(nb_path, as_version=4)
+    assert executed.metadata["kernelspec"]["name"] == "bigquery-data-science"
+    assert executed.cells[1].outputs
+
+    # Error notebook test
+    err_nb = nb_mod.v4.new_notebook()
+    err_nb.cells = [nb_mod.v4.new_code_cell("raise RuntimeError('boom')")]
+    err_path = tmp_path / "failing.ipynb"
+    nb_mod.write(err_nb, err_path)
+    assert main(["run-notebook", str(err_path), "--kernel", "python3"]) == 1
+
 
 

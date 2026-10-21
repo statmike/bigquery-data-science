@@ -43,7 +43,7 @@ Both require the feature table to have a `STRING` column named `entity_id` and a
 | `ML.MIN_MAX_SCALER` | `(x - MIN) / (MAX - MIN)` → `[0,1]` | Need a bounded range; sensitive to outliers (a single extreme value compresses everything else). |
 | `ML.MAX_ABS_SCALER` | `x / MAX(ABS(x))` → `[-1,1]` | Sparse/sign-bearing data where you must not shift/center (no subtraction of a mean/median). |
 | `ML.ROBUST_SCALER` | `(x - median) / (q_hi - q_lo)`, default IQR `[25,75]` | Data with outliers — median/IQR aren't dragged around by extreme values the way mean/stddev or min/max are. |
-| `ML.NORMALIZER` | Row-wise: `x_i / ||vector||_p` | Not a column scaler at all — normalizes each row's `ARRAY` to unit p-norm (e.g., embedding-like vectors). Scalar, no `OVER()`. |
+| `ML.NORMALIZER` | Row-wise: `x_i / ML.LP_NORM(vector, p)` | Not a column scaler at all — normalizes each row's `ARRAY` to unit p-norm (e.g., embedding-like vectors). Scalar, no `OVER()`. |
 
 The first four are **analytic** (mandatory empty `OVER()`); `ML.NORMALIZER` is **scalar** (no `OVER()`, operates within one row's array).
 
