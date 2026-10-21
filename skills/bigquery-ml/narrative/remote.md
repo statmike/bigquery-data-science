@@ -47,11 +47,22 @@ Set your project and location, authenticate, and create a shared dataset for the
 > Unlike every other notebook in this project, a remote model genuinely **needs a BigQuery Cloud Resource Connection** — Step 6 creates one and grants it `roles/aiplatform.user`. This is a real IAM change on your project (narrowly scoped to one new service account) — review Step 6 before running it.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 REGION = 'us-central1'  # Vertex AI region for the Endpoint
 DATASET_ID = 'bq_ml'  # Shared dataset across all bigquery-ml notebooks
-BUCKET = 'statmike-mlops-349915'  # <-- Replace with your GCS bucket (same location as DATASET_ID)
+BUCKET = PROJECT_ID  # <-- Replace with your GCS bucket (same location as DATASET_ID)
 CONNECTION_ID = 'bq_ml_remote_demo'  # Cloud Resource Connection created in Step 6
 ```
 
@@ -394,7 +405,7 @@ The same operations using IPython magic commands — write SQL directly in cells
 
 SELECT predicted_income_bracket, income_bracket_probs
 FROM ML.PREDICT(
-  MODEL `statmike-mlops-349915.bq_ml.remote_logistic_regression`,
+  MODEL `bq_ml.remote_logistic_regression`,
   (SELECT age, workclass, education, education_num, marital_status,
           occupation, relationship, race, sex, hours_per_week, native_country
    FROM `bigquery-public-data.ml_datasets.census_adult_income`

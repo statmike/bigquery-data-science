@@ -31,7 +31,18 @@ They belong together because the second one is only trustworthy after the first.
 Set your project and location, authenticate, and create a shared dataset. No connection needed — both functions run entirely inside BigQuery.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 DATASET_ID = 'bq_ml'  # Shared dataset across all bigquery-ml notebooks
 ```
@@ -750,7 +761,7 @@ SELECT
   ROUND(correlation, 4) AS correlation,
   segment_size
 FROM ML.CORRELATION(
-  TABLE `statmike-mlops-349915.bq_ml.exploration_census`,
+  TABLE `bq_ml.exploration_census`,
   target_col => 'education_num',
   target_correlation_cols => ['age', 'hours_per_week', 'capital_gain', 'capital_loss'])
 ORDER BY ABS(correlation) DESC

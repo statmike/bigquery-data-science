@@ -1,6 +1,6 @@
 {
   "name": "bigquery-data-science",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "description": "BigQuery Data Science Agent Skills: umbrella router (bigquery-data-science) plus 4-Lens domain skills for BigQuery ML (bigquery-ml) and BigQuery AI (bigquery-ai).",
   "owner": {
     "name": "Mike Henderson",
@@ -9,14 +9,14 @@
   "repository": "https://github.com/statmike/bigquery-data-science",
   "license": "Apache-2.0",
   "metadata": {
-    "version": "0.9.0",
+    "version": "0.9.1",
     "description": "4-Lens progressive-disclosure skills distilled from 104 live-executed BigQuery ML and BigQuery AI notebooks."
   },
   "plugins": [
     {
       "name": "bigquery-data-science",
       "description": "Umbrella router and ML.* vs AI.* namespace decoder with 10 head-to-head empirical comparisons, prerequisite matrix, and cross-namespace composition guide.",
-      "version": "0.9.0",
+      "version": "0.9.1",
       "author": {
         "name": "Mike Henderson",
         "url": "https://github.com/statmike"
@@ -31,7 +31,7 @@
     {
       "name": "bigquery-ml",
       "description": "Train, evaluate, explain, export, and orchestrate BigQuery ML models (CREATE MODEL) and model-free ML.* functions, causal inference workflows, and MLOps pipelines.",
-      "version": "0.9.0",
+      "version": "0.9.1",
       "author": {
         "name": "Mike Henderson",
         "url": "https://github.com/statmike"
@@ -42,7 +42,7 @@
     {
       "name": "bigquery-ai",
       "description": "Call Gemini and generative AI.*, embeddings, VECTOR_SEARCH/AI.SEARCH, zero-shot TimesFM/TabFM (AI.FORECAST, AI.PREDICT), AI.KEY_DRIVERS, and pre-trained Cloud AI services from BigQuery SQL.",
-      "version": "0.9.0",
+      "version": "0.9.1",
       "author": {
         "name": "Mike Henderson",
         "url": "https://github.com/statmike"

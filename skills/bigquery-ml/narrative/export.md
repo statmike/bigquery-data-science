@@ -29,11 +29,22 @@ Set your project and location, authenticate, and create a shared dataset for the
 > `EXPORT MODEL` needs **no BigQuery connection** — only GCS write IAM for the destination bucket. `model_registry='VERTEX_AI'` (Step 5) needs the usual Vertex AI Model Registry permissions, also not a BigQuery connection. This notebook additionally installs `tensorflow` and `xgboost` **locally** to prove each export loads and runs outside BigQuery entirely.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 REGION = 'us-central1'  # Vertex AI region for model_registry='VERTEX_AI' (Step 5)
 DATASET_ID = 'bq_ml'  # Shared dataset across all bigquery-ml notebooks
-BUCKET = 'statmike-mlops-349915'  # <-- Replace with your GCS bucket (same location as DATASET_ID) -- used to stage each export
+BUCKET = PROJECT_ID  # <-- Replace with your GCS bucket (same location as DATASET_ID) -- used to stage each export
 ```
 
 ### Environment
@@ -285,8 +296,10 @@ The same operations using IPython magic commands — write SQL directly in cells
 ```sql
 %%bigquery --project {PROJECT_ID}
 
-EXPORT MODEL `statmike-mlops-349915.bq_ml.export_logistic_regression_income`
-OPTIONS (URI = 'gs://statmike-mlops-349915/bq_ml/export/logistic_regression_magics/model')
+EXECUTE IMMEDIATE FORMAT(
+  "EXPORT MODEL `bq_ml.export_logistic_regression_income` OPTIONS (URI = 'gs://%s/bq_ml/export/logistic_regression_magics/model')",
+  @@project_id
+);
 ```
 
 ---

@@ -42,7 +42,18 @@ This function needs two resources: a **Cloud Resource connection** whose service
 > See the `setup` (Setup Reference) for connections and remote models in general, and `reference/cloud-ai-service-models.md` (Cloud AI Service Models) for this family in particular.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location — this family runs in US or EU
 DATASET_ID = 'bq_ai_functions'  # Shared dataset across all notebooks
 CONNECTION_ID = 'bq_ai_functions'  # Shared connection
@@ -627,9 +638,9 @@ SELECT
   ROUND(FLOAT64(ml_understand_text_result.document_sentiment.score), 2) AS score,
   ROUND(FLOAT64(ml_understand_text_result.document_sentiment.magnitude), 2) AS magnitude
 FROM ML.UNDERSTAND_TEXT(
-  MODEL `statmike-mlops-349915.bq_ai_functions.ml_understand_text_model`,
+  MODEL `bq_ai_functions.ml_understand_text_model`,
   (SELECT feedback_id, body AS text_content
-   FROM `statmike-mlops-349915.bq_ai_functions.ml_understand_text_feedback`),
+   FROM `bq_ai_functions.ml_understand_text_feedback`),
   STRUCT('ANALYZE_SENTIMENT' AS nlu_option)
 )
 ORDER BY feedback_id

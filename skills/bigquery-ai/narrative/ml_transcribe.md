@@ -31,7 +31,18 @@ This function needs a **Cloud Resource connection** whose service account may ca
 > See the `setup` (Setup Reference) for connections, object tables and remote models in general, and `reference/cloud-ai-service-models.md` (Cloud AI Service Models) for this family in particular.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location — this family runs in US or EU
 DATASET_ID = 'bq_ai_functions'  # Shared dataset across all notebooks
 CONNECTION_ID = 'bq_ai_functions'  # Shared connection
@@ -774,8 +785,8 @@ SELECT
   REGEXP_EXTRACT(uri, r'[^/]+$') AS audio_file,
   transcripts
 FROM ML.TRANSCRIBE(
-  MODEL `statmike-mlops-349915.bq_ai_functions.ml_transcribe_model`,
-  (SELECT * FROM `statmike-mlops-349915.bq_ai_functions.ml_transcribe_audio` WHERE uri LIKE '%time%'),
+  MODEL `bq_ai_functions.ml_transcribe_model`,
+  (SELECT * FROM `bq_ai_functions.ml_transcribe_audio` WHERE uri LIKE '%time%'),
   recognition_config => JSON '{"language_codes": ["en-US"], "model": "chirp", "auto_decoding_config": {}}')
 ```
 

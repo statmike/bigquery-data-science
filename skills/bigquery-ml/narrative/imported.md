@@ -32,10 +32,21 @@ Set your project and location, authenticate, and create a shared dataset for the
 > Imported models need **no BigQuery connection** to read the GCS model file — BigQuery uses the credentials of whoever runs `CREATE MODEL` (a connection is only required for the unrelated case of serving against an *object table* under reservation pricing). But this notebook also does real **local training** (scikit-learn, XGBoost, Keras) to produce the artifacts to import, which is why Setup installs far more than the usual `google-cloud-bigquery`.
 
 ```python
-PROJECT_ID = 'statmike-mlops-349915'  # <-- Replace with your project ID
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
 LOCATION = 'US'  # BigQuery dataset location
 DATASET_ID = 'bq_ml'  # Shared dataset across all bigquery-ml notebooks
-BUCKET = 'statmike-mlops-349915'  # <-- Replace with your GCS bucket (same location as DATASET_ID) -- used to stage each imported model's artifact
+BUCKET = PROJECT_ID  # <-- Replace with your GCS bucket (same location as DATASET_ID) -- used to stage each imported model's artifact
 ```
 
 ### Environment
@@ -389,7 +400,7 @@ The same operations using IPython magic commands — write SQL directly in cells
 %%bigquery --project {PROJECT_ID}
 
 SELECT *
-FROM ML.FEATURE_IMPORTANCE(MODEL `statmike-mlops-349915.bq_ml.imported_xgboost_penguins`)
+FROM ML.FEATURE_IMPORTANCE(MODEL `bq_ml.imported_xgboost_penguins`)
 ```
 
 ---
