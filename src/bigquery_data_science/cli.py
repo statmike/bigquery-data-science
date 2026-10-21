@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -10,6 +11,7 @@ from pathlib import Path
 from bigquery_data_science import __version__
 from bigquery_data_science.catalog import (
     lookup_symbol,
+    review_sql,
     search_catalog,
     triage_task,
 )
@@ -19,6 +21,7 @@ from bigquery_data_science.installer import (
     get_skill_path,
     get_skills_dir,
     install_kernel,
+    install_mcp_config,
     install_skills,
     list_bundled_skills,
 )
@@ -66,8 +69,11 @@ from bigquery_data_science.tooling.validate import (
 )
 
 
-def _cmd_list(_args: argparse.Namespace) -> int:
+def _cmd_list(args: argparse.Namespace) -> int:
     skills = list_bundled_skills()
+    if getattr(args, "as_json", False):
+        print(json.dumps(skills, indent=2))
+        return 0
     for info in skills:
         print(
             f"{info['name']} (v{info['version']}) — "
@@ -103,6 +109,14 @@ def _cmd_install(args: argparse.Namespace) -> int:
     mode = "symlinked" if args.symlink else "copied"
     for item in installed:
         print(f"{mode}: {item}")
+    if getattr(args, "mcp", False):
+        mcp_paths = install_mcp_config(
+            target=target,
+            dest=dest,
+            global_install=global_install,
+        )
+        for cfg_path in mcp_paths:
+            print(f"registered mcp: {cfg_path}")
     return 0
 
 
@@ -117,7 +131,10 @@ def _cmd_kernel(args: argparse.Namespace) -> int:
 
 def _cmd_lookup(args: argparse.Namespace) -> int:
     result = lookup_symbol(str(args.symbol))
-    print(result.format_text())
+    if getattr(args, "as_json", False):
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        print(result.format_text())
     return 0 if result.found else 1
 
 
@@ -128,6 +145,9 @@ def _cmd_search(args: argparse.Namespace) -> int:
         lens_filter=args.lens,
         limit=int(args.limit),
     )
+    if getattr(args, "as_json", False):
+        print(json.dumps([hit.to_dict() for hit in hits], indent=2))
+        return 0
     if not hits:
         print(f"No matches found for '{args.query}'.")
         return 0
@@ -139,8 +159,31 @@ def _cmd_search(args: argparse.Namespace) -> int:
 
 def _cmd_triage(args: argparse.Namespace) -> int:
     result = triage_task(str(args.query))
-    print(result.format_text())
+    if getattr(args, "as_json", False):
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        print(result.format_text())
     return 0
+
+
+def _cmd_review_sql(args: argparse.Namespace) -> int:
+    raw = str(args.sql).strip()
+    sql_text = raw
+    try:
+        candidate = Path(raw)
+        if candidate.is_file():
+            sql_text = candidate.read_text(encoding="utf-8")
+        elif raw.lower().endswith(".sql") and " " not in raw:
+            print(f"ERROR: SQL file not found: {raw}", file=sys.stderr)
+            return 1
+    except OSError:
+        pass
+    result = review_sql(sql_text)
+    if getattr(args, "as_json", False):
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        print(result.format_text())
+    return 0 if result.ok else 1
 
 
 def _cmd_mcp(_args: argparse.Namespace) -> int:
@@ -621,6 +664,12 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_list = sub.add_parser("list", help="List bundled skills and file counts.")
+    p_list.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="Emit structured JSON output.",
+    )
     p_list.set_defaults(func=_cmd_list)
 
     p_path = sub.add_parser("path", help="Print path to skills/ or a specific skill.")
@@ -669,6 +718,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Copy skill directories (default behavior).",
     )
+    p_install.add_argument(
+        "--mcp",
+        action="store_true",
+        help="Also register the bigquery-data-science stdio MCP server in client config.",
+    )
     p_install.set_defaults(func=_cmd_install)
 
     p_kernel = sub.add_parser(
@@ -703,6 +757,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Look up syntax card, prerequisites, gotchas, and narratives for a symbol.",
     )
     p_lookup.add_argument("symbol", help="Model type or SQL function (e.g. ARIMA_PLUS).")
+    p_lookup.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="Emit structured JSON output.",
+    )
     p_lookup.set_defaults(func=_cmd_lookup)
 
     p_search = sub.add_parser(
@@ -718,6 +778,12 @@ def build_parser() -> argparse.ArgumentParser:
         default=10,
         help="Maximum results to return (default: 10).",
     )
+    p_search.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="Emit structured JSON output.",
+    )
     p_search.set_defaults(func=_cmd_search)
 
     p_triage = sub.add_parser(
@@ -725,7 +791,26 @@ def build_parser() -> argparse.ArgumentParser:
         help="Arbitrate between BigQuery ML and BigQuery AI for a task.",
     )
     p_triage.add_argument("query", help="Task description (e.g. 'forecast daily sales').")
+    p_triage.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="Emit structured JSON output.",
+    )
     p_triage.set_defaults(func=_cmd_triage)
+
+    p_rev = sub.add_parser(
+        "review-sql",
+        help="Statically audit a BigQuery SQL query or .sql file for prerequisites and gotchas.",
+    )
+    p_rev.add_argument("sql", help="GoogleSQL query string or path to a .sql file.")
+    p_rev.add_argument(
+        "--json",
+        dest="as_json",
+        action="store_true",
+        help="Emit structured JSON output.",
+    )
+    p_rev.set_defaults(func=_cmd_review_sql)
 
     p_mcp = sub.add_parser("mcp", help="Run the zero-dependency stdio MCP server.")
     p_mcp.set_defaults(func=_cmd_mcp)

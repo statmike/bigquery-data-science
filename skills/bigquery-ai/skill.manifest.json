@@ -1,10 +1,10 @@
 {
   "name": "bigquery-ai",
-  "version": "0.8.2",
+  "version": "0.9.0",
   "source_project": "bigquery-ai",
   "narrative_sources": {},
   "generated_date": "2026-10-21",
-  "source_commit": "dcd557e",
+  "source_commit": "0dca5d7",
   "reference_files": [
     "augmented-analytics.md",
     "cloud-ai-service-models.md",

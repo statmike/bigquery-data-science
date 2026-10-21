@@ -66,6 +66,7 @@ The core `bigquery-data-science` package has **zero third-party runtime dependen
 ```bash
 # Option A — Zero-install ephemeral CLI via uvx (recommended for instant setup):
 uvx bigquery-data-science install                     # installs into ./.agents/skills & ./.claude/skills
+uvx bigquery-data-science install --mcp               # also registers stdio MCP server in ./.mcp.json
 uvx bigquery-data-science install --global            # installs into ~/.agents/skills & ~/.claude/skills
 uvx bigquery-data-science install --target agents     # only .agents/skills (Antigravity, Cursor, Codex, Windsurf)
 uvx bigquery-data-science install --target claude     # only .claude/skills (Claude Code)
@@ -109,6 +110,12 @@ uvx bigquery-data-science lookup ML.ENTITY_FEATURES_AT_TIME
 
 # 4. Search across all 137 syntax cards, 14 reference guides, and 104 narratives:
 uvx bigquery-data-science search "point-in-time feature leakage"
+
+# 5. Statically audit a BigQuery SQL query or .sql file for prerequisites & gotchas:
+uvx bigquery-data-science review-sql "SELECT AI.GENERATE('Summarize', endpoint => 'gemini-3.5-flash')"
+
+# 6. Add --json to any catalog command (list, lookup, search, triage, review-sql) for automation:
+uvx bigquery-data-science lookup AI.AGG --json
 ```
 
 ### Journey 3 — Run the 104 ground-truth notebooks & SQL scripts (`uv` or `pip`)
