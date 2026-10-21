@@ -12,9 +12,29 @@ from pathlib import Path
 import pytest
 
 import bigquery_data_science
+from bigquery_data_science.adk import (
+    get_bigquery_tools,
+)
+from bigquery_data_science.adk import (
+    get_bigquery_walkthrough as adk_get_walkthrough,
+)
+from bigquery_data_science.adk import (
+    lookup_bigquery_syntax as adk_lookup,
+)
+from bigquery_data_science.adk import (
+    review_bigquery_sql as adk_review,
+)
+from bigquery_data_science.adk import (
+    search_bigquery_gotchas as adk_search,
+)
+from bigquery_data_science.adk import (
+    triage_bigquery_task as adk_triage,
+)
 from bigquery_data_science.catalog import (
     get_walkthrough,
     lookup_symbol,
+    review,
+    review_sql,
     search_catalog,
     triage_task,
 )
@@ -25,6 +45,7 @@ from bigquery_data_science.installer import (
     get_skill_path,
     get_skills_dir,
     install_kernel,
+    install_mcp_config,
     install_skills,
     list_bundled_skills,
 )
@@ -389,6 +410,7 @@ def test_mcp_server_jsonrpc_protocol_and_tools() -> None:
         "lookup_bigquery_syntax",
         "search_bigquery_gotchas",
         "get_bigquery_walkthrough",
+        "review_bigquery_sql",
     }
 
     for call_id, name, args in (
@@ -411,6 +433,11 @@ def test_mcp_server_jsonrpc_protocol_and_tools() -> None:
             {"query": "xyznonexistenttoken999888"},
         ),
         (6, "get_bigquery_walkthrough", {"topic": "ai_forecast"}),
+        (
+            61,
+            "review_bigquery_sql",
+            {"sql": "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.5-flash')"},
+        ),
     ):
         call_resp = handle_message(
             {
@@ -432,6 +459,7 @@ def test_mcp_server_jsonrpc_protocol_and_tools() -> None:
         (91, "lookup_bigquery_syntax", {"symbol": "```"}),
         (92, "search_bigquery_gotchas", {"query": ""}),
         (93, "get_bigquery_walkthrough", {"topic": ""}),
+        (94, "review_bigquery_sql", {"sql": "   "}),
     ):
         bad_resp = handle_message(
             {
@@ -549,4 +577,230 @@ def test_cli_user_and_maintainer_subcommands_end_to_end(tmp_path: Path) -> None:
     assert (
         main(["check-pinned-models", "bigquery-ml", "--repo-root", "."]) == 0
     )
+
+
+def test_mcp_resources_and_prompts_protocol() -> None:
+    res_list = handle_message(
+        {"jsonrpc": "2.0", "id": 100, "method": "resources/list", "params": {}}
+    )
+    assert res_list is not None
+    resources = res_list["result"]["resources"]  # type: ignore[index]
+    uris = {r["uri"] for r in resources}
+    assert "bqds://skill/bigquery-data-science" in uris
+    assert "bqds://reference/bigquery-data-science/namespace-matrix" in uris
+
+    tmpl_list = handle_message(
+        {
+            "jsonrpc": "2.0",
+            "id": 101,
+            "method": "resources/templates/list",
+            "params": {},
+        }
+    )
+    assert tmpl_list is not None
+    templates = tmpl_list["result"]["resourceTemplates"]  # type: ignore[index]
+    assert len(templates) == 4
+
+    for idx, uri in enumerate(
+        (
+            "bqds://skill/bigquery-ml",
+            "bqds://reference/bigquery-data-science/namespace-matrix",
+            "bqds://syntax/bigquery-ai/aiforecast",
+            "bqds://syntax/ARIMA_PLUS",
+            "bqds://narrative/bigquery-ai/ai_agg",
+            "bqds://narrative/arima_plus",
+        ),
+        start=110,
+    ):
+        read_resp = handle_message(
+            {
+                "jsonrpc": "2.0",
+                "id": idx,
+                "method": "resources/read",
+                "params": {"uri": uri},
+            }
+        )
+        assert read_resp is not None
+        contents = read_resp["result"]["contents"]  # type: ignore[index]
+        assert contents[0]["uri"] == uri
+        assert contents[0]["text"]
+
+    for bad_uri in (
+        "http://example.com/bad",
+        "bqds://../secret",
+        "bqds://skill/nonexistent",
+        "bqds://unknown_lens/foo/bar",
+        "bqds://syntax/NONEXISTENT_999",
+    ):
+        bad_read = handle_message(
+            {
+                "jsonrpc": "2.0",
+                "id": 130,
+                "method": "resources/read",
+                "params": {"uri": bad_uri},
+            }
+        )
+        assert bad_read is not None
+        assert bad_read["error"]["code"] == -32602  # type: ignore[index]
+
+    prompts_list = handle_message(
+        {"jsonrpc": "2.0", "id": 140, "method": "prompts/list", "params": {}}
+    )
+    assert prompts_list is not None
+    prompt_names = {p["name"] for p in prompts_list["result"]["prompts"]}  # type: ignore[index]
+    assert prompt_names == {
+        "design_bigquery_pipeline",
+        "audit_bigquery_sql",
+        "compare_ml_vs_ai",
+        "prevent_feature_leakage",
+    }
+
+    for idx, (pname, pargs) in enumerate(
+        (
+            (
+                "design_bigquery_pipeline",
+                {"goal": "forecast sales", "constraints": "daily"},
+            ),
+            ("audit_bigquery_sql", {"sql": "SELECT AI.FORECAST(TABLE t)"}),
+            ("compare_ml_vs_ai", {"task": "churn prediction"}),
+            ("prevent_feature_leakage", {}),
+        ),
+        start=150,
+    ):
+        p_resp = handle_message(
+            {
+                "jsonrpc": "2.0",
+                "id": idx,
+                "method": "prompts/get",
+                "params": {"name": pname, "arguments": pargs},
+            }
+        )
+        assert p_resp is not None
+        assert p_resp["result"]["messages"][0]["content"]["text"]  # type: ignore[index]
+
+    for bad_pname, bad_pargs in (
+        ("design_bigquery_pipeline", {}),
+        ("audit_bigquery_sql", {}),
+        ("compare_ml_vs_ai", {}),
+        ("unknown_prompt", {}),
+    ):
+        bad_p = handle_message(
+            {
+                "jsonrpc": "2.0",
+                "id": 160,
+                "method": "prompts/get",
+                "params": {"name": bad_pname, "arguments": bad_pargs},
+            }
+        )
+        assert bad_p is not None
+        assert bad_p["error"]["code"] == -32602  # type: ignore[index]
+
+
+def test_review_sql_detects_all_empirical_guardrails(tmp_path: Path) -> None:
+    clean_sql = (
+        "SELECT AI.GENERATE('Summarize', endpoint => 'gemini-3.5-flash') "
+        "FROM my_dataset.my_table"
+    )
+    clean_res = review_sql(clean_sql)
+    assert clean_res.ok is True
+    assert "AI.GENERATE" in clean_res.detected_symbols
+    assert clean_res.findings == []
+    assert "PASS" in clean_res.format_text()
+
+    bad_sql = """
+    CREATE OR REPLACE MODEL `my_ds.bst`
+    OPTIONS(model_type = 'BOOSTED_TREE_CLASSIFIER') AS
+    SELECT
+      AI.PARSE_DOCUMENT(doc),
+      AI.GENERATE(OBJ.GET_ACCESS_URL(ref, 'r')),
+      AI.GENERATE('text', endpoint => 'gemini-1.5-pro')
+    FROM HYBRID_SEARCH(TABLE my_ds.idx, 'query')
+    JOIN ML.FORECAST(MODEL m)
+    JOIN AI.FORECAST(TABLE s, data_col => 'y', timestamp_col => 'ts', past_covariate_cols => ['x'])
+    JOIN ML.ENTITY_FEATURES_AT_TIME(TABLE e, TABLE f)
+    JOIN ML.METRICS(TABLE p)
+    JOIN ML.DECODE_IMAGE(ref)
+    """
+    bad_res = review_sql(bad_sql)
+    assert bad_res.ok is False
+    rules = {f.rule for f in bad_res.findings}
+    assert "RETIRED_FUNCTION" in rules
+    assert "NONEXISTENT_HYBRID_TVF" in rules
+    assert "DEPRECATED_MODEL_ENDPOINT" in rules
+    assert "UNPINNED_FORECAST_MODEL" in rules
+    assert "TIMESFM_COVARIATES_REQUIRE_3_0" in rules
+    assert "UNNECESSARY_GET_ACCESS_URL" in rules
+    assert "MISSING_XGBOOST_VERSION" in rules
+    assert "ENTERPRISE_RESERVATION_REQUIRED" in rules
+    assert "FEATURE_TIME_NULL_SEMANTICS" in rules
+    assert "ML_METRICS_BOOL_POSITIVE_CLASS" in rules
+    assert "FAIL" in bad_res.format_text()
+
+    dict_res = review(clean_sql)
+    assert dict_res["ok"] is True
+
+    sql_file = tmp_path / "query.sql"
+    sql_file.write_text(clean_sql, encoding="utf-8")
+    assert main(["review-sql", str(sql_file)]) == 0
+    assert main(["review-sql", str(sql_file), "--json"]) == 0
+    assert main(["review-sql", "SELECT AI.PARSE_DOCUMENT(x)"]) == 1
+
+
+def test_cli_json_flags_and_install_mcp(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert main(["list", "--json"]) == 0
+    assert main(["lookup", "AI.AGG", "--json"]) == 0
+    assert main(["search", "TimesFM", "--limit", "2", "--json"]) == 0
+    assert main(["triage", "forecast daily demand", "--json"]) == 0
+
+    # Project-scoped install --mcp preserves existing keys
+    mcp_file = tmp_path / ".mcp.json"
+    mcp_file.write_text(
+        json.dumps({"mcpServers": {"other-server": {"command": "other"}}}),
+        encoding="utf-8",
+    )
+    assert (
+        main(
+            [
+                "install",
+                "--target",
+                "agents",
+                "--dest",
+                str(tmp_path),
+                "--mcp",
+            ]
+        )
+        == 0
+    )
+    loaded = json.loads(mcp_file.read_text(encoding="utf-8"))
+    assert "other-server" in loaded["mcpServers"]
+    assert loaded["mcpServers"]["bigquery-data-science"] == {
+        "command": "bigquery-data-science",
+        "args": ["mcp"],
+    }
+
+    # Global install_mcp_config across targets
+    fake_home = tmp_path / "fake_home"
+    monkeypatch.setattr(Path, "home", lambda: fake_home)
+    global_paths = install_mcp_config(target="all", global_install=True)
+    assert len(global_paths) == 2
+    assert (fake_home / ".claude.json").is_file()
+    assert (fake_home / ".gemini" / "settings.json").is_file()
+
+
+def test_adk_toolset_wrappers() -> None:
+    tools = get_bigquery_tools()
+    assert len(tools) == 5
+    triage_dict = adk_triage("forecast daily store sales")
+    assert "Time-Series Forecasting" in str(triage_dict["category"])
+    lookup_dict = adk_lookup("AI.AGG")
+    assert lookup_dict["found"] is True
+    hits = adk_search("TimesFM", skill="bigquery-ai", limit=2)
+    assert len(hits) == 2
+    wt = adk_get_walkthrough("ai_agg")
+    assert wt["found"] is True
+    rev = adk_review("SELECT AI.GENERATE('hi', endpoint => 'gemini-3.5-flash')")
+    assert rev["ok"] is True
 

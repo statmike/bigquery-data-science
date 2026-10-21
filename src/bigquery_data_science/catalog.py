@@ -10,6 +10,10 @@ from types import MappingProxyType
 
 from bigquery_data_science.installer import get_skills_dir
 from bigquery_data_science.tooling.markdown_anchors import headings
+from bigquery_data_science.tooling.pinned_models import (
+    find_allow_file,
+    load_allow_list,
+)
 from bigquery_data_science.tooling.sync_syntax import syntax_slug
 
 _TOKEN_RE = re.compile(r"[a-z0-9_.]+")
@@ -1104,4 +1108,368 @@ def triage(
 ) -> dict[str, object]:
     """Route a data-science task description across `ML.*` and `AI.*`."""
     return triage_task(query=query, skills_dir=skills_dir).to_dict()
+
+
+@dataclass
+class ReviewFinding:
+    """Single static-analysis finding for a BigQuery ML or BigQuery AI SQL query."""
+
+    severity: str
+    rule: str
+    message: str
+    remediation: str
+
+    def to_dict(self) -> dict[str, str]:
+        """Convert the finding to a JSON-serializable dictionary."""
+        return {
+            "severity": self.severity,
+            "rule": self.rule,
+            "message": self.message,
+            "remediation": self.remediation,
+        }
+
+
+@dataclass
+class SqlReviewResult:
+    """Structured result for `review_sql`."""
+
+    sql: str
+    detected_symbols: list[str] = field(default_factory=list)
+    prerequisites: list[dict[str, str]] = field(default_factory=list)
+    findings: list[ReviewFinding] = field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        """Return True when no ERROR-severity findings were raised."""
+        return not any(f.severity == "ERROR" for f in self.findings)
+
+    def to_dict(self) -> dict[str, object]:
+        """Convert the SQL review result to a JSON-serializable dictionary."""
+        return {
+            "ok": self.ok,
+            "detected_symbols": self.detected_symbols,
+            "prerequisites": self.prerequisites,
+            "findings": [f.to_dict() for f in self.findings],
+        }
+
+    def format_text(self) -> str:
+        """Render a human- and agent-readable SQL review report."""
+        verdict = "PASS (no errors)" if self.ok else "FAIL (errors detected)"
+        lines: list[str] = [f"# BigQuery SQL Review: {verdict}"]
+        if self.detected_symbols:
+            syms = ", ".join(f"`{s}`" for s in self.detected_symbols)
+            lines.append(f"**Detected Symbols:** {syms}")
+        else:
+            lines.append(
+                "**Detected Symbols:** None (`ML.*`, `AI.*`, or `CREATE MODEL` not found)"
+            )
+
+        if self.prerequisites:
+            lines.append("\n## Prerequisites (`namespace-matrix.md`)")
+            for row in self.prerequisites:
+                summary = ", ".join(
+                    f"{k}: {v}" for k, v in row.items() if v
+                )
+                lines.append(f"- {summary}")
+
+        if self.findings:
+            lines.append("\n## Findings & Empirical Guardrails")
+            for finding in self.findings:
+                lines.append(
+                    f"- **[{finding.severity}] `{finding.rule}`**: {finding.message}\n"
+                    f"  - *Fix:* {finding.remediation}"
+                )
+        else:
+            lines.append(
+                "\n## Findings & Empirical Guardrails\n"
+                "- No anti-patterns or unpinned model issues detected."
+            )
+        return "\n".join(lines)
+
+
+_SQL_FN_TOKEN_RE = re.compile(
+    r"\b(AI\.[A-Z0-9_]+|ML\.[A-Z0-9_]+|OBJ\.[A-Z0-9_]+|VECTOR_SEARCH|HYBRID_SEARCH)\b",
+    re.IGNORECASE,
+)
+_MODEL_TYPE_SQL_RE = re.compile(
+    r"\bMODEL_TYPE\s*=\s*['\"]([A-Za-z0-9_]+)['\"]",
+    re.IGNORECASE,
+)
+_DEFAULT_ALLOWED_MODELS: frozenset[str] = frozenset(
+    {
+        "text-embedding-005",
+        "text-multilingual-embedding-002",
+        "gemini-embedding-001",
+        "gemini-embedding-2",
+        "multimodalembedding@001",
+        "embeddinggemma-300m",
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-2.5-flash-lite",
+        "gemini-3.1-flash-lite",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
+        "gemini-3.6-flash",
+        "gemini-3.7-flash",
+        "gemini-3.8-flash",
+        "gemini-4-argon",
+        "TimesFM 2.5",
+        "TimesFM 3.0",
+        "claude-sonnet-4-20250514",
+    }
+)
+
+
+_ENDPOINT_ARG_RE = re.compile(
+    r"\b(?:endpoint|model)\s*(?:=>|=)\s*['\"]([^'\"]+)['\"]",
+    re.IGNORECASE,
+)
+
+
+def review_sql(
+    sql: str,
+    skills_dir: Path | None = None,
+) -> SqlReviewResult:
+    """Statically review a BigQuery SQL query for prerequisites and empirical gotchas."""
+    root = skills_dir if skills_dir is not None else get_skills_dir()
+    cleaned = sql.strip()
+    sql_upper = cleaned.upper()
+
+    detected: list[str] = []
+    for match in _SQL_FN_TOKEN_RE.finditer(cleaned):
+        sym = match.group(1).upper()
+        if sym not in detected:
+            detected.append(sym)
+    for match in _MODEL_TYPE_SQL_RE.finditer(cleaned):
+        mtype = match.group(1).upper()
+        canonical = _SYMBOL_ALIASES.get(mtype, mtype)
+        if canonical not in detected:
+            detected.append(canonical)
+
+    matrix_path = (
+        root / "bigquery-data-science" / "reference" / "namespace-matrix.md"
+    )
+    matrix_rows = _parse_namespace_matrix(matrix_path)
+    prerequisites: list[dict[str, str]] = []
+    for sym in detected:
+        for row in matrix_rows:
+            row_sym = row.get("Symbol", "").upper()
+            if sym in row_sym and row not in prerequisites:
+                prerequisites.append(row)
+
+    findings: list[ReviewFinding] = []
+
+    if "AI.PARSE_DOCUMENT" in sql_upper:
+        findings.append(
+            ReviewFinding(
+                severity="ERROR",
+                rule="RETIRED_FUNCTION",
+                message="`AI.PARSE_DOCUMENT` was retired and taken offline on 2026-06-01.",
+                remediation=(
+                    "Use `ML.PROCESS_DOCUMENT` with a Document AI processor or pass "
+                    "`ObjectRef` directly to `AI.GENERATE`."
+                ),
+            )
+        )
+
+    if "HYBRID_SEARCH" in detected:
+        findings.append(
+            ReviewFinding(
+                severity="ERROR",
+                rule="NONEXISTENT_HYBRID_TVF",
+                message="BigQuery does not have a standalone `HYBRID_SEARCH` TVF.",
+                remediation=(
+                    "Use `VECTOR_SEARCH(..., options => '{\"lexical_search_columns\": [...]}')` "
+                    "or `AI.SEARCH(..., mode => 'HYBRID')`."
+                ),
+            )
+        )
+
+    allow_file = find_allow_file(root)
+    if allow_file is not None and allow_file.is_file():
+        allowed_models = load_allow_list(allow_file, "bigquery-ai") | load_allow_list(
+            allow_file, "bigquery-ml"
+        )
+    else:
+        allowed_models = set(_DEFAULT_ALLOWED_MODELS)
+
+    for ep_match in _ENDPOINT_ARG_RE.finditer(cleaned):
+        val = ep_match.group(1).strip()
+        if val and val not in allowed_models:
+            findings.append(
+                ReviewFinding(
+                    severity="ERROR",
+                    rule="DEPRECATED_MODEL_ENDPOINT",
+                    message=(
+                        f"Model or endpoint `{val}` is not in the `pinned-models.json` "
+                        "allowlist."
+                    ),
+                    remediation=(
+                        "Pin a current supported model such as `gemini-3.5-flash`, "
+                        "`gemini-3.5-pro`, `gemini-4-argon`, `TimesFM 2.5`, or "
+                        "`TimesFM 3.0`."
+                    ),
+                )
+            )
+
+    gen_fns = {
+        "AI.GENERATE",
+        "AI.GENERATE_BOOL",
+        "AI.GENERATE_INT",
+        "AI.GENERATE_DOUBLE",
+        "AI.GENERATE_TABLE",
+    }
+    if any(fn in detected for fn in gen_fns) and not re.search(
+        r"\bendpoint\s*=>", cleaned, re.IGNORECASE
+    ):
+        findings.append(
+            ReviewFinding(
+                severity="WARNING",
+                rule="UNPINNED_AI_ENDPOINT",
+                message="Generative `AI.GENERATE*` call omits an explicit `endpoint =>` argument.",
+                remediation=(
+                    "Pin `endpoint => 'gemini-3.5-flash'` (or `'gemini-3.5-pro'` / "
+                    "`'gemini-4-argon'`) for reproducible production behavior."
+                ),
+            )
+        )
+
+    if "AI.FORECAST" in detected:
+        has_model_arg = re.search(r"\bmodel\s*=>", cleaned, re.IGNORECASE) is not None
+        has_3_0_cols = any(
+            col in sql_upper
+            for col in ("TARGET_COLS", "PAST_COVARIATE_COLS", "FUTURE_COVARIATE_COLS")
+        )
+        if not has_model_arg:
+            findings.append(
+                ReviewFinding(
+                    severity="WARNING",
+                    rule="UNPINNED_FORECAST_MODEL",
+                    message="`AI.FORECAST` call omits an explicit `model =>` argument.",
+                    remediation=(
+                        "Pin `model => 'TimesFM 2.5'` (GA univariate) or "
+                        "`model => 'TimesFM 3.0'` (Preview covariates/multivariate)."
+                    ),
+                )
+            )
+        if has_3_0_cols and "TIMESFM 3.0" not in sql_upper:
+            findings.append(
+                ReviewFinding(
+                    severity="ERROR",
+                    rule="TIMESFM_COVARIATES_REQUIRE_3_0",
+                    message=(
+                        "`AI.FORECAST` uses `target_cols`, `past_covariate_cols`, or "
+                        "`future_covariate_cols` without `model => 'TimesFM 3.0'`."
+                    ),
+                    remediation="Set `model => 'TimesFM 3.0'` when forecasting with covariates.",
+                )
+            )
+
+    direct_objref_fns = gen_fns | {"AI.IF", "AI.SCORE", "AI.CLASSIFY", "AI.EMBED"}
+    if "OBJ.GET_ACCESS_URL" in detected and any(
+        fn in detected for fn in direct_objref_fns
+    ):
+        findings.append(
+            ReviewFinding(
+                severity="WARNING",
+                rule="UNNECESSARY_GET_ACCESS_URL",
+                message=(
+                    "`OBJ.GET_ACCESS_URL` is used alongside a direct `AI.*` function "
+                    "that accepts bare `ObjectRef` values."
+                ),
+                remediation=(
+                    "Pass the `ObjectRef` column (`OBJ.MAKE_REF` / `OBJ.FETCH_METADATA`) "
+                    "directly to `AI.*` without wrapping in `OBJ.GET_ACCESS_URL`."
+                ),
+            )
+        )
+
+    xgb_models = {
+        "BOOSTED_TREE_CLASSIFIER",
+        "BOOSTED_TREE_REGRESSOR",
+        "RANDOM_FOREST_CLASSIFIER",
+        "RANDOM_FOREST_REGRESSOR",
+    }
+    if any(m in detected for m in xgb_models) and "XGBOOST_VERSION" not in sql_upper:
+        findings.append(
+            ReviewFinding(
+                severity="INFO",
+                rule="MISSING_XGBOOST_VERSION",
+                message="Tree model omits `xgboost_version = '2.1'` in `OPTIONS(...)`.",
+                remediation=(
+                    "Add `xgboost_version = '2.1'` if you plan to export the model "
+                    "or convert it via `ML.CONVERT`."
+                ),
+            )
+        )
+
+    enterprise_syms = {
+        "MATRIX_FACTORIZATION",
+        "ML.DECODE_IMAGE",
+        "ML.RESIZE_IMAGE",
+        "ML.CONVERT_COLOR_SPACE",
+        "ML.CONVERT_IMAGE_TYPE",
+    }
+    matched_ent = [s for s in detected if s in enterprise_syms]
+    if matched_ent or "ALTER VECTOR INDEX" in sql_upper:
+        label = ", ".join(matched_ent) if matched_ent else "ALTER VECTOR INDEX"
+        findings.append(
+            ReviewFinding(
+                severity="WARNING",
+                rule="ENTERPRISE_RESERVATION_REQUIRED",
+                message=f"`{label}` requires a BigQuery `ENTERPRISE` reservation assignment.",
+                remediation=(
+                    "Ensure the project has an active `ENTERPRISE` (or `ENTERPRISE_PLUS`) "
+                    "`QUERY` / `BACKGROUND` reservation assignment before running."
+                ),
+            )
+        )
+
+    if any(
+        s in detected for s in ("ML.ENTITY_FEATURES_AT_TIME", "ML.FEATURES_AT_TIME")
+    ) and "IGNORE_FEATURE_NULLS" not in sql_upper:
+        findings.append(
+            ReviewFinding(
+                severity="INFO",
+                rule="FEATURE_TIME_NULL_SEMANTICS",
+                message=(
+                    "Point-in-time feature TVF omits explicit `ignore_feature_nulls`."
+                ),
+                remediation=(
+                    "Set `ignore_feature_nulls => TRUE` on sparse/EAV feature tables so a "
+                    "`NULL` in one feature does not overwrite non-null values from earlier "
+                    "timestamps; keep `FALSE` on dense snapshot tables."
+                ),
+            )
+        )
+
+    if "ML.METRICS" in detected:
+        findings.append(
+            ReviewFinding(
+                severity="INFO",
+                rule="ML_METRICS_BOOL_POSITIVE_CLASS",
+                message="`ML.METRICS` ignores `positive_class` when inputs are `BOOL`.",
+                remediation=(
+                    "For `BOOL` binary classification columns, `TRUE` is always the "
+                    "positive class; cast `BOOL` to `STRING` if you need `FALSE` as "
+                    "the positive class."
+                ),
+            )
+        )
+
+    return SqlReviewResult(
+        sql=cleaned,
+        detected_symbols=detected,
+        prerequisites=prerequisites,
+        findings=findings,
+    )
+
+
+def review(
+    sql: str,
+    *,
+    skills_dir: Path | None = None,
+) -> dict[str, object]:
+    """Statically review a BigQuery SQL query and return a JSON-serializable dict."""
+    return review_sql(sql=sql, skills_dir=skills_dir).to_dict()
 

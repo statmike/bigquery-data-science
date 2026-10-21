@@ -81,10 +81,14 @@ grep -q "bigquery-ai" <<<"$LIST_OUT" || fail "list missing bigquery-ai"
 "$BIN/bigquery-data-science" check-markdown --repo-root "$REPO_ROOT" >/dev/null || fail "check-markdown failed"
 
 TARGET_DIR="$WORK/installed-skills"
-"$BIN/bigquery-data-science" install --target "$TARGET_DIR" >/dev/null || fail "install failed"
+"$BIN/bigquery-data-science" install --target "$TARGET_DIR" --mcp >/dev/null || fail "install failed"
 [[ -f "$TARGET_DIR/bigquery-data-science/SKILL.md" ]] || fail "installed bigquery-data-science/SKILL.md missing"
 [[ -f "$TARGET_DIR/bigquery-ml/SKILL.md" ]] || fail "installed bigquery-ml/SKILL.md missing"
 [[ -f "$TARGET_DIR/bigquery-ai/SKILL.md" ]] || fail "installed bigquery-ai/SKILL.md missing"
+[[ -f "$TARGET_DIR/.mcp.json" ]] || fail "installed .mcp.json missing"
+
+"$BIN/bigquery-data-science" list --json >/dev/null || fail "list --json failed"
+"$BIN/bigquery-data-science" review-sql "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.5-flash')" --json >/dev/null || fail "review-sql --json failed"
 
 ARIMA_OUT="$("$BIN/bigquery-data-science" lookup ARIMA_PLUS)" || fail "lookup ARIMA_PLUS failed"
 grep -qi "ARIMA_PLUS" <<<"$ARIMA_OUT" || fail "lookup ARIMA_PLUS output missing ARIMA_PLUS"
@@ -111,10 +115,13 @@ assert not rel_links, f"Un-rewritten relative links in PyPI Description: {rel_li
 assert "```mermaid" not in desc, "Un-substituted ```mermaid block in PyPI Description"
 
 requests = [
-    {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "smoke", "version": "0.7.0"}}},
+    {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "smoke", "version": "0.9.0"}}},
     {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
     {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "triage_bigquery_task", "arguments": {"query": "forecast daily sales"}}},
     {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "lookup_bigquery_syntax", "arguments": {"symbol": "ARIMA_PLUS"}}},
+    {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "review_bigquery_sql", "arguments": {"sql": "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.5-flash')"}}},
+    {"jsonrpc": "2.0", "id": 6, "method": "resources/list", "params": {}},
+    {"jsonrpc": "2.0", "id": 7, "method": "prompts/list", "params": {}},
 ]
 payload = "\n".join(json.dumps(r) for r in requests) + "\n"
 proc = subprocess.run(
@@ -125,18 +132,24 @@ proc = subprocess.run(
     check=True,
 )
 responses = [json.loads(line) for line in proc.stdout.strip().splitlines() if line.strip()]
-assert len(responses) >= 4, f"Expected 4 JSON-RPC responses, got {len(responses)}"
+assert len(responses) >= 7, f"Expected 7 JSON-RPC responses, got {len(responses)}"
 tool_names = {t["name"] for t in responses[1]["result"]["tools"]}
 expected_tools = {
     "triage_bigquery_task",
     "lookup_bigquery_syntax",
     "search_bigquery_gotchas",
     "get_bigquery_walkthrough",
+    "review_bigquery_sql",
 }
 assert expected_tools <= tool_names, f"Missing MCP tools: {expected_tools - tool_names}"
 assert not responses[2]["result"].get("isError"), f"triage_bigquery_task returned error: {responses[2]}"
 assert not responses[3]["result"].get("isError"), f"lookup_bigquery_syntax returned error: {responses[3]}"
-print(f"   MCP tools verified: {sorted(tool_names)}")
+assert not responses[4]["result"].get("isError"), f"review_bigquery_sql returned error: {responses[4]}"
+assert len(responses[5]["result"]["resources"]) >= 10, "Expected >= 10 MCP resources"
+assert len(responses[6]["result"]["prompts"]) == 4, "Expected 4 MCP prompts"
+from bigquery_data_science.adk import get_bigquery_tools
+assert len(get_bigquery_tools()) == 5
+print(f"   MCP tools verified: {sorted(tool_names)} (+ resources, prompts & ADK toolset)")
 print("   0 relative links in built PyPI Description")
 PY
 

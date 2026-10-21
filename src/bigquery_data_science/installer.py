@@ -282,3 +282,72 @@ def available_skills(skills_dir: Path | None = None) -> list[str]:
     """Return sorted skill names available in `skills_dir`."""
     return [str(s["name"]) for s in list_bundled_skills(skills_dir)]
 
+
+def _resolve_mcp_config_paths(
+    target: str,
+    dest: Path | None,
+    global_install: bool,
+) -> list[Path]:
+    """Resolve MCP client configuration file paths for `install_mcp_config`."""
+    if global_install:
+        home = Path.home()
+        if target == "claude":
+            return [home / ".claude.json"]
+        if target == "agents":
+            return [home / ".gemini" / "settings.json"]
+        if target == "all":
+            return [
+                home / ".claude.json",
+                home / ".gemini" / "settings.json",
+            ]
+        return [Path(target).expanduser() / ".mcp.json"]
+
+    base_dir = dest.expanduser() if dest is not None else Path.cwd()
+    if target in ("agents", "claude", "all"):
+        return [base_dir / ".mcp.json"]
+    custom = Path(target).expanduser()
+    if custom.suffix == ".json":
+        return [custom]
+    return [custom / ".mcp.json"]
+
+
+def install_mcp_config(
+    target: str = "agents",
+    dest: Path | None = None,
+    global_install: bool = False,
+    command: str = "bigquery-data-science",
+) -> list[Path]:
+    """Non-destructively register the `bigquery-data-science mcp` stdio server."""
+    config_paths = _resolve_mcp_config_paths(
+        target=target,
+        dest=dest,
+        global_install=global_install,
+    )
+    updated: list[Path] = []
+    for cfg_path in config_paths:
+        cfg_path.parent.mkdir(parents=True, exist_ok=True)
+        payload: dict[str, object] = {}
+        if cfg_path.is_file():
+            try:
+                loaded = json.loads(cfg_path.read_text(encoding="utf-8"))
+                if isinstance(loaded, dict):
+                    payload = loaded
+            except (OSError, json.JSONDecodeError):
+                payload = {}
+
+        raw_servers = payload.get("mcpServers")
+        servers: dict[str, object] = (
+            dict(raw_servers) if isinstance(raw_servers, dict) else {}
+        )
+        servers["bigquery-data-science"] = {
+            "command": command,
+            "args": ["mcp"],
+        }
+        payload["mcpServers"] = servers
+        cfg_path.write_text(
+            json.dumps(payload, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        updated.append(cfg_path)
+    return updated
+

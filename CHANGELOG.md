@@ -5,6 +5,16 @@ All notable changes to `bigquery-data-science` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] - 2026-10-21
+
+### Added
+- **CLI, Catalog, MCP Server & Google ADK Rollout (`P3.1`–`P3.5`):**
+  - **MCP `resources` & `prompts` Protocol Support (`P3.1`):** Extended `bigquery-data-science mcp` (`src/bigquery_data_science/mcp_server.py`) with `resources/list`, `resources/templates/list`, and `resources/read` (`bqds://skill/{skill}`, `bqds://reference/{skill}/{name}`, `bqds://syntax/{skill}/{slug}`, `bqds://narrative/{skill}/{topic}`), plus `prompts/list` and `prompts/get` (`design_bigquery_pipeline`, `audit_bigquery_sql`, `compare_ml_vs_ai`, `prevent_feature_leakage`).
+  - **Static SQL Query Reviewer (`P3.2`):** Added `review_sql` / `review` in `src/bigquery_data_science/catalog.py`, `bigquery-data-science review-sql <sql_or_file>` CLI command, and the 5th MCP tool `review_bigquery_sql` to statically audit BigQuery SQL queries against `namespace-matrix.md`, `pinned-models.json`, and empirical guardrails (retired functions, nonexistent `HYBRID_SEARCH`, unpinned foundation models, `TimesFM` covariate version requirements, unnecessary `OBJ.GET_ACCESS_URL`, `xgboost_version`, Enterprise reservation requirements, `ignore_feature_nulls`, and `ML.METRICS` `BOOL` semantics).
+  - **Opt-In `--json` Output Flag (`P3.3`):** Added `--json` across `list`, `lookup`, `search`, `triage`, and `review-sql` while preserving default human-readable text output.
+  - **Opt-In MCP Client Config Registration (`P3.4`):** Added `install_mcp_config` in `src/bigquery_data_science/installer.py` and `bigquery-data-science install --mcp` to non-destructively register the `bigquery-data-science mcp` stdio server in project `.mcp.json` or global `~/.claude.json` / `~/.gemini/settings.json`.
+  - **Google ADK Toolset Wrapper (`P3.5`):** Added `src/bigquery_data_science/adk.py` exporting `get_bigquery_tools()` and typed Python tool functions (`triage_bigquery_task`, `lookup_bigquery_syntax`, `search_bigquery_gotchas`, `get_bigquery_walkthrough`, `review_bigquery_sql`) ready for `google.adk.Agent(tools=get_bigquery_tools())`.
+
 ## [0.8.2] - 2026-10-21
 
 ### Added
