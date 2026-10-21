@@ -2,7 +2,7 @@
 name: bigquery-ai
 description: Use when calling Gemini, TimesFM, TabFM, or pre-trained Cloud AI services from BigQuery SQL or BigFrames — generation (AI.GENERATE*, AI.COUNT_TOKENS), managed scoring/classification (AI.IF, AI.SCORE, AI.CLASSIFY, AI.AGG), embeddings and vector/hybrid search (AI.EMBED, VECTOR_SEARCH, AI.SEARCH), forecasting/prediction (AI.FORECAST, AI.PREDICT, AI.KEY_DRIVERS), and Cloud AI service models (ML.PROCESS_DOCUMENT, ML.TRANSLATE, ML.TRANSCRIBE).
 metadata:
-  version: "0.8.0"
+  version: "0.8.1"
 ---
 
 # BigQuery AI (`bigquery-ai`)

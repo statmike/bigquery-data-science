@@ -1,10 +1,10 @@
 {
   "name": "bigquery-data-science",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "source_project": null,
   "narrative_sources": {},
-  "generated_date": "2026-10-20",
-  "source_commit": "aa66279",
+  "generated_date": "2026-10-21",
+  "source_commit": "4813a88",
   "reference_files": [
     "namespace-matrix.md"
   ],

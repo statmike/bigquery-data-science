@@ -2,7 +2,7 @@
 name: bigquery-ml
 description: Use when training, evaluating, deploying, or monitoring a machine learning model in BigQuery with SQL (CREATE MODEL and ML.* functions) — picking a model type, choosing a preprocessing function, point-in-time feature retrieval, causal inference (including AI.CAUSAL_EFFECT), or production retraining pipelines across 23 model types, 49 functions, 18 workflows, and 8 pipelines.
 metadata:
-  version: "0.8.0"
+  version: "0.8.1"
 ---
 
 # BigQuery ML (`bigquery-ml`)

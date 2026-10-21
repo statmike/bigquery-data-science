@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from importlib.metadata import PackageNotFoundError, version
 
+try:
+    __version__ = version("bigquery-data-science")
+except PackageNotFoundError:
+    __version__ = "0.8.1"
+
 from bigquery_data_science.catalog import (
     LookupResult,
     SearchHit,
@@ -26,11 +31,6 @@ from bigquery_data_science.installer import (
     install_skills,
     list_bundled_skills,
 )
-
-try:
-    __version__ = version("bigquery-data-science")
-except PackageNotFoundError:
-    __version__ = "0.8.0"
 
 list_skills = list_bundled_skills
 

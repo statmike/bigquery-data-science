@@ -69,7 +69,7 @@ def test_list_bundled_skills_edge_cases(tmp_path: Path) -> None:
     listed = list_bundled_skills(custom_root)
     assert len(listed) == 1
     assert listed[0]["name"] == "custom-extra-skill"
-    assert listed[0]["version"] == "0.7.0"
+    assert listed[0]["version"] == bigquery_data_science.__version__
 
 
 def test_get_skill_path_and_unknown_skill_error() -> None:

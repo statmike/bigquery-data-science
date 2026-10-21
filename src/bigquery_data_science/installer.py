@@ -91,9 +91,11 @@ def list_bundled_skills(
         and path.name not in SKILL_NAMES
     ]
 
+    import bigquery_data_science
+
     for skill_dir in [*ordered_dirs, *extra_dirs]:
         manifest_path = skill_dir / MANIFEST_FILENAME
-        version = "0.7.0"
+        version = bigquery_data_science.__version__
         if manifest_path.is_file():
             try:
                 manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

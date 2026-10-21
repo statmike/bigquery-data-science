@@ -38,6 +38,22 @@ Every contribution must follow these security and privacy rules:
 - **Zero proprietary or customer data:** Never include customer names, internal hostnames, credentials, or hardcoded live personal/internal GCP project IDs in tracked code or configs.
 - **Self-contained, reproducible workflows:** Notebooks rely on public datasets (`bigquery-public-data.*`), synthetic data generated in-notebook, or resources created by the workflow's own setup steps.
 
+## Authoring, Readability & Visual Standards
+
+To keep `bigquery-data-science` easy for humans to read and deterministic for agents to consume, all contributions follow four authoring rules:
+
+1. **100% Additive & Backward-Compatible Changes:**
+   - Do not remove or incompatibly alter existing CLI subcommands, positional arguments, flags, MCP tool names/schemas, Python exports (`bigquery_data_science.__all__`), or skill paths (`skills/<name>/{SKILL.md,reference,syntax,narrative}`).
+   - Add new CLI capabilities via opt-in flags, and add new BigQuery features to existing notebooks/SQL scripts as additional numbered steps or examples rather than deleting foundational examples.
+2. **Simple Code & Simple English:**
+   - **Python & SQL:** Prefer flat control flow, descriptive identifiers, named module-level constants instead of magic literals, full type annotations (`mypy --strict`), and small single-purpose functions. SQL scripts should use clear CTE stages and brief inline comments explaining *why* options are set.
+   - **Prose:** Open every section with a plain-English summary (*what it does, when to use it, and what it requires*) before diving into syntax tables or edge cases. Prefer short sentences and comparison tables over dense paragraphs.
+3. **Vertical-First Mermaid Diagrams (`flowchart TD`):**
+   - Wide horizontal diagrams (`flowchart LR` or rows with 4+ nodes side-by-side) force GitHub and Markdown viewers to shrink the entire SVG to fit the page width, making node text tiny and hard to read.
+   - Always orient the primary flow **vertically (`flowchart TD`)**, keep horizontal width to **at most 3 nodes per rank** (stacking larger sets into vertical `subgraph` blocks), wrap node labels at ~35–45 characters using `<br/>`, and quote labels containing parentheses or brackets (`id["Label (Detail)"]`).
+4. **Clean Markdown, Mermaid & Table Compilation:**
+   - Every Markdown file and notebook Markdown cell must render cleanly on GitHub: balanced code fences, valid GFM table delimiter rows with matching column counts across every row, no unescaped `|` characters inside table cells, and 100% resolved relative links and `#anchors`.
+
 ## Releasing
 
 Releases are published to TestPyPI and PyPI via GitHub Actions OIDC Trusted Publishing ([`.github/workflows/release.yml`](.github/workflows/release.yml)) whenever a `v*` tag is pushed.
@@ -53,16 +69,13 @@ Releases are published to TestPyPI and PyPI via GitHub Actions OIDC Trusted Publ
 
 ### 1. Version Bump & Changelog Lockstep
 
-Update the version string across all 7 single-sourced locations (enforced by `tests/test_packaging.py`):
-1. `pyproject.toml` (`[project].version`)
-2. `src/bigquery_data_science/__init__.py` (`PackageNotFoundError` fallback literal)
-3. `plugin.json` (`"version"`)
-4. `.claude-plugin/marketplace.json` (`"version"`, `metadata.version`, and each entry in `"plugins"`)
-5. `CITATION.cff` (`version` and `date-released`)
-6. `CHANGELOG.md` (`## [X.Y.Z] - YYYY-MM-DD` section)
-7. `skills/{bigquery-data-science,bigquery-ml,bigquery-ai}/skill.manifest.json` (`"version"`, regenerated via `uv run bigquery-data-science manifest --version X.Y.Z`)
+Stamp the new version across all lockstep locations (`pyproject.toml`, `src/bigquery_data_science/__init__.py`, `CITATION.cff`, `plugin.json`, `.claude-plugin/marketplace.json`, `skills/*/SKILL.md`, `skills/*/skill.manifest.json`, and `tests/test_packaging.py`) with a single command:
 
-Then re-lock with `UV_NO_CONFIG=1 uv lock` and run the full verification gate above.
+```bash
+uv run bigquery-data-science bump-version X.Y.Z
+```
+
+Then add the `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`, re-lock with `UV_NO_CONFIG=1 uv lock`, and run the full verification gate above (or `uv run bigquery-data-science bump-version --check`).
 
 ### 2. Pre-Release Verification on TestPyPI (`vX.Y.Zrc1`)
 
