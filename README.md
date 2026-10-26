@@ -13,34 +13,40 @@
 `104 live-verified notebooks` · `87 SQL scripts` · `4 Composable Agent Skills` · `20 Reference & Playbook Guides` · `137 <25 KB syntax cards` · `zero-dependency CLI, MCP & ADK`
 
 ```mermaid
+%%{init: {'flowchart': {'wrappingWidth': 380, 'nodeSpacing': 24, 'rankSpacing': 28}}}%%
 flowchart TD
     subgraph GT["1. Ground-Truth Notebooks, SQL & Reference Hubs (GitHub)"]
         direction LR
-        BQML["bigquery-ml/ (61 Notebooks · 58 SQL)<br/>23 CREATE MODEL Types · 12 ML.* Functions<br/>18 Workflows · 8 MLOps Pipelines"]
-        BQAI["bigquery-ai/ (43 Notebooks · 29 SQL)<br/>29 AI.* & Cloud AI Functions<br/>14 Multi-Function Workflows"]
-        REFS["13 Deep Reference Guides<br/>bigquery-ml/reference/ (5) · bigquery-ai/reference/ (8)<br/>Options · Gotchas · pinned-models.json"]
+        BQML["<b>bigquery-ml/</b> (61 Notebooks · 58 SQL)<br/>23 CREATE MODEL · 12 ML.* Families<br/>18 Applied Workflows · 8 MLOps Pipelines"]
+        BQAI["<b>bigquery-ai/</b> (43 Notebooks · 29 SQL)<br/>29 AI.* & Cloud AI SQL Functions<br/>14 Multi-Function Workflows"]
+        REFS["<b>13 Deep Reference Guides</b><br/>bigquery-ml/reference/ (5 Guides)<br/>bigquery-ai/reference/ (8 Guides)"]
+        BQML ~~~ BQAI ~~~ REFS
     end
 
     subgraph SKILLS["2. 4 Composable Agent Skills (skills/ · .agents/skills/ · .claude/skills/)"]
         direction TB
-        ROUTER["bigquery-data-science (Umbrella Router & Multi-Skill Composer)<br/>ML.* vs AI.* Prerequisite Matrix · 10 Head-to-Head Comparisons<br/>6 Multi-Skill Composition Playbooks · 7-Stage Lifecycle Navigator"]
-        S_ML["bigquery-ml<br/>23 CREATE MODEL Types<br/>Preprocessing · Causal · Explain"]
-        S_AI["bigquery-ai<br/>29 AI.* & Cloud AI Functions<br/>TimesFM · TabFM · Vector/Hybrid Search"]
-        S_OPS["bigquery-mlops<br/>8 Orchestrators · Vertex Registry<br/>Export/Import · Drift & Feature Store"]
+        ROUTER["<b>bigquery-data-science</b> (Umbrella Router)<br/>ML.* vs AI.* Matrix · 10 Head-to-Head Comparisons<br/>6 Multi-Skill Playbooks · 7-Stage Lifecycle Navigator"]
+        S_ML["<b>bigquery-ml</b> (Trained Models)<br/>23 CREATE MODEL · 49 ML.* Functions<br/>Preprocessing · Causal · Explain"]
+        S_AI["<b>bigquery-ai</b> (Foundation Models)<br/>29 AI.* & Cloud AI · TimesFM · TabFM<br/>Embeddings · Vector & Hybrid Search"]
+        S_OPS["<b>bigquery-mlops</b> (Production Ops)<br/>8 Orchestrators · Vertex AI Registry<br/>EXPORT / IMPORT · Drift & Feature Store"]
         ROUTER --> S_ML
         ROUTER --> S_AI
         ROUTER --> S_OPS
     end
 
     subgraph LENS["3. 4-Lens Progressive Disclosure & Zero-Dependency Delivery"]
-        direction TB
-        L12["Lens 1: 4 SKILL.md Routers (~8 KB)  ➜  Lens 2: 20 Decision & Playbook Guides (~15–45 KB)"]
-        L34["Lens 3: 137 Surgical Syntax Cards (< 25 KB)  ➜  Lens 4: 104 Worked Walkthroughs (~20 KB)"]
-        DELIV["Zero-Dependency Package (< 1.5 MB Wheel) · CLI · Stdio MCP Server · Google ADK<br/>uvx bigquery-data-science install · triage · lookup · search · review-sql · mcp"]
+        direction LR
+        L12["<b>Lens 1 & Lens 2 — Route & Compare</b><br/>4 SKILL.md Routers (~8 KB)<br/>20 Decision & Playbook Guides (~25 KB)"]
+        L34["<b>Lens 3 & Lens 4 — Write & Build</b><br/>137 Surgical Syntax Cards (< 25 KB)<br/>104 Worked Walkthroughs (~20 KB)"]
+        DELIV["<b>Zero-Dependency CLI, MCP & ADK</b><br/>uvx bigquery-data-science install · mcp<br/>triage · lookup · search · review-sql"]
         L12 --> L34 --> DELIV
     end
 
     GT --> SKILLS --> LENS
+
+    style GT fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style SKILLS fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style LENS fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
 
     classDef data fill:#E8F0FE,stroke:#4285F4,stroke-width:2px,color:#174EA6
     classDef config fill:#FEF7E0,stroke:#F9AB00,stroke-width:2px,color:#7A5A00
