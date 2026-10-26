@@ -55,7 +55,7 @@ def search_bigquery_gotchas(
     Args:
         query: Keywords or phrase to search for across the bundled skills.
         skill: Optional skill name filter ('bigquery-data-science', 'bigquery-ml',
-            or 'bigquery-ai'). Leave empty to search all three skills.
+            'bigquery-ai', or 'bigquery-mlops'). Leave empty to search all four skills.
         limit: Maximum number of ranked hits to return (default: 10).
 
     Returns:

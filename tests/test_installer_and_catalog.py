@@ -56,21 +56,27 @@ def test_get_skills_dir_and_list_bundled_skills() -> None:
     skills_dir = get_skills_dir()
     assert skills_dir.is_dir()
     skills = list_bundled_skills()
-    assert len(skills) == 3
+    assert len(skills) == 4
     by_name = {str(item["name"]): item for item in skills}
     assert set(by_name) == {
         "bigquery-data-science",
         "bigquery-ml",
         "bigquery-ai",
+        "bigquery-mlops",
     }
+    assert by_name["bigquery-data-science"]["reference_count"] == 2
     assert by_name["bigquery-ml"]["syntax_count"] == 93
     assert by_name["bigquery-ml"]["narrative_count"] == 61
     assert by_name["bigquery-ai"]["syntax_count"] == 44
     assert by_name["bigquery-ai"]["narrative_count"] == 43
+    assert by_name["bigquery-mlops"]["reference_count"] == 4
+    assert by_name["bigquery-mlops"]["syntax_count"] == 0
+    assert by_name["bigquery-mlops"]["narrative_count"] == 0
     assert available_skills() == [
         "bigquery-data-science",
         "bigquery-ml",
         "bigquery-ai",
+        "bigquery-mlops",
     ]
 
 
@@ -127,8 +133,13 @@ def test_install_skills_copy_and_symlink_and_idempotency(
     tmp_path: Path,
 ) -> None:
     copied = install_skills(target="all", dest=tmp_path, symlink=False)
-    assert len(copied) == 6
-    for name in ("bigquery-data-science", "bigquery-ml", "bigquery-ai"):
+    assert len(copied) == 8
+    for name in (
+        "bigquery-data-science",
+        "bigquery-ml",
+        "bigquery-ai",
+        "bigquery-mlops",
+    ):
         agent_skill = tmp_path / ".agents" / "skills" / name
         claude_skill = tmp_path / ".claude" / "skills" / name
         assert (agent_skill / "SKILL.md").is_file()
@@ -137,8 +148,13 @@ def test_install_skills_copy_and_symlink_and_idempotency(
 
     # Overwrite with symlinks idempotently
     linked = install_skills(target="agents", dest=tmp_path, symlink=True)
-    assert len(linked) == 3
-    for name in ("bigquery-data-science", "bigquery-ml", "bigquery-ai"):
+    assert len(linked) == 4
+    for name in (
+        "bigquery-data-science",
+        "bigquery-ml",
+        "bigquery-ai",
+        "bigquery-mlops",
+    ):
         agent_skill = tmp_path / ".agents" / "skills" / name
         assert agent_skill.is_symlink()
         assert (agent_skill / "SKILL.md").is_file()
@@ -160,15 +176,20 @@ def test_install_skills_global_and_file_conflict_replacement(
         global_install=True,
         symlink=False,
     )
-    assert len(installed) == 3
+    assert len(installed) == 4
     assert (claude_skills / "bigquery-ml" / "SKILL.md").is_file()
 
 
 def test_install_skills_custom_target_directory(tmp_path: Path) -> None:
     custom_dir = tmp_path / "custom_skills_bundle"
     installed = install_skills(target=str(custom_dir), symlink=False)
-    assert len(installed) == 3
-    for name in ("bigquery-data-science", "bigquery-ml", "bigquery-ai"):
+    assert len(installed) == 4
+    for name in (
+        "bigquery-data-science",
+        "bigquery-ml",
+        "bigquery-ai",
+        "bigquery-mlops",
+    ):
         assert (custom_dir / name / "SKILL.md").is_file()
 
 
@@ -355,6 +376,46 @@ def test_triage_task_across_all_nine_domains_and_word_boundaries() -> None:
 
     provision = triage_task("provisioned throughput quota for gemini")
     assert "Generative SQL" in provision.category
+    assert provision.recommended_skill == "bigquery-ai"
+    assert provision.recommended_skills == [
+        "bigquery-ai",
+        "bigquery-ml",
+        "bigquery-mlops",
+    ]
+
+    # Production MLOps & Multi-Skill Composition routing (Phase 5)
+    mlops_orch = triage_task(
+        "schedule retraining pipeline with Kubeflow KFP and Vertex AI Model Registry"
+    )
+    assert "MLOps Pipelines" in mlops_orch.category
+    assert mlops_orch.recommended_skill == "bigquery-mlops"
+    assert "bigquery-mlops" in mlops_orch.recommended_skills
+    assert "bigquery-ml" in mlops_orch.recommended_skills
+    assert "**Collaborating Skills:**" in mlops_orch.format_text()
+    assert mlops_orch.to_dict()["recommended_skills"] == mlops_orch.recommended_skills
+
+    mlops_ai_pipe = triage_task(
+        "orchestrate AI.GENERATE and VECTOR_SEARCH with Cloud Workflows"
+    )
+    assert set(mlops_ai_pipe.recommended_skills) >= {
+        "bigquery-ai",
+        "bigquery-mlops",
+    }
+
+    mlops_wf = triage_task(
+        "orchestrate BigQuery pipelines with Cloud Workflows and Dataform"
+    )
+    assert mlops_wf.recommended_skill == "bigquery-mlops"
+    assert "bigquery-ai" in mlops_wf.recommended_skills
+
+    mlops_drift = triage_task(
+        "monitor feature drift with ML.VALIDATE_DATA_DRIFT and export ONNX"
+    )
+    assert mlops_drift.recommended_skill == "bigquery-mlops"
+    assert "ML.VALIDATE_DATA_DRIFT" in mlops_drift.format_text()
+
+    assert set(forecast.recommended_skills) >= {"bigquery-ml", "bigquery-ai"}
+    assert set(leakage.recommended_skills) >= {"bigquery-ml", "bigquery-mlops"}
 
 
 def test_get_walkthrough_resolves_narratives_and_variants() -> None:
@@ -587,7 +648,10 @@ def test_mcp_resources_and_prompts_protocol() -> None:
     resources = res_list["result"]["resources"]  # type: ignore[index]
     uris = {r["uri"] for r in resources}
     assert "bqds://skill/bigquery-data-science" in uris
+    assert "bqds://skill/bigquery-mlops" in uris
     assert "bqds://reference/bigquery-data-science/namespace-matrix" in uris
+    assert "bqds://reference/bigquery-data-science/cross-skill-playbooks" in uris
+    assert "bqds://reference/bigquery-mlops/orchestration-and-pipelines" in uris
 
     tmpl_list = handle_message(
         {

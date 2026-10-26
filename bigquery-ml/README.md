@@ -62,7 +62,7 @@ This project's Agent Skill content lives centrally in [`skills/`](../skills/) at
 - **Google Antigravity, Codex, and other `.agents/skills/`-compatible tools** — discovered from the repo-root `.agents/skills/bigquery-ml/` symlink, using the same `SKILL.md` files.
 - **Standalone / other repos** — the whole `skills/bigquery-ml/` folder is self-contained and can be copied into any other project.
 
-Not sure whether BigQuery ML or [BigQuery AI Functions](../bigquery-ai/) fits your task? The [`bigquery-data-science`](../skills/bigquery-data-science/SKILL.md) skill triages between the two.
+Not sure whether BigQuery ML, [BigQuery AI Functions](../bigquery-ai/), or production MLOps ([`bigquery-mlops`](../skills/bigquery-mlops/SKILL.md)) fits your task — or need to compose `ML.*` and `AI.*` together? The [`bigquery-data-science`](../skills/bigquery-data-science/SKILL.md) skill and its [Cross-Skill Composition Playbooks](../skills/bigquery-data-science/reference/cross-skill-playbooks.md) route and compose across all four skills.
 
 ## Models
 
@@ -162,35 +162,37 @@ Operationalizing the workflows — MLOps on BigQuery. Same logic, scheduled and 
 ## How BigQuery ML Fits Together
 
 ```mermaid
+%%{init: {'flowchart': {'wrappingWidth': 360, 'nodeSpacing': 24, 'rankSpacing': 28}}}%%
 flowchart TD
-    DATA["DATA (BigQuery Table or Query)"] --> PREP["Model-Free ML.* Preprocessing & Point-in-Time Features<br/>ML.STANDARD_SCALER · ML.BUCKETIZE · ML.ONE_HOT_ENCODER<br/>ML.IMPUTER · ML.FEATURE_CROSS · ML.ENTITY_FEATURES_AT_TIME<br/>(Standalone in SELECT/FROM, or embedded inside TRANSFORM)"]
-    PREP --> MODEL["CREATE MODEL<br/>Trains & stores a model in your dataset (+ optional TRANSFORM & NUM_TRIALS)<br/>LOGISTIC_REG · LINEAR_REG · BOOSTED_TREE_* · RANDOM_FOREST_*<br/>DNN_* · WIDE_AND_DEEP_* · AUTOML_* · ARIMA_PLUS · ARIMA_PLUS_XREG<br/>KMEANS · PCA · AUTOENCODER · MATRIX_FACTORIZATION · CONTRIBUTION_ANALYSIS"]
-
-    subgraph SCORE["Evaluate & Score (Model Lifecycle)"]
+    subgraph TRAIN["1. Data Preparation, Point-in-Time Features &amp; Model Training"]
         direction LR
-        EVAL["Evaluation<br/>ML.EVALUATE · ML.METRICS<br/>ML.CONFUSION_MATRIX<br/>ML.ROC_CURVE · ML.ARIMA_EVALUATE"]
-        INFER["Inference & Scoring<br/>ML.PREDICT · ML.FORECAST<br/>ML.RECOMMEND · ML.DETECT_ANOMALIES<br/>ML.GET_INSIGHTS · ML.TRANSFORM"]
+        DATA["<b>Data &amp; Temporal Features</b><br/>BigQuery Tables &amp; Views<br/>ML.ENTITY_FEATURES_AT_TIME<br/>ML.FEATURES_AT_TIME"]
+        PREP["<b>Model-Free ML.* Preprocessing</b><br/>ML.STANDARD_SCALER · ML.BUCKETIZE<br/>ML.ONE_HOT_ENCODER · ML.IMPUTER<br/>Standalone or inside TRANSFORM"]
+        MODEL["<b>CREATE MODEL (23 Model Types)</b><br/>LINEAR/LOGISTIC_REG · BOOSTED_TREE_*<br/>RANDOM_FOREST_* · DNN_* · ARIMA_PLUS<br/>KMEANS · PCA · MATRIX_FACTORIZATION"]
+        DATA --> PREP --> MODEL
     end
 
-    subgraph EXPLAIN["Explainability, Weights & Training Metadata"]
+    subgraph SCORE["2. Evaluate, Score &amp; Explain (Model Lifecycle)"]
         direction LR
-        LOCAL_EXP["Local Explainability<br/>ML.EXPLAIN_PREDICT<br/>ML.EXPLAIN_FORECAST<br/>(Per-row feature attributions)"]
-        GLOBAL_EXP["Global Explainability & Weights<br/>ML.GLOBAL_EXPLAIN · ML.FEATURE_IMPORTANCE<br/>ML.WEIGHTS · ML.ADVANCED_WEIGHTS<br/>ML.CENTROIDS · ML.PRINCIPAL_COMPONENTS"]
-        META["Training & Tuning Metadata<br/>ML.TRAINING_INFO · ML.FEATURE_INFO<br/>ML.TRIAL_INFO · ML.HOLIDAY_INFO"]
+        EVAL["<b>Evaluation</b><br/>ML.EVALUATE · ML.METRICS<br/>ML.CONFUSION_MATRIX · ML.ROC_CURVE<br/>ML.ARIMA_EVALUATE"]
+        INFER["<b>Inference &amp; Scoring</b><br/>ML.PREDICT · ML.FORECAST<br/>ML.RECOMMEND · ML.DETECT_ANOMALIES<br/>ML.GET_INSIGHTS · ML.TRANSFORM"]
+        EXP["<b>Explainability &amp; Metadata</b><br/>ML.EXPLAIN_PREDICT · ML.GLOBAL_EXPLAIN<br/>ML.FEATURE_IMPORTANCE · ML.WEIGHTS<br/>ML.TRAINING_INFO · ML.TRIAL_INFO"]
+        EVAL ~~~ INFER ~~~ EXP
     end
 
-    subgraph MGMT["Model Portability, Remote Serving & Monitoring"]
+    subgraph OPS["3. Portability, Hybrid Serving, Drift Monitoring &amp; Orchestration"]
         direction LR
-        PORT["Import / Export / Remote<br/>EXPORT MODEL (→ GCS / Vertex Registry)<br/>Imported (ONNX · TF · TFLite · XGBoost)<br/>REMOTE WITH CONNECTION (→ Vertex Endpoint)<br/>TRANSFORM_ONLY (reusable preprocessing)"]
-        MON["Dataset Drift & Skew Monitoring<br/>ML.DESCRIBE_DATA · ML.VALIDATE_DATA_SKEW<br/>ML.VALIDATE_DATA_DRIFT · ML.TFDV_*"]
+        PORT["<b>Registry, Export, Import &amp; Remote</b><br/>model_registry='VERTEX_AI' · EXPORT MODEL<br/>Imported (ONNX · TF · TFLite · XGBoost)<br/>REMOTE WITH CONNECTION · TRANSFORM_ONLY"]
+        MON["<b>Dataset Drift &amp; Skew Monitoring</b><br/>ML.DESCRIBE_DATA<br/>ML.VALIDATE_DATA_SKEW<br/>ML.VALIDATE_DATA_DRIFT"]
+        PIPE["<b>8 Production Orchestration Pipelines</b><br/>SQL Scripting · Scheduled Queries · Dataform<br/>dbt · Cloud Workflows · Vertex KFP<br/>Managed Airflow (Composer Gen 3)"]
+        PORT ~~~ MON ~~~ PIPE
     end
 
-    subgraph OPS["Production Orchestration (bigquery-ml/pipelines/)"]
-        direction LR
-        PIPE["Scheduled Retrain, Drift Gate & Scoring<br/>SQL Scripting · Scheduled Queries · Dataform · dbt<br/>Cloud Workflows · Managed Airflow (Composer Gen 3) · Vertex AI Pipelines (KFP)"]
-    end
+    TRAIN --> SCORE --> OPS
 
-    MODEL --> SCORE --> EXPLAIN --> MGMT --> OPS
+    style TRAIN fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style SCORE fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style OPS fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
 
     classDef data fill:#E8F0FE,stroke:#4285F4,stroke-width:2px,color:#174EA6
     classDef config fill:#FEF7E0,stroke:#F9AB00,stroke-width:2px,color:#7A5A00
@@ -198,7 +200,7 @@ flowchart TD
     classDef compute fill:#E6F4EA,stroke:#34A853,stroke-width:2px,color:#0D652D
     class DATA,PREP data
     class MODEL route
-    class EVAL,INFER,LOCAL_EXP,GLOBAL_EXP,META compute
+    class EVAL,INFER,EXP compute
     class PORT,MON,PIPE config
 ```
 

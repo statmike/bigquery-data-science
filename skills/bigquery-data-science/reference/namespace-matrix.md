@@ -7,13 +7,15 @@ Contents:
 - [Model Lifecycle & Model-Free Functions (`ML.*` in `bigquery-ml`)](#model-lifecycle--model-free-functions-ml-in-bigquery-ml)
 - [Generative, Foundation & Managed Functions (`AI.*` & `VECTOR_SEARCH` in `bigquery-ai`)](#generative-foundation--managed-functions-ai--vector_search-in-bigquery-ai)
 - [Pre-Trained Cloud AI Service Models & Object Infrastructure (`bigquery-ai`)](#pre-trained-cloud-ai-service-models--object-infrastructure-bigquery-ai)
+- [Production MLOps, Registry, Monitoring & Feature Store (`bigquery-mlops`)](#production-mlops-registry-monitoring--feature-store-bigquery-mlops)
 
 ## Why Namespace Prefix != Skill Folder
 
-BigQuery's SQL prefix (`ML.*` vs `AI.*`) reflects when a feature was introduced and whether a `MODEL` DDL handle exists — **not** whether a model is trained:
+BigQuery's SQL prefix (`ML.*` vs `AI.*`) reflects when a feature was introduced and whether a `MODEL` DDL handle exists — **not** whether a model is trained or which operational skill governs it:
 
 - **Cross-prefix placement in [`bigquery-ml`](../../bigquery-ml/SKILL.md)**: `AI.CAUSAL_EFFECT` uses the `AI.*` prefix (model-free interrupted time-series counterfactual TVF) but is documented in `bigquery-ml` alongside `ARIMA_PLUS` and the econometric causal inference workflows (`difference_in_differences`, `synthetic_control`, `propensity_score_matching`, `price_elasticity_dml`, `uplift_cate`).
 - **Cross-prefix placement in [`bigquery-ai`](../../bigquery-ai/SKILL.md)**: `ML.PROCESS_DOCUMENT`, `ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, and `ML.TRANSCRIBE` use `CREATE MODEL ... OPTIONS(REMOTE_SERVICE_TYPE = '...')` and `ML.*` TVFs, plus legacy `ML.GENERATE_TEXT` and `ML.GENERATE_EMBEDDING`, and are documented in `bigquery-ai`.
+- **Cross-domain operationalization in [`bigquery-mlops`](../../bigquery-mlops/SKILL.md)**: `EXPORT MODEL`, imported models (`ONNX`, `XGBOOST`, `TENSORFLOW`, `TENSORFLOW_LITE`), `REMOTE WITH CONNECTION` (`endpoint = 'https://...'`), `TRANSFORM_ONLY`, `ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW`, `ML.METRICS`, `ML.ENTITY_FEATURES_AT_TIME`, `ML.FEATURES_AT_TIME`, and the 8 production orchestrators apply across native BQML models, `AI.*` foundation workflows, and external models logging to BigQuery. See [`cross-skill-playbooks.md`](cross-skill-playbooks.md) for multi-skill composition patterns.
 
 ## BigQuery Edition Reservation Requirements
 
@@ -111,3 +113,14 @@ Most BigQuery ML and BigQuery AI features run on standard on-demand pricing, **e
 | `ML.ANNOTATE_IMAGE` | `bigquery-ai` | Cloud Vision (`CLOUD_AI_VISION_V1`) | `CLOUD_RESOURCE` (`roles/serviceusage.serviceUsageConsumer`) | On-demand OK | GA | `bigquery-ai/narrative/ml_annotate_image.md` |
 | `ML.TRANSCRIBE` | `bigquery-ai` | Cloud Speech-to-Text (`CLOUD_AI_SPEECH_V1`) | `CLOUD_RESOURCE` (`roles/speech.client` + `serviceUsageConsumer` + Recon SA grant) | On-demand OK | GA | `bigquery-ai/narrative/ml_transcribe.md` |
 | `OBJ.MAKE_REF` / `OBJ.FETCH_METADATA` / `OBJ.GET_ACCESS_URL` / `OBJ.LIST` / `OBJ.READ` | `bigquery-ai` | Unstructured `ObjectRef` Functions | `CLOUD_RESOURCE` (`roles/storage.objectViewer`) | On-demand OK (Object Table + remote model joins may require Enterprise) | GA / Preview | `bigquery-ai/narrative/multimodal_analysis.md` |
+
+## Production MLOps, Registry, Monitoring & Feature Store (`bigquery-mlops`)
+
+For production operationalization across both `bigquery-ml` and `bigquery-ai` (as well as external models served in Vertex AI, Cloud Run, or GKE that log inference tables to BigQuery), consult **[`bigquery-mlops`](../../bigquery-mlops/SKILL.md)**:
+
+| Operational Pillar | Key SQL / Control-Plane Surfaces | Guide in `bigquery-mlops` |
+| --- | --- | --- |
+| **1. Production Orchestration (8 Engines)** | `sql_scripting`, `scheduled_queries`, `dataform`, `cloud_workflows`, `dbt`, `vertex_kfp`, `composer_airflow`, `airflow_with_kfp` (`useQueryCache: false` / `'false'`) | [`orchestration-and-pipelines.md`](../../bigquery-mlops/reference/orchestration-and-pipelines.md) |
+| **2. Model Registry, Export, Import & Hybrid Serving** | `model_registry='VERTEX_AI'`, `EXPORT MODEL` (`xgboost_version='2.1'`), `IMPORT MODEL` (`ONNX`, `XGBOOST`, `TENSORFLOW`, `TENSORFLOW_LITE`), `REMOTE WITH CONNECTION` (`endpoint='https://...'`), `TRANSFORM_ONLY` | [`model-registry-export-and-serving.md`](../../bigquery-mlops/reference/model-registry-export-and-serving.md) |
+| **3 & 4. Universal Drift Monitoring & Model-Free Evaluation** | 3-arg `ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW`, `ML.DESCRIBE_DATA`, `ML.METRICS`, `ML.EVALUATE`, `AI.EVALUATE` | [`monitoring-drift-and-evaluation.md`](../../bigquery-mlops/reference/monitoring-drift-and-evaluation.md) |
+| **5. Point-in-Time Feature Store & Skew Audits** | `ML.ENTITY_FEATURES_AT_TIME`, `ML.FEATURES_AT_TIME`, `ignore_feature_nulls`, 3-arm skew audit, Vertex AI Feature Store sync | [`feature-store-and-temporal-joins.md`](../../bigquery-mlops/reference/feature-store-and-temporal-joins.md) |

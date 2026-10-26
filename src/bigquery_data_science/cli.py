@@ -792,7 +792,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_search = sub.add_parser(
         "search",
-        help="Search across all 3 skills and 4 progressive lenses.",
+        help="Search across all 4 skills and 4 progressive lenses.",
     )
     p_search.add_argument("query", help="Search keywords or phrase.")
     p_search.add_argument("--skill", default=None, help="Optional skill filter.")

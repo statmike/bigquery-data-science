@@ -2,7 +2,7 @@
 name: bigquery-ai
 description: Use when calling Gemini, TimesFM, TabFM, or pre-trained Cloud AI services from BigQuery SQL or BigFrames — generation (AI.GENERATE*, AI.COUNT_TOKENS), managed scoring/classification (AI.IF, AI.SCORE, AI.CLASSIFY, AI.AGG), embeddings and vector/hybrid search (AI.EMBED, VECTOR_SEARCH, AI.SEARCH), forecasting/prediction (AI.FORECAST, AI.PREDICT, AI.KEY_DRIVERS), and Cloud AI service models (ML.PROCESS_DOCUMENT, ML.TRANSLATE, ML.TRANSCRIBE).
 metadata:
-  version: "0.9.1"
+  version: "0.10.0"
 ---
 
 # BigQuery AI (`bigquery-ai`)
@@ -22,7 +22,14 @@ This skill packages a verified, field-tested 4-Lens reference distilled from liv
 7. **Do you need a pre-trained Cloud AI service (`REMOTE_SERVICE_TYPE`) with a fixed API schema and per-row status column** (`ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`, `ML.PROCESS_DOCUMENT`)? → see [`reference/cloud-ai-service-models.md`](reference/cloud-ai-service-models.md)
 8. **Are you composing multiple capabilities into an end-to-end application** (RAG, hybrid catalog search, document intelligence, log triage, content moderation, metric diagnostics)? → see [`reference/workflows.md`](reference/workflows.md)
 
-If the task is ambiguous between zero-training foundation functions (`bigquery-ai`) and trained models (`bigquery-ml`), consult [`../bigquery-data-science/SKILL.md`](../bigquery-data-science/SKILL.md) first.
+If the task is ambiguous between zero-training foundation functions (`bigquery-ai`), trained models (`bigquery-ml`), or production orchestration/monitoring (`bigquery-mlops`), consult [`../bigquery-data-science/SKILL.md`](../bigquery-data-science/SKILL.md) first.
+
+## Composing With Sister Skills (`bigquery-ml`, `bigquery-mlops`, `bigquery-data-science`)
+
+| When Your `bigquery-ai` Task Also Needs... | Combine With... | Exact Handoff Guide |
+| --- | --- | --- |
+| Feeding `AI.EMBED` or `AI.GENERATE_TABLE` features into a supervised classifier/regressor, distilling `AI.CLASSIFY` teacher labels into a fast student model (`BOOSTED_TREE_*` / `LOGISTIC_REG`), custom holiday/hierarchical forecasting (`ARIMA_PLUS`), `> 12`-dimension attribution (`CONTRIBUTION_ANALYSIS`), or causal inference (`AI.CAUSAL_EFFECT`, DiD, Synthetic Control) | **[`bigquery-ml`](../bigquery-ml/SKILL.md)** | [`../bigquery-data-science/reference/cross-skill-playbooks.md`](../bigquery-data-science/reference/cross-skill-playbooks.md) (Playbooks 1–4) |
+| Scheduling recurring `AI.EMBED` + `ALTER VECTOR INDEX` or `AI.FORECAST` pipelines across the 8 orchestrators, monitoring `ARRAY<FLOAT64>` embedding or output drift (`ML.VALIDATE_DATA_DRIFT`), deterministically scoring saved `AI.PREDICT` / `AI.CLASSIFY` tables (`ML.METRICS`), or joining features point-in-time (`ML.ENTITY_FEATURES_AT_TIME`) | **[`bigquery-mlops`](../bigquery-mlops/SKILL.md)** | [`../bigquery-mlops/reference/orchestration-and-pipelines.md`](../bigquery-mlops/reference/orchestration-and-pipelines.md) · [`../bigquery-mlops/reference/monitoring-drift-and-evaluation.md`](../bigquery-mlops/reference/monitoring-drift-and-evaluation.md) · [`../bigquery-mlops/reference/feature-store-and-temporal-joins.md`](../bigquery-mlops/reference/feature-store-and-temporal-joins.md) |
 
 ## Tool Wrapper & Generator Rules (SQL + `bigframes.bigquery.ai`)
 

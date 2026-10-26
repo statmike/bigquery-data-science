@@ -89,6 +89,7 @@ def test_validate_all_passes_on_repository_skills() -> None:
         "bigquery-data-science",
         "bigquery-ml",
         "bigquery-ai",
+        "bigquery-mlops",
     }
     for name, res in results.items():
         assert res.ok, f"Skill {name} failed validation: {res.errors}"
@@ -345,7 +346,12 @@ def test_bump_version_and_lockstep_parity_check(tmp_path: Path) -> None:
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(REPO_ROOT / rel_file, dest)
 
-    for skill_name in ("bigquery-data-science", "bigquery-ml", "bigquery-ai"):
+    for skill_name in (
+        "bigquery-data-science",
+        "bigquery-ml",
+        "bigquery-ai",
+        "bigquery-mlops",
+    ):
         skill_dest = tmp_path / "skills" / skill_name
         skill_dest.mkdir(parents=True, exist_ok=True)
         for fname in ("SKILL.md", "skill.manifest.json"):
@@ -357,7 +363,7 @@ def test_bump_version_and_lockstep_parity_check(tmp_path: Path) -> None:
     assert check_version_lockstep(tmp_path) == []
 
     updated = bump_version(tmp_path, "1.2.3", release_date="2026-10-21")
-    assert len(updated) == 12
+    assert len(updated) == 14
     assert check_version_lockstep(tmp_path, expected_version="1.2.3") == []
     assert (
         'date-released: "2026-10-21"'

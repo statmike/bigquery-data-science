@@ -14,20 +14,48 @@ To prevent context-window bloat while keeping 100% of syntax tables, empirical g
 - **Lens 4 (`narrative/<topic>.md`, 104 walkthroughs)**: Complete, ceremony-stripped markdown walkthroughs extracted from all 61 `bigquery-ml` topic notebooks and 43 `bigquery-ai` topic notebooks via `bigquery-data-science convert-notebook`. Every narrative starts with a clickable GitHub provenance banner linking to the source `.ipynb` and companion `.sql` script.
 
 ```mermaid
+%%{init: {'flowchart': {'wrappingWidth': 360, 'nodeSpacing': 22, 'rankSpacing': 28}}}%%
 flowchart TD
-    User["User / Agent Task"] --> L1_Router["Lens 1: Umbrella Router<br/>skills/bigquery-data-science/SKILL.md"]
-    L1_Router --> Matrix["Lens 2: Prerequisite & Namespace Matrix<br/>skills/bigquery-data-science/reference/namespace-matrix.md"]
-    L1_Router --> L1_ML["Lens 1: Trained Models & Feature Store<br/>skills/bigquery-ml/SKILL.md"]
-    L1_Router --> L1_AI["Lens 1: Foundation Models & Cloud AI<br/>skills/bigquery-ai/SKILL.md"]
+    subgraph L1["Lens 1 — Entry Routers & Guardrails (skills/*/SKILL.md · ~8 KB)"]
+        direction TB
+        L1_Router["<b>bigquery-data-science/SKILL.md</b> (Umbrella Router)<br/>10 Task Comparisons · 6 Multi-Skill Playbooks"]
+        L1_ML["<b>bigquery-ml/SKILL.md</b><br/>Trained Models &amp; Preprocessing"]
+        L1_AI["<b>bigquery-ai/SKILL.md</b><br/>Foundation Models &amp; Search"]
+        L1_MLOPS["<b>bigquery-mlops/SKILL.md</b><br/>Orchestration, Registry &amp; Drift"]
+        L1_Router --> L1_ML
+        L1_Router --> L1_AI
+        L1_Router --> L1_MLOPS
+    end
 
-    L1_ML --> L2_ML["Lens 2: Use-Case Decision Guides<br/>skills/bigquery-ml/reference/*.md (6 guides)"]
-    L1_AI --> L2_AI["Lens 2: Use-Case Decision Guides<br/>skills/bigquery-ai/reference/*.md (8 guides)"]
+    subgraph L2["Lens 2 — Decision Matrices & Playbooks (skills/*/reference/*.md · 20 Guides)"]
+        direction LR
+        L2_DS["<b>bigquery-data-science/reference/</b> (2)<br/>namespace-matrix.md<br/>cross-skill-playbooks.md"]
+        L2_MLAI["<b>bigquery-ml/ (6) &amp; bigquery-ai/ (8)</b><br/>14 Use-Case Decision Guides<br/>Options · Empirical Gotchas · Snippets"]
+        L2_OPS["<b>bigquery-mlops/reference/</b> (4)<br/>Orchestration · Vertex Registry<br/>Drift Monitoring · Feature Store"]
+        L2_DS ~~~ L2_MLAI ~~~ L2_OPS
+    end
 
-    L2_ML --> L3_ML["Lens 3: Per-Statement Syntax Cards (< 25 KB)<br/>skills/bigquery-ml/syntax/*.md (93 cards + INDEX.md)"]
-    L2_AI --> L3_AI["Lens 3: Per-Statement Syntax Cards (< 25 KB)<br/>skills/bigquery-ai/syntax/*.md (44 cards + INDEX.md)"]
+    subgraph L34["Lens 3 (Syntax Cards < 25 KB) & Lens 4 (Worked Narratives ~20 KB)"]
+        direction LR
+        L3["<b>Lens 3 — 137 Per-Statement Syntax Cards</b><br/>93 ML Cards · 44 AI Cards (&lt; 25 KB each)<br/>Auto-sliced at H2 boundaries via sync-syntax"]
+        L4["<b>Lens 4 — 104 Worked Walkthroughs</b><br/>61 ML Walkthroughs · 43 AI Walkthroughs<br/>Ceremony-stripped from .ipynb via sync-narratives"]
+        L3 --> L4
+    end
 
-    L2_ML --> L4_ML["Lens 4: Worked Walkthroughs<br/>skills/bigquery-ml/narrative/*.md (61 walkthroughs)"]
-    L2_AI --> L4_AI["Lens 4: Worked Walkthroughs<br/>skills/bigquery-ai/narrative/*.md (43 walkthroughs)"]
+    L1 --> L2 --> L34
+
+    style L1 fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style L2 fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style L34 fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+
+    classDef data fill:#E8F0FE,stroke:#4285F4,stroke-width:2px,color:#174EA6
+    classDef config fill:#FEF7E0,stroke:#F9AB00,stroke-width:2px,color:#7A5A00
+    classDef route fill:#FCE8E6,stroke:#EA4335,stroke-width:2px,color:#A50E0E
+    classDef compute fill:#E6F4EA,stroke:#34A853,stroke-width:2px,color:#0D652D
+    class L1_Router route
+    class L1_ML,L2_DS data
+    class L1_AI,L3,L4 compute
+    class L1_MLOPS,L2_MLAI,L2_OPS config
 ```
 
 ## Authoring Standard
@@ -46,14 +74,14 @@ All skill markdown, domain reference guides, notebooks, and maintainer Python co
 
 1. **100% Additive & Backward-Compatible**: Existing CLI commands, positional arguments, flags, MCP tool names/schemas, Python exports, and skill paths are never incompatibly altered in `0.x` minor or patch releases. New modes use opt-in flags, and new BigQuery features are appended as new numbered examples.
 2. **Simple Code & Simple English**: Python modules use flat control flow, named constants instead of magic literals, and strict `mypy` typing. Prose opens with a plain-English summary (*what it does, when to use it, and what it requires*) and uses scannable tables over dense paragraphs.
-3. **Vertical-First Mermaid Diagrams (`flowchart TD`)**: Orient the longest flow vertically (`flowchart TD`), cap horizontal width at $\le 3$ nodes per rank (stacking wider sets into vertical `subgraph` blocks) so GitHub never shrinks diagram fonts, wrap text at ~35–45 chars with `<br/>`, and quote labels containing special characters (`id["Label (Detail)"]`).
+3. **Vertical-First Mermaid Diagrams (`flowchart TD`)**: Always open with `%%{init: {'flowchart': {'wrappingWidth': 360, 'nodeSpacing': 24, 'rankSpacing': 28}}}%%` so Mermaid does not wrap node text at its `200px` (`~20`-character) default. Orient the top-level flow vertically (`flowchart TD`), cap horizontal width at $\le 3$ nodes per rank (`direction LR` inside horizontal stage subgraphs with `A ~~~ B ~~~ C` invisible rank links to lock left-to-right order), keep lines $\le 45$ chars with `<br/>`, and quote labels containing special characters (`id["Label (Detail)"]`).
 4. **Clean Markdown & Table Compilation**: Every `.md` file and `.ipynb` markdown cell must compile cleanly with balanced code fences, consistent GFM table column counts across every row, no unescaped `|` characters in cells, and 100% verified relative links and `#anchors`.
 
 ## Change Types and Checklists
 
 ### Semantic Versioning Strategy & Sweep Cadence
 
-This repository, the Python package, and all three agent skills follow a coordinated SemVer structure (`Major.Minor.Patch`):
+This repository, the Python package, and all four agent skills follow a coordinated SemVer structure (`Major.Minor.Patch`):
 
 - **Major (`X.0.0`) — Skills architecture, names & structural contract shifts:**
   - Changes in skills layout, naming, or hierarchy (`skills/`), packaging changes, or removing/incompatibly changing CLI subcommands, MCP tool schemas, or Python library public exports.

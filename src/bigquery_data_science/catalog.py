@@ -138,6 +138,20 @@ _FEATURE_OPS_KEYWORDS: tuple[str, ...] = (
     "dataform",
     "dbt",
     "kfp",
+    "cloud workflows",
+    "mlops",
+    "model registry",
+    "vertex_ai",
+    "export model",
+    "import model",
+    "onnx",
+    "remote with connection",
+    "validate_data_drift",
+    "validate_data_skew",
+    "ml.metrics",
+    "external model",
+    "retrain",
+    "retraining",
     "scaler",
     "scalers",
     "scale",
@@ -155,6 +169,43 @@ _FEATURE_OPS_KEYWORDS: tuple[str, ...] = (
     "preprocessing",
     "describe_data",
     "correlation",
+    "drift",
+    "skew",
+    "features_at_time",
+    "entity_features_at_time",
+)
+
+_MLOPS_PRIMARY_KEYWORDS: tuple[str, ...] = (
+    "feature store",
+    "point in time",
+    "point-in-time",
+    "leakage",
+    "pipeline",
+    "pipelines",
+    "schedule",
+    "scheduled",
+    "orchestrate",
+    "orchestration",
+    "orchestrating",
+    "airflow",
+    "composer",
+    "dataform",
+    "dbt",
+    "kfp",
+    "cloud workflows",
+    "mlops",
+    "model registry",
+    "vertex_ai",
+    "export model",
+    "import model",
+    "onnx",
+    "remote with connection",
+    "validate_data_drift",
+    "validate_data_skew",
+    "ml.metrics",
+    "external model",
+    "retrain",
+    "retraining",
     "drift",
     "skew",
     "features_at_time",
@@ -277,7 +328,7 @@ class SearchHit:
 
 @dataclass
 class TriageResult:
-    """Structured task-routing recommendation across `ML.*` and `AI.*`."""
+    """Structured task-routing recommendation across `ML.*`, `AI.*`, and `bigquery-mlops`."""
 
     query: str
     category: str
@@ -286,6 +337,11 @@ class TriageResult:
     head_to_head: str
     prerequisites: str
     next_steps: list[str]
+    recommended_skills: list[str] = field(default_factory=list)
+
+    def __post_init__(self) -> None:
+        if not self.recommended_skills:
+            self.recommended_skills = [self.recommended_skill]
 
     def to_dict(self) -> dict[str, object]:
         """Convert the triage result to a JSON-serializable dictionary."""
@@ -293,6 +349,7 @@ class TriageResult:
             "query": self.query,
             "category": self.category,
             "recommended_skill": self.recommended_skill,
+            "recommended_skills": self.recommended_skills,
             "primary_options": self.primary_options,
             "head_to_head": self.head_to_head,
             "prerequisites": self.prerequisites,
@@ -303,10 +360,12 @@ class TriageResult:
         """Render the triage decision for CLI and MCP output."""
         options_str = "\n".join(f"- {opt}" for opt in self.primary_options)
         steps_str = "\n".join(f"- {step}" for step in self.next_steps)
+        skills_str = ", ".join(f"`{s}`" for s in self.recommended_skills)
         return (
             f"# BigQuery Data Science Triage: {self.category}\n"
             f"**Query:** {self.query}\n"
-            f"**Recommended Primary Skill:** `{self.recommended_skill}`\n\n"
+            f"**Recommended Primary Skill:** `{self.recommended_skill}`\n"
+            f"**Collaborating Skills:** {skills_str}\n\n"
             f"## Primary Options\n{options_str}\n\n"
             f"## Empirical Head-to-Head Tradeoffs\n{self.head_to_head}\n\n"
             f"## Infrastructure & Prerequisites\n{self.prerequisites}\n\n"
@@ -658,6 +717,7 @@ def triage_task(
             query=query,
             category="Time-Series Decomposition & Structural Change Points",
             recommended_skill="bigquery-ml",
+            recommended_skills=["bigquery-ml", "bigquery-ai"],
             primary_options=[
                 (
                     "`ML.TREND`, `ML.SEASONALITY`, `ML.DETECT_CHANGE_POINTS` "
@@ -692,6 +752,7 @@ def triage_task(
             query=query,
             category="Time-Series Forecasting (`AI.FORECAST` vs `ARIMA_PLUS` / `ARIMA_PLUS_XREG`)",
             recommended_skill="bigquery-data-science",
+            recommended_skills=["bigquery-data-science", "bigquery-ai", "bigquery-ml"],
             primary_options=[
                 (
                     "`AI.FORECAST` on `TimesFM 2.5` (GA) or `TimesFM 3.0` "
@@ -743,6 +804,7 @@ def triage_task(
             query=query,
             category="Causal Inference & Treatment Effect Estimation",
             recommended_skill="bigquery-ml",
+            recommended_skills=["bigquery-ml", "bigquery-ai"],
             primary_options=[
                 (
                     "`AI.CAUSAL_EFFECT` (`bigquery-ml/workflows/causal_effect` — "
@@ -788,6 +850,7 @@ def triage_task(
                 "(`AI.KEY_DRIVERS` vs `CONTRIBUTION_ANALYSIS`)"
             ),
             recommended_skill="bigquery-ai",
+            recommended_skills=["bigquery-ai", "bigquery-ml"],
             primary_options=[
                 (
                     "`AI.KEY_DRIVERS` (`bigquery-ai` — GA model-free TVF for "
@@ -823,6 +886,7 @@ def triage_task(
             query=query,
             category="Embeddings, Vector Search & Hybrid Retrieval",
             recommended_skill="bigquery-ai",
+            recommended_skills=["bigquery-ai", "bigquery-ml", "bigquery-mlops"],
             primary_options=[
                 (
                     "Text/multimodal embeddings: `AI.EMBED` (scalar, no `CREATE MODEL` "
@@ -866,6 +930,7 @@ def triage_task(
             query=query,
             category="Unstructured Media, Document AI & Pre-Trained Cloud AI Services",
             recommended_skill="bigquery-ai",
+            recommended_skills=["bigquery-ai", "bigquery-ml"],
             primary_options=[
                 (
                     "Pre-trained Cloud AI service remote models (`REMOTE_SERVICE_TYPE`): "
@@ -906,39 +971,59 @@ def triage_task(
         )
 
     if _matches_any(text, _FEATURE_OPS_KEYWORDS):
+        is_mlops_primary = _matches_any(text, _MLOPS_PRIMARY_KEYWORDS)
+        primary_skill = "bigquery-mlops" if is_mlops_primary else "bigquery-ml"
+        collab_skills = (
+            ["bigquery-mlops", "bigquery-ml", "bigquery-ai"]
+            if is_mlops_primary
+            else ["bigquery-ml", "bigquery-mlops"]
+        )
         return TriageResult(
             query=query,
             category="Feature Retrieval, Preprocessing, Drift Monitoring & MLOps Pipelines",
-            recommended_skill="bigquery-ml",
+            recommended_skill=primary_skill,
+            recommended_skills=collab_skills,
             primary_options=[
                 (
                     "Point-in-time feature retrieval: `ML.ENTITY_FEATURES_AT_TIME` "
-                    "(training) and `ML.FEATURES_AT_TIME` (serving) in `bigquery-ml`"
+                    "(training) and `ML.FEATURES_AT_TIME` (serving) in "
+                    "`bigquery-mlops` / `bigquery-ml`"
                 ),
                 (
-                    "EDA & drift monitoring: `ML.DESCRIBE_DATA`, `ML.CORRELATION`, "
-                    "`ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW` in `bigquery-ml`"
+                    "Universal drift monitoring & model-free evaluation: `ML.DESCRIBE_DATA`, "
+                    "`ML.CORRELATION`, `ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW`, "
+                    "`ML.METRICS` (for BQML, `AI.*`, and external models logging to BigQuery) "
+                    "in `bigquery-mlops`"
                 ),
                 (
-                    "8 production orchestration pipelines (`sql_scripting`, "
-                    "`scheduled_queries`, `dataform`, `cloud_workflows`, `dbt`, "
-                    "`vertex_kfp`, `composer_airflow`, `airflow_with_kfp`) in `bigquery-ml`"
+                    "8 production orchestrators (`sql_scripting`, `scheduled_queries`, "
+                    "`dataform`, `cloud_workflows`, `dbt`, `vertex_kfp`, `composer_airflow`, "
+                    "`airflow_with_kfp`) and Vertex AI Model Registry / `EXPORT` / "
+                    "`IMPORT` / `REMOTE` in `bigquery-mlops`"
                 ),
             ],
             head_to_head=(
                 "Use `ML.ENTITY_FEATURES_AT_TIME` instead of a `GROUP BY` latest-row join "
                 "to eliminate future label leakage (`roc_auc` 0.9387 leaky vs 0.5194 honest). "
                 "Set `ignore_feature_nulls => TRUE` on sparse/EAV feature tables, and "
-                "`FALSE` on dense snapshot tables."
+                "`FALSE` on dense snapshot tables. Use 3-arg `ML.VALIDATE_DATA_DRIFT` and "
+                "`ML.METRICS` (`TABLE` form, `BOOL` labels) to monitor and score BQML, "
+                "`AI.*`, and external Vertex AI / Cloud Run models logging to BigQuery."
             ),
             prerequisites=(
-                "All preprocessing, point-in-time feature retrieval, and drift functions "
-                "are model-free SQL functions requiring no connection and no reservation."
+                "All preprocessing, point-in-time feature retrieval, `ML.VALIDATE_DATA_DRIFT`, "
+                "and `ML.METRICS` functions are model-free SQL functions requiring no connection "
+                "and no reservation."
             ),
             next_steps=[
                 (
+                    "Inspect `skills/bigquery-mlops/SKILL.md`, "
+                    "`skills/bigquery-mlops/reference/orchestration-and-pipelines.md`, and "
+                    "`skills/bigquery-mlops/reference/monitoring-drift-and-evaluation.md`"
+                ),
+                (
                     "Inspect `skills/bigquery-ml/reference/preprocessing-functions.md` "
-                    "and `workflows-and-pipelines.md`"
+                    "and `skills/bigquery-data-science/reference/cross-skill-playbooks.md`"
                 ),
                 "Run `bigquery-data-science lookup ML.ENTITY_FEATURES_AT_TIME`",
             ],
@@ -949,6 +1034,7 @@ def triage_task(
             query=query,
             category="Generative SQL, Managed Classification/Scoring & Group Synthesis",
             recommended_skill="bigquery-ai",
+            recommended_skills=["bigquery-ai", "bigquery-ml", "bigquery-mlops"],
             primary_options=[
                 (
                     "General-purpose generation: `AI.GENERATE` (with optional "
@@ -988,6 +1074,7 @@ def triage_task(
         query=query,
         category="Tabular Prediction, Classification & Regression (`bigquery-ml` vs `AI.PREDICT`)",
         recommended_skill="bigquery-ml",
+        recommended_skills=["bigquery-ml", "bigquery-ai", "bigquery-mlops"],
         primary_options=[
             (
                 "Trained BigQuery ML models: `LOGISTIC_REG`, `LINEAR_REG`, "
@@ -998,7 +1085,10 @@ def triage_task(
                 "Zero-training tabular foundation model: `AI.PREDICT` + "
                 "`AI.EVALUATE` (TabFM in `bigquery-ai`, Preview)"
             ),
-            "Model-free evaluation of saved predictions: `ML.METRICS` (`bigquery-ml`, Preview)",
+            (
+                "Model-free evaluation of saved predictions: `ML.METRICS` "
+                "(`bigquery-mlops` / `bigquery-ml`, Preview)"
+            ),
         ],
         head_to_head=(
             "Choose trained `bigquery-ml` models when you need reproducible predictions, "

@@ -59,7 +59,7 @@ This project's Agent Skill content lives centrally in [`skills/`](../skills/) at
 - **Google Antigravity, Codex, and other `.agents/skills/`-compatible tools** — discovered from the repo-root `.agents/skills/bigquery-ai/` symlink, using the same `SKILL.md` files.
 - **Standalone / other repos** — the whole `skills/bigquery-ai/` folder is self-contained and can be copied into any other project.
 
-Not sure whether BigQuery AI Functions or [BigQuery ML](../bigquery-ml/) fits your task? The [`bigquery-data-science`](../skills/bigquery-data-science/SKILL.md) skill triages between the two.
+Not sure whether BigQuery AI Functions, [BigQuery ML](../bigquery-ml/), or production MLOps ([`bigquery-mlops`](../skills/bigquery-mlops/SKILL.md)) fits your task — or need to compose `AI.*` and `ML.*` together? The [`bigquery-data-science`](../skills/bigquery-data-science/SKILL.md) skill and its [Cross-Skill Composition Playbooks](../skills/bigquery-data-science/reference/cross-skill-playbooks.md) route and compose across all four skills.
 
 ---
 
@@ -222,60 +222,64 @@ Two built-in foundation models sit behind these functions: **TimesFM** for time 
 ## How Functions Relate
 
 ```mermaid
+%%{init: {'flowchart': {'wrappingWidth': 360, 'nodeSpacing': 22, 'rankSpacing': 26}}}%%
 flowchart TD
     subgraph GEN["1. General-Purpose Generation (Gemini)"]
-        direction TB
-        G1["AI.GENERATE (Scalar · No CREATE MODEL)<br/>Text or structured output_schema · Multimodal ObjectRef"]
-        G2["Typed Scalar Shorthands (No CREATE MODEL)<br/>AI.GENERATE_BOOL · AI.GENERATE_DOUBLE · AI.GENERATE_INT"]
-        G3["Table-Valued & Utility Functions<br/>AI.GENERATE_TABLE (TVF structured output)<br/>AI.GENERATE_TEXT / ML.GENERATE_TEXT (TVF · requires CREATE MODEL)<br/>AI.COUNT_TOKENS (Free local input token counter)"]
-        G1 --> G2 --> G3
+        direction LR
+        G1["<b>AI.GENERATE</b> (Scalar · No Model)<br/>Free-text or structured output_schema<br/>Multimodal ObjectRef · Search Grounding"]
+        G2["<b>Typed Scalar Shorthands</b> (No Model)<br/>AI.GENERATE_BOOL<br/>AI.GENERATE_DOUBLE · AI.GENERATE_INT"]
+        G3["<b>Table-Valued &amp; Token Utilities</b><br/>AI.GENERATE_TABLE (TVF structured output)<br/>AI.GENERATE_TEXT · AI.COUNT_TOKENS"]
+        G1 ~~~ G2 ~~~ G3
     end
 
     subgraph MGD["2. Managed Task Functions (Gemini · No CREATE MODEL)"]
-        direction TB
-        M1["AI.IF — Auto-optimized boolean filter (SELECT / WHERE / JOIN)"]
-        M2["AI.SCORE — Auto-rubric continuous scoring (FLOAT64)"]
-        M3["AI.CLASSIFY — Multi-category assignment (STRING / ARRAY&lt;STRING&gt;)"]
-        M4["AI.AGG — Group-level summarization across rows (GROUP BY)"]
-        M1 --- M2 --- M3 --- M4
+        direction LR
+        M1["<b>AI.IF &amp; AI.SCORE</b> (Row-Level)<br/>AI.IF — Boolean filter (SELECT/WHERE/JOIN)<br/>AI.SCORE — Auto-rubric FLOAT64 rating"]
+        M2["<b>AI.CLASSIFY</b> (Categorization)<br/>Single or multi-label category assignment<br/>(STRING or ARRAY&lt;STRING&gt;)"]
+        M3["<b>AI.AGG</b> (Aggregate Summarization)<br/>Group-level synthesis across rows<br/>with GROUP BY"]
+        M1 ~~~ M2 ~~~ M3
     end
 
-    subgraph EMB["3. Embeddings & Semantic / Hybrid Search"]
-        direction TB
-        E1["Embedding Generation<br/>AI.EMBED (Scalar · No CREATE MODEL · Text &amp; Multimodal)<br/>AI.GENERATE_EMBEDDING / ML.GENERATE_EMBEDDING (TVF · requires CREATE MODEL)"]
-        E2["Similarity &amp; Vector Retrieval<br/>AI.SIMILARITY (Scalar cosine similarity between 2 inputs)<br/>VECTOR_SEARCH + CREATE VECTOR INDEX (Top-K over pre-computed embeddings)<br/>AI.SEARCH (Simplified search over autonomous embedding column)<br/>Hybrid Search = VECTOR_SEARCH / AI.SEARCH + SEARCH (BM25) + RRF"]
-        E1 --> E2
+    subgraph EMB["3. Embeddings &amp; Semantic / Hybrid Search"]
+        direction LR
+        E1["<b>Embedding Generation</b><br/>AI.EMBED (Scalar · No Model · Text &amp; Media)<br/>AI.GENERATE_EMBEDDING (TVF)"]
+        E2["<b>Vector &amp; Autonomous Search</b><br/>AI.SIMILARITY · VECTOR_SEARCH (+ Index)<br/>AI.SEARCH (Autonomous embedding column)"]
+        E3["<b>Hybrid Search Pattern</b><br/>VECTOR_SEARCH / AI.SEARCH (Semantic)<br/>+ SEARCH (BM25) + Reciprocal Rank Fusion"]
+        E1 ~~~ E2 ~~~ E3
     end
 
-    subgraph PRED["4. Predictive AI & Augmented Analytics (No CREATE MODEL)"]
-        direction TB
-        P1["TimesFM (Time Series)<br/>AI.FORECAST · AI.DETECT_ANOMALIES · AI.EVALUATE<br/>(Pin model =&gt; 'TimesFM 2.5' or 'TimesFM 3.0')"]
-        P2["TabFM (Zero-Shot Tabular)<br/>AI.PREDICT · AI.EVALUATE<br/>(Inline training + test tables in one query)"]
-        P3["Augmented Analytics &amp; Causal Impact<br/>AI.KEY_DRIVERS (Segment driver analysis)<br/>AI.CAUSAL_EFFECT (Counterfactual impact → covered in bigquery-ml)"]
-        P1 --- P2 --- P3
+    subgraph PRED["4. Predictive AI &amp; Augmented Analytics (No CREATE MODEL)"]
+        direction LR
+        P1["<b>TimesFM (Time Series)</b><br/>AI.FORECAST · AI.DETECT_ANOMALIES<br/>AI.EVALUATE ('TimesFM 2.5' / '3.0')"]
+        P2["<b>TabFM (Zero-Shot Tabular)</b><br/>AI.PREDICT · AI.EVALUATE<br/>Inline train + test tables in one query"]
+        P3["<b>Driver &amp; Counterfactual Analysis</b><br/>AI.KEY_DRIVERS (Segment driver ranking)<br/>AI.CAUSAL_EFFECT (in bigquery-ml)"]
+        P1 ~~~ P2 ~~~ P3
     end
 
-    subgraph DOC["5. Document Processing & Pre-Trained Cloud AI Service Models"]
-        direction TB
-        D1["Document AI<br/>ML.PROCESS_DOCUMENT (Object table + Document AI processor + REMOTE model)<br/>AI.PARSE_DOCUMENT (Layout Parser · currently offline / docs withdrawn)"]
-        D2["Cloud AI Service Models (All require CREATE MODEL ... REMOTE)<br/>ML.TRANSLATE (Translation V3) · ML.UNDERSTAND_TEXT (Natural Language)<br/>ML.ANNOTATE_IMAGE (Vision API) · ML.TRANSCRIBE (Speech-to-Text V2)"]
-        D1 --- D2
+    subgraph DOC["5. Document Processing &amp; Pre-Trained Cloud AI Service Models"]
+        direction LR
+        D1["<b>Document AI</b><br/>ML.PROCESS_DOCUMENT (Object table + REMOTE)<br/>AI.PARSE_DOCUMENT (Layout Parser)"]
+        D2["<b>Text &amp; Speech Cloud AI (REMOTE)</b><br/>ML.TRANSLATE (Translation V3)<br/>ML.UNDERSTAND_TEXT · ML.TRANSCRIBE"]
+        D3["<b>Vision Cloud AI (REMOTE)</b><br/>ML.ANNOTATE_IMAGE (Vision API)<br/>Object tables + Cloud Resource Connection"]
+        D1 ~~~ D2 ~~~ D3
     end
 
-    GEN --- MGD
-    EMB --- PRED
-    MGD --- DOC
-    PRED --- DOC
+    GEN --> MGD --> EMB --> PRED --> DOC
+
+    style GEN fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style MGD fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style EMB fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style PRED fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style DOC fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
 
     classDef data fill:#E8F0FE,stroke:#4285F4,stroke-width:2px,color:#174EA6
     classDef config fill:#FEF7E0,stroke:#F9AB00,stroke-width:2px,color:#7A5A00
     classDef route fill:#FCE8E6,stroke:#EA4335,stroke-width:2px,color:#A50E0E
     classDef compute fill:#E6F4EA,stroke:#34A853,stroke-width:2px,color:#0D652D
-    class G1,G2,G3 data
-    class M1,M2,M3,M4 compute
-    class E1,E2 config
+    class G1,G2,G3,D1,D2,D3 data
+    class M1,M2,M3 compute
+    class E1,E2,E3 config
     class P1,P2,P3 route
-    class D1,D2 data
 ```
 
 **Key distinctions:**
