@@ -263,6 +263,12 @@ def test_lookup_symbol_canonical_aliases_and_body_fallback(
         "WIDE_AND_DEEP_CLASSIFIER",
         "WIDE_AND_DEEP_REGRESSOR",
         "ML.GET_INSIGHTS",
+        "IMPORT MODEL",
+        "REMOTE MODEL",
+        "VERTEX_AI_MODEL_ID",
+        "TIMESFM",
+        "TABFM",
+        "arima-plus",
     ):
         res = lookup_symbol(alias)
         assert res.found is True, f"Expected alias {alias} to resolve"
@@ -435,6 +441,17 @@ def test_get_walkthrough_resolves_narratives_and_variants() -> None:
     substring_match = get_walkthrough("xreg")
     assert substring_match["found"] is True
     assert substring_match["topic"] == "arima_plus_xreg"
+
+    for mlops_topic in (
+        "pipeline_scheduled_queries",
+        "pipeline_dataform",
+        "validate_data_drift",
+        "export_model",
+        "import_model",
+        "remote_model",
+    ):
+        wt_res = get_walkthrough(mlops_topic)
+        assert wt_res["found"] is True, f"Expected walkthrough for {mlops_topic}"
 
     missing = get_walkthrough("nonexistent_walkthrough_999")
     assert missing["found"] is False
@@ -669,9 +686,12 @@ def test_mcp_resources_and_prompts_protocol() -> None:
         (
             "bqds://skill/bigquery-ml",
             "bqds://reference/bigquery-data-science/namespace-matrix",
+            "bqds://reference/bigquery-mlops/feature-store-and-point-in-time",
             "bqds://syntax/bigquery-ai/aiforecast",
+            "bqds://syntax/bigquery-ml/arima-plus",
             "bqds://syntax/ARIMA_PLUS",
             "bqds://narrative/bigquery-ai/ai_agg",
+            "bqds://narrative/bigquery-ml/pipeline_scheduled_queries",
             "bqds://narrative/arima_plus",
         ),
         start=110,

@@ -326,9 +326,21 @@ def _read_resource(uri: str, skills_dir: Path | None = None) -> str:
         if len(parts) == 3:
             skill_name, item_name = parts[1], parts[2]
             stem = item_name[:-3] if item_name.endswith(".md") else item_name
+            if lens == "reference" and stem == "feature-store-and-point-in-time":
+                stem = "feature-store-and-temporal-joins"
             target = (root / skill_name / lens / f"{stem}.md").resolve()
             if target.is_file() and root in target.parents:
                 return target.read_text(encoding="utf-8")
+            if lens == "syntax":
+                lookup_res = lookup_symbol(stem, skills_dir=root)
+                if lookup_res.found and (
+                    not skill_name or lookup_res.skill == skill_name
+                ):
+                    return lookup_res.format_text()
+            elif lens == "narrative":
+                wt = get_walkthrough(f"{skill_name}/{stem}", skills_dir=root)
+                if wt.get("found"):
+                    return str(wt["content"])
         elif len(parts) == 2 and lens == "syntax":
             lookup_res = lookup_symbol(parts[1], skills_dir=root)
             if lookup_res.found:

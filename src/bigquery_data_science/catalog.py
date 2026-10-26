@@ -29,6 +29,16 @@ _SYMBOL_ALIASES: Mapping[str, str] = MappingProxyType(
         "ML.GET_INSIGHTS": "CONTRIBUTION_ANALYSIS",
         "GET_INSIGHTS": "CONTRIBUTION_ANALYSIS",
         "ML_GET_INSIGHTS": "CONTRIBUTION_ANALYSIS",
+        "IMPORT MODEL": "IMPORTED MODELS",
+        "IMPORT_MODEL": "IMPORTED MODELS",
+        "IMPORTED_MODEL": "IMPORTED MODELS",
+        "EXPORT_MODEL": "EXPORT MODEL",
+        "REMOTE_MODEL": "REMOTE",
+        "REMOTE MODEL": "REMOTE",
+        "VERTEX_AI_MODEL_ID": "EXPORT MODEL",
+        "MODEL_REGISTRY": "EXPORT MODEL",
+        "TIMESFM": "AI.FORECAST",
+        "TABFM": "AI.PREDICT",
     }
 )
 
@@ -36,9 +46,12 @@ _DECOMPOSITION_KEYWORDS: tuple[str, ...] = (
     "change point",
     "change points",
     "step change",
+    "step changes",
     "level shift",
+    "level shifts",
     "decompose",
     "decomposition",
+    "seasonality",
     "seasonal component",
     "ml.trend",
     "ml.seasonality",
@@ -142,7 +155,10 @@ _FEATURE_OPS_KEYWORDS: tuple[str, ...] = (
     "mlops",
     "model registry",
     "vertex_ai",
+    "vertex ai",
+    "register",
     "export model",
+    "export",
     "import model",
     "onnx",
     "remote with connection",
@@ -196,7 +212,10 @@ _MLOPS_PRIMARY_KEYWORDS: tuple[str, ...] = (
     "mlops",
     "model registry",
     "vertex_ai",
+    "vertex ai",
+    "register",
     "export model",
+    "export",
     "import model",
     "onnx",
     "remote with connection",
@@ -431,7 +450,7 @@ def lookup_symbol(
     if not cleaned or not slug_query:
         return LookupResult(symbol=cleaned, found=False)
 
-    normalized_upper = cleaned.upper()
+    normalized_upper = cleaned.upper().replace("-", "_")
     canonical_upper = _SYMBOL_ALIASES.get(
         normalized_upper,
         _SYMBOL_ALIASES.get(
@@ -1114,6 +1133,26 @@ def triage_task(
     )
 
 
+_WALKTHROUGH_ALIASES: Mapping[str, str] = MappingProxyType(
+    {
+        "validate_data_drift": "model_monitoring",
+        "validate_data_skew": "model_monitoring",
+        "drift_monitoring": "model_monitoring",
+        "data_drift": "model_monitoring",
+        "metrics": "evaluation",
+        "ml_metrics": "evaluation",
+        "export_model": "export",
+        "vertex_ai_model_registry": "export",
+        "model_registry": "export",
+        "import_model": "imported",
+        "imported_models": "imported",
+        "remote_model": "remote",
+        "entity_features_at_time": "feature_store",
+        "features_at_time": "feature_store",
+    }
+)
+
+
 def get_walkthrough(
     topic: str,
     skills_dir: Path | None = None,
@@ -1124,7 +1163,11 @@ def get_walkthrough(
     if cleaned.endswith(".md"):
         cleaned = cleaned[:-3]
     parts = cleaned.split("/")
-    stem = parts[-1].lower().replace(".", "_")
+    raw_stem = parts[-1].lower().replace(".", "_").replace("-", "_")
+    stem = _WALKTHROUGH_ALIASES.get(raw_stem, raw_stem)
+    stripped_stem = re.sub(r"^(?:pipeline|pipelines|ml)_", "", stem)
+    stripped_stem = _WALKTHROUGH_ALIASES.get(stripped_stem, stripped_stem)
+    candidate_stems = list(dict.fromkeys([stem, stripped_stem]))
     skill_hint = parts[0] if len(parts) > 1 else None
 
     for skill_name in ("bigquery-ml", "bigquery-ai"):
@@ -1133,24 +1176,26 @@ def get_walkthrough(
         nar_dir = root / skill_name / "narrative"
         if not nar_dir.is_dir():
             continue
-        exact_path = nar_dir / f"{stem}.md"
-        if exact_path.is_file():
-            return {
-                "topic": stem,
-                "skill": skill_name,
-                "path": f"{skill_name}/narrative/{exact_path.name}",
-                "found": True,
-                "content": exact_path.read_text(encoding="utf-8"),
-            }
-        for candidate in sorted(nar_dir.glob("*.md")):
-            if stem in candidate.stem.lower():
+        for c_stem in candidate_stems:
+            exact_path = nar_dir / f"{c_stem}.md"
+            if exact_path.is_file():
                 return {
-                    "topic": candidate.stem,
+                    "topic": exact_path.stem,
                     "skill": skill_name,
-                    "path": f"{skill_name}/narrative/{candidate.name}",
+                    "path": f"{skill_name}/narrative/{exact_path.name}",
                     "found": True,
-                    "content": candidate.read_text(encoding="utf-8"),
+                    "content": exact_path.read_text(encoding="utf-8"),
                 }
+        for c_stem in candidate_stems:
+            for candidate in sorted(nar_dir.glob("*.md")):
+                if c_stem in candidate.stem.lower():
+                    return {
+                        "topic": candidate.stem,
+                        "skill": skill_name,
+                        "path": f"{skill_name}/narrative/{candidate.name}",
+                        "found": True,
+                        "content": candidate.read_text(encoding="utf-8"),
+                    }
 
     return {
         "topic": topic,
