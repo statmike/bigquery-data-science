@@ -59,7 +59,7 @@ This project's Agent Skill content lives centrally in [`skills/`](../skills/) at
 - **Google Antigravity, Codex, and other `.agents/skills/`-compatible tools** — discovered from the repo-root `.agents/skills/bigquery-ai/` symlink, using the same `SKILL.md` files.
 - **Standalone / other repos** — the whole `skills/bigquery-ai/` folder is self-contained and can be copied into any other project.
 
-Not sure whether BigQuery AI Functions or [BigQuery ML](../bigquery-ml/) fits your task? The [`bigquery-data-science`](../skills/bigquery-data-science/SKILL.md) skill triages between the two.
+Not sure whether BigQuery AI Functions, [BigQuery ML](../bigquery-ml/), or production MLOps ([`bigquery-mlops`](../skills/bigquery-mlops/SKILL.md)) fits your task — or need to compose `AI.*` and `ML.*` together? The [`bigquery-data-science`](../skills/bigquery-data-science/SKILL.md) skill and its [Cross-Skill Composition Playbooks](../skills/bigquery-data-science/reference/cross-skill-playbooks.md) route and compose across all four skills.
 
 ---
 

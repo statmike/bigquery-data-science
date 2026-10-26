@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bigquery-data-science"
-version = "0.9.1"
+version = "0.10.0"
 description = "BigQuery ML, BigQuery AI, and 4-Lens Agent Skills: 104 live-verified SQL/Python workflows, zero-dependency CLI catalog & skill installer, and stdio MCP server."
 dynamic = ["readme"]
 requires-python = ">=3.11"

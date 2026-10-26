@@ -104,7 +104,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
                     "type": "string",
                     "description": (
                         "Optional skill filter ('bigquery-data-science', "
-                        "'bigquery-ml', or 'bigquery-ai')."
+                        "'bigquery-ml', 'bigquery-ai', or 'bigquery-mlops')."
                     ),
                 },
                 "limit": {
@@ -164,7 +164,8 @@ RESOURCE_TEMPLATES: tuple[dict[str, Any], ...] = (
         "uriTemplate": "bqds://skill/{skill}",
         "name": "BigQuery Skill Router & Guardrails (Lens 1)",
         "description": (
-            "Read SKILL.md for 'bigquery-data-science', 'bigquery-ml', or 'bigquery-ai'."
+            "Read SKILL.md for 'bigquery-data-science', 'bigquery-ml', "
+            "'bigquery-ai', or 'bigquery-mlops'."
         ),
         "mimeType": "text/markdown",
     },

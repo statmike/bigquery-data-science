@@ -7,7 +7,7 @@ from importlib.metadata import PackageNotFoundError, version
 try:
     __version__ = version("bigquery-data-science")
 except PackageNotFoundError:
-    __version__ = "0.9.1"
+    __version__ = "0.10.0"
 
 from bigquery_data_science.adk import get_bigquery_tools
 from bigquery_data_science.catalog import (

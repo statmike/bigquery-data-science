@@ -22,6 +22,7 @@ SKILL_NAMES: tuple[str, ...] = (
     "bigquery-data-science",
     "bigquery-ml",
     "bigquery-ai",
+    "bigquery-mlops",
 )
 
 _DESCRIPTION_RE = re.compile(r"^description:\s*(.+)$", re.MULTILINE)

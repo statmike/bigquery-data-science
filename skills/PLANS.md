@@ -16,18 +16,22 @@ To prevent context-window bloat while keeping 100% of syntax tables, empirical g
 ```mermaid
 flowchart TD
     User["User / Agent Task"] --> L1_Router["Lens 1: Umbrella Router<br/>skills/bigquery-data-science/SKILL.md"]
-    L1_Router --> Matrix["Lens 2: Prerequisite & Namespace Matrix<br/>skills/bigquery-data-science/reference/namespace-matrix.md"]
-    L1_Router --> L1_ML["Lens 1: Trained Models & Feature Store<br/>skills/bigquery-ml/SKILL.md"]
-    L1_Router --> L1_AI["Lens 1: Foundation Models & Cloud AI<br/>skills/bigquery-ai/SKILL.md"]
+    L1_Router --> Matrix["Lens 2: Matrix & Multi-Skill Playbooks<br/>skills/bigquery-data-science/reference/*.md (2 guides)"]
+    Matrix --> L1_ML["Lens 1: Trained Models & Feature Store<br/>skills/bigquery-ml/SKILL.md"]
+    Matrix --> L1_AI["Lens 1: Foundation Models & Cloud AI<br/>skills/bigquery-ai/SKILL.md"]
+    Matrix --> L1_MLOPS["Lens 1: Production MLOps & Serving<br/>skills/bigquery-mlops/SKILL.md"]
 
     L1_ML --> L2_ML["Lens 2: Use-Case Decision Guides<br/>skills/bigquery-ml/reference/*.md (6 guides)"]
     L1_AI --> L2_AI["Lens 2: Use-Case Decision Guides<br/>skills/bigquery-ai/reference/*.md (8 guides)"]
+    L1_MLOPS --> L2_MLOPS["Lens 2: MLOps Decision Guides<br/>skills/bigquery-mlops/reference/*.md (4 guides)"]
 
     L2_ML --> L3_ML["Lens 3: Per-Statement Syntax Cards (< 25 KB)<br/>skills/bigquery-ml/syntax/*.md (93 cards + INDEX.md)"]
     L2_AI --> L3_AI["Lens 3: Per-Statement Syntax Cards (< 25 KB)<br/>skills/bigquery-ai/syntax/*.md (44 cards + INDEX.md)"]
+    L2_MLOPS --> L3_ML
 
     L2_ML --> L4_ML["Lens 4: Worked Walkthroughs<br/>skills/bigquery-ml/narrative/*.md (61 walkthroughs)"]
     L2_AI --> L4_AI["Lens 4: Worked Walkthroughs<br/>skills/bigquery-ai/narrative/*.md (43 walkthroughs)"]
+    L2_MLOPS --> L4_ML
 ```
 
 ## Authoring Standard
@@ -53,7 +57,7 @@ All skill markdown, domain reference guides, notebooks, and maintainer Python co
 
 ### Semantic Versioning Strategy & Sweep Cadence
 
-This repository, the Python package, and all three agent skills follow a coordinated SemVer structure (`Major.Minor.Patch`):
+This repository, the Python package, and all four agent skills follow a coordinated SemVer structure (`Major.Minor.Patch`):
 
 - **Major (`X.0.0`) — Skills architecture, names & structural contract shifts:**
   - Changes in skills layout, naming, or hierarchy (`skills/`), packaging changes, or removing/incompatibly changing CLI subcommands, MCP tool schemas, or Python library public exports.

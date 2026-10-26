@@ -46,7 +46,7 @@ with zipfile.ZipFile(wheel_path) as zf:
     ipynb_in_wheel = [n for n in wheel_names if n.endswith(".ipynb")]
     assert not ipynb_in_wheel, f"Wheel contains .ipynb files: {ipynb_in_wheel}"
     skill_files = [n for n in wheel_names if "_skills/" in n and n.endswith("SKILL.md")]
-    assert len(skill_files) == 3, f"Expected 3 SKILL.md files in wheel, found {skill_files}"
+    assert len(skill_files) == 4, f"Expected 4 SKILL.md files in wheel, found {skill_files}"
 
 with tarfile.open(sdist_path, "r:gz") as tf:
     sdist_names = tf.getnames()
@@ -73,6 +73,7 @@ LIST_OUT="$("$BIN/bigquery-data-science" list)" || fail "bigquery-data-science l
 grep -q "bigquery-data-science" <<<"$LIST_OUT" || fail "list missing bigquery-data-science"
 grep -q "bigquery-ml" <<<"$LIST_OUT" || fail "list missing bigquery-ml"
 grep -q "bigquery-ai" <<<"$LIST_OUT" || fail "list missing bigquery-ai"
+grep -q "bigquery-mlops" <<<"$LIST_OUT" || fail "list missing bigquery-mlops"
 
 "$BIN/bigquery-data-science" bump-version --check --repo-root "$REPO_ROOT" >/dev/null || fail "bump-version --check failed"
 "$BIN/bigquery-data-science" check-status-labels "$REPO_ROOT/skills" --repo-root "$REPO_ROOT" >/dev/null || fail "check-status-labels failed"
@@ -85,6 +86,7 @@ TARGET_DIR="$WORK/installed-skills"
 [[ -f "$TARGET_DIR/bigquery-data-science/SKILL.md" ]] || fail "installed bigquery-data-science/SKILL.md missing"
 [[ -f "$TARGET_DIR/bigquery-ml/SKILL.md" ]] || fail "installed bigquery-ml/SKILL.md missing"
 [[ -f "$TARGET_DIR/bigquery-ai/SKILL.md" ]] || fail "installed bigquery-ai/SKILL.md missing"
+[[ -f "$TARGET_DIR/bigquery-mlops/SKILL.md" ]] || fail "installed bigquery-mlops/SKILL.md missing"
 [[ -f "$TARGET_DIR/.mcp.json" ]] || fail "installed .mcp.json missing"
 
 "$BIN/bigquery-data-science" list --json >/dev/null || fail "list --json failed"

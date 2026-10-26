@@ -5,6 +5,22 @@ All notable changes to `bigquery-data-science` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] - 2026-10-26
+
+### Added
+- **4th Bundled Agent Skill (`skills/bigquery-mlops/`) (`P5.1`):**
+  - Added `bigquery-mlops` (`SKILL.md`, `skill.manifest.json`, and 4 Lens 2 operational reference guides under `skills/bigquery-mlops/reference/`) covering the complete operational lifecycle for `CREATE MODEL` (`bigquery-ml`), zero-training `AI.*` (`bigquery-ai`), and external models served on Vertex AI, Cloud Run, or GKE that log features and predictions to BigQuery:
+    - `orchestration-and-pipelines.md`: 8 GCP orchestration patterns (Scheduled Queries, Dataform SQLX, Cloud Workflows, Cloud Composer / Managed Airflow Gen 3, Vertex AI Pipelines / KFP, Vertex AI Model Registry, Online Serving, and Feature Store) with `useQueryCache: false` and `xgboost_version = '2.1'` guardrails.
+    - `model-registry-export-and-serving.md`: `model_registry = 'VERTEX_AI'`, `EXPORT MODEL` to GCS, `IMPORT MODEL` (`ONNX`, `XGBOOST`, `TENSORFLOW`, `TENSORFLOW_LITE`), `REMOTE WITH CONNECTION`, and `TRANSFORM_ONLY` feature-serving models.
+    - `monitoring-drift-and-evaluation.md`: Model-agnostic drift and skew monitoring (`ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW`, `ML.DESCRIBE_DATA`, `ML.TFDV_DESCRIBE`) and table-based evaluation (`ML.METRICS`, `ML.EVALUATE`, `AI.EVALUATE`) across BQML, `AI.*`, and external models logging to BigQuery.
+    - `feature-store-and-temporal-joins.md`: Point-in-time feature retrieval (`ML.ENTITY_FEATURES_AT_TIME`, `ML.FEATURES_AT_TIME`), the `ignore_feature_nulls` table-shape rule, 3-arm training-serving skew audits, and Vertex AI Feature Store synchronization.
+- **Multi-Skill Composition Playbooks & 7-Stage Problem-First Navigator (`P5.2` & `P5.3`):**
+  - Added `skills/bigquery-data-science/reference/cross-skill-playbooks.md` with 6 concrete multi-skill SQL choreography playbooks (`bigquery-ml` + `bigquery-ai` + `bigquery-mlops`) and a unified 7-stage problem-first index across all 32 workflows and 8 pipelines.
+  - Added bidirectional *Composing With Sister Skills* sections to `skills/bigquery-ml/SKILL.md` and `skills/bigquery-ai/SKILL.md` and added the 7-stage problem-first navigator table to `README.md`.
+- **Multi-Skill Task Triage (`recommended_skills: list[str]`) (`P5.4`):**
+  - Extended `TriageResult` in `src/bigquery_data_science/catalog.py` with `recommended_skills: list[str]` (while preserving `recommended_skill: str` for 100% backward compatibility) and added production MLOps routing to `bigquery-mlops`.
+  - Updated `src/bigquery_data_science/installer.py` (`SKILL_NAMES`), `mcp_server.py`, `adk.py`, `plugin.json`, and `.claude-plugin/marketplace.json` to bundle and expose all 4 skills (`bigquery-data-science`, `bigquery-ml`, `bigquery-ai`, `bigquery-mlops`).
+
 ## [0.9.1] - 2026-10-21
 
 ### Added

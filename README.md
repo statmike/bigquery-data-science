@@ -9,7 +9,7 @@
 [![Namespace Matrix](https://img.shields.io/badge/ML.*%20vs%20AI.*-Namespace%20Matrix-EA4335?style=for-the-badge)](skills/bigquery-data-science/reference/namespace-matrix.md)
 [![License](https://img.shields.io/badge/License-Apache%202.0-4E5D6C?style=for-the-badge)](LICENSE)
 
-`104 live-verified notebooks` · `87 SQL scripts` · `3 Agent Skills` · `137 <25 KB syntax cards` · `zero-dependency CLI & stdio MCP`
+`104 live-verified notebooks` · `87 SQL scripts` · `4 Agent Skills` · `137 <25 KB syntax cards` · `zero-dependency CLI & stdio MCP`
 
 ```mermaid
 flowchart TD
@@ -27,8 +27,8 @@ flowchart TD
     end
     subgraph LENS["3. 4-Lens Progressive Disclosure (skills/)"]
         direction TB
-        L1["Lens 1: 3 SKILL.md Routers (~8 KB)<br/>bigquery-data-science · bigquery-ml · bigquery-ai"]
-        L2["Lens 2: Reference Guides (14 files)<br/>Decision Matrices · Empirical Gotchas"]
+        L1["Lens 1: 4 SKILL.md Routers (~8 KB)<br/>bigquery-data-science · bigquery-ml · bigquery-ai · bigquery-mlops"]
+        L2["Lens 2: Reference Guides (20 files)<br/>Decision Matrices · Multi-Skill Playbooks · Gotchas"]
         L3["Lens 3: 137 Syntax Cards (< 25 KB)<br/>Surgical CREATE MODEL & AI.*/ML.* Cards"]
         L4["Lens 4: 104 Narratives (~20 KB)<br/>Full Setup · IAM · SQL · BigFrames"]
         L1 --> L2 --> L3 --> L4
@@ -61,7 +61,7 @@ This repository pairs **two complementary layers** that stay synchronized throug
 
 ### Journey 1 — Equip your AI coding agent (`uvx`, `uv`, `pip`, `pipx`, `npx skills`, or MCP)
 
-The core `bigquery-data-science` package has **zero third-party runtime dependencies** (`< 1.5 MB` wheel) and installs the 3 skills (`bigquery-data-science`, `bigquery-ml`, `bigquery-ai`) into `.agents/skills/` and `.claude/skills/`:
+The core `bigquery-data-science` package has **zero third-party runtime dependencies** (`< 1.5 MB` wheel) and installs the 4 skills (`bigquery-data-science`, `bigquery-ml`, `bigquery-ai`, `bigquery-mlops`) into `.agents/skills/` and `.claude/skills/`:
 
 ```bash
 # Option A — Zero-install ephemeral CLI via uvx (recommended for instant setup):
@@ -80,9 +80,10 @@ pip install bigquery-data-science && bigquery-data-science install
 uv add bigquery-data-science && uv run bigquery-data-science install
 pip install bigquery-data-science && python3 -m bigquery_data_science.cli install
 
-# Option D — skills.sh CLI (installs all 3 skills or an individual skill from GitHub):
+# Option D — skills.sh CLI (installs all 4 skills or an individual skill from GitHub):
 npx skills add statmike/bigquery-data-science
 npx skills add statmike/bigquery-data-science --skill bigquery-ml
+npx skills add statmike/bigquery-data-science --skill bigquery-mlops
 
 # Option E — Claude Code plugin marketplace & stdio MCP server:
 # In Claude Code: /plugin marketplace add statmike/bigquery-data-science
@@ -108,7 +109,7 @@ uvx bigquery-data-science lookup ARIMA_PLUS
 uvx bigquery-data-science lookup AI.FORECAST
 uvx bigquery-data-science lookup ML.ENTITY_FEATURES_AT_TIME
 
-# 4. Search across all 137 syntax cards, 14 reference guides, and 104 narratives:
+# 4. Search across all 137 syntax cards, 20 reference guides, and 104 narratives:
 uvx bigquery-data-science search "point-in-time feature leakage"
 
 # 5. Statically audit a BigQuery SQL query or .sql file for prerequisites & gotchas:
@@ -150,13 +151,14 @@ bigquery-data-science kernel --user
 
 ## Front Door 1 — Agent Skills & 4-Lens Progressive Disclosure ([`skills/`](skills/PLANS.md))
 
-### The 3 Bundled Skills
+### The 4 Bundled Skills
 
 | Skill | Canonical Role | What It Covers | Entry Point |
 | :--- | :--- | :--- | :--- |
-| **[`bigquery-data-science`](skills/bigquery-data-science/SKILL.md)** | **Umbrella Router & Namespace Decoder** (`Workflow` + `Reviewer`) | Routes between trained `CREATE MODEL` (`bigquery-ml`), zero-shot `AI.*`/`ML.*` (`bigquery-ai`), and hybrid pipelines; 10 empirical head-to-head task comparisons; complete `ML.*` vs `AI.*` prerequisite matrix ([`namespace-matrix.md`](skills/bigquery-data-science/reference/namespace-matrix.md)). | [`skills/bigquery-data-science/SKILL.md`](skills/bigquery-data-science/SKILL.md) |
+| **[`bigquery-data-science`](skills/bigquery-data-science/SKILL.md)** | **Umbrella Router & Multi-Skill Composer** (`Workflow` + `Reviewer`) | Routes across `bigquery-ml`, `bigquery-ai`, and `bigquery-mlops` (and recommends multi-skill combinations when a task spans modeling + GenAI + MLOps); 10 empirical head-to-head task comparisons; complete `ML.*` vs `AI.*` prerequisite matrix ([`namespace-matrix.md`](skills/bigquery-data-science/reference/namespace-matrix.md)); and 6 multi-skill composition playbooks ([`cross-skill-playbooks.md`](skills/bigquery-data-science/reference/cross-skill-playbooks.md)). | [`skills/bigquery-data-science/SKILL.md`](skills/bigquery-data-science/SKILL.md) |
 | **[`bigquery-ml`](skills/bigquery-ml/SKILL.md)** | **Trained Models, Preprocessing & Pipelines** (`Workflow` + `Generator` + `Tool Wrapper` + `Reviewer`) | 23 `CREATE MODEL` types (`LINEAR_REG`, `BOOSTED_TREE_*`, `ARIMA_PLUS`, `ARIMA_PLUS_XREG`, `KMEANS`, `PCA`, `MATRIX_FACTORIZATION`, `DNN_*`, `AUTOML_*`, `CONTRIBUTION_ANALYSIS`, imported `ONNX`/`TENSORFLOW`/`XGBOOST`), 20+ model-free `ML.*` preprocessing/drift/feature-time functions, 18 workflows, and 8 production orchestration patterns. | [`skills/bigquery-ml/SKILL.md`](skills/bigquery-ml/SKILL.md) |
 | **[`bigquery-ai`](skills/bigquery-ai/SKILL.md)** | **Foundation Models, Embeddings, Search & Document AI** (`Workflow` + `Generator` + `Tool Wrapper` + `Reviewer`) | 29 SQL functions across `AI.GENERATE*`, `AI.IF`/`SCORE`/`CLASSIFY`/`AGG`, `AI.EMBED` + `VECTOR_SEARCH` + `AI.SEARCH`, `AI.FORECAST` + `AI.DETECT_ANOMALIES` (TimesFM), `AI.PREDICT` + `AI.EVALUATE` (TabFM), `AI.KEY_DRIVERS`, `AI.PARSE_DOCUMENT` + `ML.PROCESS_DOCUMENT`, and Cloud AI `ML.TRANSLATE`/`UNDERSTAND_TEXT`/`ANNOTATE_IMAGE`/`TRANSCRIBE`, plus 14 multi-function workflows. | [`skills/bigquery-ai/SKILL.md`](skills/bigquery-ai/SKILL.md) |
+| **[`bigquery-mlops`](skills/bigquery-mlops/SKILL.md)** | **Production MLOps, Registry, Serving, Monitoring & Feature Store** (`Workflow` + `Generator` + `Tool Wrapper` + `Reviewer`) | Operationalizes both `ML.*` (`bigquery-ml`), `AI.*` (`bigquery-ai`), and external models logging to BigQuery across 8 orchestration engines, Vertex AI Model Registry & online endpoints (`model_registry='VERTEX_AI'`), `EXPORT MODEL` (`xgboost_version='2.1'`) / `IMPORT MODEL` (`ONNX`/`XGBOOST`/`TENSORFLOW`), drift & skew monitoring (`ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW`, `ML.METRICS`), and point-in-time Feature Store (`ML.ENTITY_FEATURES_AT_TIME`). | [`skills/bigquery-mlops/SKILL.md`](skills/bigquery-mlops/SKILL.md) |
 
 ### How the 4 Progressive Lenses Prevent Context Bloat
 
@@ -181,6 +183,20 @@ BigQuery exposes machine learning and generative AI across two SQL prefixes (`ML
 | **2. Model-Free Feature Engineering, Drift & Point-in-Time Joins** | `ML.*` | **No** (operates directly on tables/queries) | No | `ML.STANDARD_SCALER`, `ML.QUANTILE_BUCKETIZE`, `ML.ONE_HOT_ENCODER`, `ML.VALIDATE_DATA_DRIFT`, `ML.TF_IDF`, `ML.NGRAMS`, `ML.ENTITY_FEATURES_AT_TIME` | **[`bigquery-ml/`](bigquery-ml/README.md)** |
 | **3. Zero-Training Foundation Model Functions (Gemini, TimesFM, TabFM)** | `AI.*` (plus `VECTOR_SEARCH`) | **No** (`endpoint => '...'` inline or managed) | For multimodal `ObjectRef` or custom connections | `AI.GENERATE`, `AI.GENERATE_TABLE`, `AI.IF`, `AI.SCORE`, `AI.CLASSIFY`, `AI.AGG`, `AI.EMBED`, `AI.SEARCH`, `AI.FORECAST`, `AI.DETECT_ANOMALIES`, `AI.PREDICT`, `AI.EVALUATE`, `AI.KEY_DRIVERS`, `AI.PARSE_DOCUMENT` | **[`bigquery-ai/`](bigquery-ai/README.md)** |
 | **4. Remote Cloud AI APIs & First-Gen Vertex Wrappers** | `CREATE MODEL ... REMOTE` + `ML.*` | **Yes** (thin metadata pointer to Vertex / Cloud AI API) | **Yes** (`CLOUD_RESOURCE` connection + IAM) | `ML.PROCESS_DOCUMENT`, `ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`, `ML.GENERATE_TEXT`, `ML.GENERATE_EMBEDDING` | **[`bigquery-ai/`](bigquery-ai/README.md)** |
+
+### 7-Stage Problem-First Data Science Navigator (All 32 Workflows & 8 Pipelines)
+
+Whether you are reading the repository as a human practitioner or routing an AI coding agent, every workflow and pipeline maps to one of **7 problem-first stages** (full playbook & SQL choreography: **[`skills/bigquery-data-science/reference/cross-skill-playbooks.md`](skills/bigquery-data-science/reference/cross-skill-playbooks.md)**):
+
+| Lifecycle Stage | Skills Composed | Ground-Truth Workflows & Pipelines Across Both Hubs |
+| :--- | :--- | :--- |
+| **1. Data Preparation, Enrichment & Point-in-Time Feature Engineering** | `bigquery-ml` + `bigquery-ai` + `bigquery-mlops` | [`data_enrichment`](bigquery-ai/workflows/data_enrichment/) · [`feature_store` (workflow)](bigquery-ml/workflows/feature_store/) · [`feature_store` (function)](bigquery-ml/functions/feature_store/) · [`exploration`](bigquery-ml/functions/exploration/) · [`scalers`](bigquery-ml/functions/scalers/) · [`feature_engineering`](bigquery-ml/functions/feature_engineering/) · [`encoding`](bigquery-ml/functions/encoding/) · [`bucketizing`](bigquery-ml/functions/bucketizing/) |
+| **2. Unstructured Media, Document AI & Multimodal Extraction** | `bigquery-ai` + `bigquery-ml` | [`document_intelligence`](bigquery-ai/workflows/document_intelligence/) · [`multimodal_analysis`](bigquery-ai/workflows/multimodal_analysis/) · [`image_deduplication`](bigquery-ai/workflows/image_deduplication/) · [`content_analysis`](bigquery-ai/workflows/content_analysis/) · [`content_moderation`](bigquery-ai/workflows/content_moderation/) · [`image`](bigquery-ml/functions/image/) |
+| **3. Embeddings, Semantic & Hybrid Search + RAG** | `bigquery-ai` + `bigquery-ml` | [`semantic_search`](bigquery-ai/workflows/semantic_search/) · [`catalog_search`](bigquery-ai/workflows/catalog_search/) · [`rag_pipeline`](bigquery-ai/workflows/rag_pipeline/) · [`document_rag`](bigquery-ai/workflows/document_rag/) · [`embeddings_classification`](bigquery-ml/workflows/embeddings_classification/) |
+| **4. Predictive Modeling (Classification, Regression, Survival & Recommendations)** | `bigquery-ml` + `bigquery-ai` | [`tabular_prediction`](bigquery-ai/workflows/tabular_prediction/) · [`churn_retention`](bigquery-ml/workflows/churn_retention/) · [`ga4_churn_prediction`](bigquery-ml/workflows/ga4_churn_prediction/) · [`survival_analysis`](bigquery-ml/workflows/survival_analysis/) · [`anomaly_fraud_detection`](bigquery-ml/workflows/anomaly_fraud_detection/) · [`customer_segmentation`](bigquery-ml/workflows/customer_segmentation/) · [`recommendation`](bigquery-ml/workflows/recommendation/) · [`cross_validation`](bigquery-ml/workflows/cross_validation/) · [`ensembling`](bigquery-ml/workflows/ensembling/) |
+| **5. Time-Series Intelligence & Forecasting** | `bigquery-ml` + `bigquery-ai` | [`time_series_intelligence`](bigquery-ai/workflows/time_series_intelligence/) · [`regression_based_forecasting`](bigquery-ml/workflows/regression_based_forecasting/) · [`hierarchical_forecasting`](bigquery-ml/workflows/hierarchical_forecasting/) · [`time_series`](bigquery-ml/functions/time_series/) · [`log_analysis`](bigquery-ai/workflows/log_analysis/) |
+| **6. Causal Inference, Uplift & Key-Driver Attribution** | `bigquery-ml` + `bigquery-ai` | [`metric_diagnostics`](bigquery-ai/workflows/metric_diagnostics/) · [`propensity_score_matching`](bigquery-ml/workflows/propensity_score_matching/) · [`price_elasticity_dml`](bigquery-ml/workflows/price_elasticity_dml/) · [`uplift_cate`](bigquery-ml/workflows/uplift_cate/) · [`difference_in_differences`](bigquery-ml/workflows/difference_in_differences/) · [`synthetic_control`](bigquery-ml/workflows/synthetic_control/) · [`causal_effect`](bigquery-ml/workflows/causal_effect/) |
+| **7. Production MLOps, Registry, Serving & Drift Monitoring** | `bigquery-mlops` + `bigquery-ml` + `bigquery-ai` | [`model_monitoring`](bigquery-ml/functions/model_monitoring/) · [`evaluation`](bigquery-ml/functions/evaluation/) · [`export`](bigquery-ml/models/export/) · [`imported`](bigquery-ml/models/imported/) · [`remote`](bigquery-ml/models/remote/) · [`transform_only`](bigquery-ml/models/transform_only/) · [`sql_scripting`](bigquery-ml/pipelines/sql_scripting/) · [`scheduled_queries`](bigquery-ml/pipelines/scheduled_queries/) · [`dataform`](bigquery-ml/pipelines/dataform/) · [`cloud_workflows`](bigquery-ml/pipelines/cloud_workflows/) · [`dbt`](bigquery-ml/pipelines/dbt/) · [`vertex_kfp`](bigquery-ml/pipelines/vertex_kfp/) · [`composer_airflow`](bigquery-ml/pipelines/composer_airflow/) · [`airflow_with_kfp`](bigquery-ml/pipelines/airflow_with_kfp/) |
 
 ### Navigate the Notebook & Reference Hubs
 

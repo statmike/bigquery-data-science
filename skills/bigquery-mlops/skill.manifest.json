@@ -1,0 +1,16 @@
+{
+  "name": "bigquery-mlops",
+  "version": "0.10.0",
+  "source_project": null,
+  "narrative_sources": {},
+  "generated_date": "2026-10-26",
+  "source_commit": "3e3f275",
+  "reference_files": [
+    "feature-store-and-temporal-joins.md",
+    "model-registry-export-and-serving.md",
+    "monitoring-drift-and-evaluation.md",
+    "orchestration-and-pipelines.md"
+  ],
+  "syntax_files": [],
+  "narrative_files": []
+}

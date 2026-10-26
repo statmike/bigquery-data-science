@@ -2,7 +2,7 @@
 name: bigquery-ml
 description: Use when training, evaluating, deploying, or monitoring a machine learning model in BigQuery with SQL (CREATE MODEL and ML.* functions) — picking a model type, choosing a preprocessing function, point-in-time feature retrieval, causal inference (including AI.CAUSAL_EFFECT), or production retraining pipelines across 23 model types, 49 functions, 18 workflows, and 8 pipelines.
 metadata:
-  version: "0.9.1"
+  version: "0.10.0"
 ---
 
 # BigQuery ML (`bigquery-ml`)
@@ -26,7 +26,14 @@ This skill packages a verified, field-tested 4-Lens reference distilled from liv
 6. **Do you already have saved predictions and just need evaluation metrics?** → `ML.METRICS` requires no model object; see [`reference/regression.md`](reference/regression.md) and [`reference/classification.md`](reference/classification.md).
 7. **Are you joining historical features to labeled events?** → use `ML.ENTITY_FEATURES_AT_TIME` / `ML.FEATURES_AT_TIME` in [`reference/preprocessing-functions.md`](reference/preprocessing-functions.md) and the `feature_store_workflow` narrative in [`narrative/feature_store_workflow.md`](narrative/feature_store_workflow.md).
 
-If the task is ambiguous between trained models (`bigquery-ml`) and zero-training foundation models (`bigquery-ai`), consult [`../bigquery-data-science/SKILL.md`](../bigquery-data-science/SKILL.md) first.
+If the task is ambiguous between trained models (`bigquery-ml`), zero-training foundation models (`bigquery-ai`), or production orchestration/monitoring (`bigquery-mlops`), consult [`../bigquery-data-science/SKILL.md`](../bigquery-data-science/SKILL.md) first.
+
+## Composing With Sister Skills (`bigquery-ai`, `bigquery-mlops`, `bigquery-data-science`)
+
+| When Your `bigquery-ml` Task Also Needs... | Combine With... | Exact Handoff Guide |
+| --- | --- | --- |
+| Unstructured text/PDF/image featurization (`AI.EMBED`, `AI.GENERATE_TABLE`, `ML.PROCESS_DOCUMENT`), zero-shot teacher labels (`AI.CLASSIFY`), or executive narrative synthesis (`AI.AGG`) | **[`bigquery-ai`](../bigquery-ai/SKILL.md)** | [`../bigquery-data-science/reference/cross-skill-playbooks.md`](../bigquery-data-science/reference/cross-skill-playbooks.md) (Playbooks 1–4) |
+| Production scheduling across the 8 orchestrators, Vertex AI Model Registry (`model_registry='VERTEX_AI'`), `EXPORT` / `IMPORT` / `REMOTE` hybrid serving, universal drift monitoring (`ML.VALIDATE_DATA_DRIFT`), model-free `ML.METRICS`, or point-in-time feature store (`ML.ENTITY_FEATURES_AT_TIME`) | **[`bigquery-mlops`](../bigquery-mlops/SKILL.md)** | [`../bigquery-mlops/reference/orchestration-and-pipelines.md`](../bigquery-mlops/reference/orchestration-and-pipelines.md) · [`../bigquery-mlops/reference/model-registry-export-and-serving.md`](../bigquery-mlops/reference/model-registry-export-and-serving.md) · [`../bigquery-mlops/reference/monitoring-drift-and-evaluation.md`](../bigquery-mlops/reference/monitoring-drift-and-evaluation.md) · [`../bigquery-mlops/reference/feature-store-and-temporal-joins.md`](../bigquery-mlops/reference/feature-store-and-temporal-joins.md) |
 
 ## Tool Wrapper & Generator Rules (SQL + `bigframes.ml`)
 
