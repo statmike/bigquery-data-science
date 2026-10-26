@@ -168,6 +168,7 @@ def test_hatch_fancy_pypi_readme_substitutions_leave_zero_relative_links() -> No
     )
     assert (REPO_ROOT / "docs" / "assets" / "social_card.png").is_file()
     assert (REPO_ROOT / "docs" / "assets" / "readme_architecture.png").is_file()
+    assert (REPO_ROOT / "docs" / "assets" / "readme_architecture.svg").is_file()
 
 
 def test_governance_and_ci_workflow_files_exist() -> None:
