@@ -14,31 +14,44 @@ BigQuery MLOps operationalizes **three distinct production workloads** using one
 3. **External Models Logging to BigQuery (Vertex AI Endpoints, Cloud Run, GKE, Vendor APIs)** — because `ML.VALIDATE_DATA_DRIFT`, `ML.DESCRIBE_DATA`, `ML.METRICS`, and `ML.FEATURES_AT_TIME` operate directly on **BigQuery tables with no `MODEL` object required**, BigQuery serves as a zero-infrastructure monitoring, evaluation, and feature-store plane for models served anywhere that log inference requests and ground-truth labels to BigQuery.
 
 ```mermaid
+%%{init: {'flowchart': {'wrappingWidth': 360, 'nodeSpacing': 24, 'rankSpacing': 28}}}%%
 flowchart TD
     subgraph WORKLOADS["1. Production Workloads Backing Into BigQuery Tables"]
-        direction TB
-        W_BQML["Native BQML Models<br/>CREATE MODEL + ML.PREDICT / ML.FORECAST"]
-        W_BQAI["BigQuery AI Pipelines<br/>AI.GENERATE* / AI.CLASSIFY / AI.EMBED / AI.FORECAST"]
-        W_EXT["External Models (Vertex AI / Cloud Run / GKE)<br/>Inference Request-Response Logs in BigQuery"]
+        direction LR
+        W_BQML["<b>Native BQML Models</b><br/>CREATE MODEL + ML.PREDICT / ML.FORECAST"]
+        W_BQAI["<b>BigQuery AI Pipelines</b><br/>AI.GENERATE* · AI.CLASSIFY · AI.EMBED · AI.FORECAST"]
+        W_EXT["<b>External Models (Vertex / Cloud Run / GKE)</b><br/>Inference Request-Response Logs in BigQuery"]
+        W_BQML ~~~ W_BQAI ~~~ W_EXT
     end
 
-    subgraph PILLARS["2. Five Operational Pillars (skills/bigquery-mlops/reference/)"]
-        direction TB
-        P_FS["Pillar 1: Point-in-Time Feature Store<br/>ML.ENTITY_FEATURES_AT_TIME · ML.FEATURES_AT_TIME<br/>Vertex AI Feature Store Sync"]
-        P_REG["Pillar 2: Registry, Export, Import & Hybrid Serving<br/>model_registry='VERTEX_AI' · EXPORT / IMPORT MODEL<br/>REMOTE WITH CONNECTION · TRANSFORM_ONLY"]
-        P_MON["Pillar 3 & 4: Table-Native Drift Monitoring & Evaluation<br/>ML.VALIDATE_DATA_DRIFT · ML.VALIDATE_DATA_SKEW<br/>ML.DESCRIBE_DATA · Model-Free ML.METRICS"]
-        P_ORCH["Pillar 5: Production Orchestration (8 Engines)<br/>SQL Scripting · Scheduled Queries · Dataform · dbt<br/>Cloud Workflows · Vertex KFP · Managed Airflow"]
-        P_FS --> P_REG --> P_MON --> P_ORCH
+    subgraph PILLARS["2. Operational Pillars 1–4 (Feature Store, Registry/Serving &amp; Universal Monitoring)"]
+        direction LR
+        P_FS["<b>Pillar 1: Point-in-Time Feature Store</b><br/>ML.ENTITY_FEATURES_AT_TIME<br/>ML.FEATURES_AT_TIME · Vertex Feature Store"]
+        P_REG["<b>Pillar 2: Registry, Export &amp; Serving</b><br/>model_registry='VERTEX_AI' · EXPORT / IMPORT<br/>REMOTE WITH CONNECTION · TRANSFORM_ONLY"]
+        P_MON["<b>Pillars 3 &amp; 4: Drift &amp; Evaluation</b><br/>ML.VALIDATE_DATA_DRIFT · ML.DESCRIBE_DATA<br/>ML.VALIDATE_DATA_SKEW · ML.METRICS"]
+        P_FS ~~~ P_REG ~~~ P_MON
     end
 
-    WORKLOADS --> PILLARS
+    subgraph ORCH["3. Pillar 5 — Production Orchestration Across 8 GCP &amp; SQL Engines"]
+        direction LR
+        O_SQL["<b>BigQuery-Native SQL (2)</b><br/>sql_scripting (Procedural SQL)<br/>scheduled_queries (DTS Cron + Alert)"]
+        O_DAG["<b>Declarative SQL DAGs (2)</b><br/>dataform (SQLX + Assertions)<br/>dbt (Custom Model Macro + Tests)"]
+        O_CP["<b>Serverless &amp; ML Control Plane (4)</b><br/>cloud_workflows · vertex_kfp<br/>composer_airflow · airflow_with_kfp"]
+        O_SQL ~~~ O_DAG ~~~ O_CP
+    end
+
+    WORKLOADS --> PILLARS --> ORCH
+
+    style WORKLOADS fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style PILLARS fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+    style ORCH fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
 
     classDef data fill:#E8F0FE,stroke:#4285F4,stroke-width:2px,color:#174EA6
     classDef config fill:#FEF7E0,stroke:#F9AB00,stroke-width:2px,color:#7A5A00
     classDef compute fill:#E6F4EA,stroke:#34A853,stroke-width:2px,color:#0D652D
     class W_BQML,W_BQAI,W_EXT data
     class P_FS,P_REG,P_MON config
-    class P_ORCH compute
+    class O_SQL,O_DAG,O_CP compute
 ```
 
 ## Decision Tree (Lens 1 → Lens 2)

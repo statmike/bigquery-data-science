@@ -9,21 +9,28 @@ Real-world data science problems on BigQuery rarely stop at a single SQL namespa
 ## 1. When to combine multiple skills
 
 ```mermaid
+%%{init: {'flowchart': {'wrappingWidth': 360, 'nodeSpacing': 24, 'rankSpacing': 28}}}%%
 flowchart TD
-    TASK["Incoming Data Science / Engineering Task"]
-    Q_UNSTRUCT["Stage A: Unstructured Inputs or Zero-Shot Baseline?<br/>Load bigquery-ai (AI.EMBED, AI.GENERATE_TABLE,<br/>ML.PROCESS_DOCUMENT, AI.CLASSIFY, AI.FORECAST)"]
-    Q_TRAIN["Stage B: Supervised / Unsupervised / Causal Model?<br/>Load bigquery-ml (CREATE MODEL, TRANSFORM,<br/>ARIMA_PLUS, BOOSTED_TREE_*, Causal Estimators)"]
-    Q_OPS["Stage C: Point-in-Time Joins, Registry, Drift, or Scheduling?<br/>Load bigquery-mlops (ML.ENTITY_FEATURES_AT_TIME,<br/>EXPORT/IMPORT/REMOTE, ML.VALIDATE_DATA_DRIFT, 8 Pipelines)"]
+    TASK["<b>Incoming Data Science / Engineering Task</b><br/>Routed by bigquery-data-science"]
+    subgraph COMPOSE["Multi-Skill Composition Stages (Combine Any Subset)"]
+        direction LR
+        Q_UNSTRUCT["<b>Stage A — bigquery-ai</b><br/>Unstructured or Zero-Shot Baseline?<br/>AI.EMBED · AI.GENERATE_TABLE<br/>ML.PROCESS_DOCUMENT · AI.FORECAST"]
+        Q_TRAIN["<b>Stage B — bigquery-ml</b><br/>Supervised, Unsupervised, or Causal?<br/>CREATE MODEL · TRANSFORM<br/>BOOSTED_TREE_* · ARIMA_PLUS · Causal"]
+        Q_OPS["<b>Stage C — bigquery-mlops</b><br/>Temporal Joins, Registry, or Drift?<br/>ML.ENTITY_FEATURES_AT_TIME · Registry<br/>ML.VALIDATE_DATA_DRIFT · 8 Pipelines"]
+        Q_UNSTRUCT --> Q_TRAIN --> Q_OPS
+    end
 
-    TASK --> Q_UNSTRUCT
-    Q_UNSTRUCT --> Q_TRAIN
-    Q_TRAIN --> Q_OPS
+    TASK --> COMPOSE
 
+    style COMPOSE fill:#F8FAFF,stroke:#AECBFA,stroke-width:1.5px,color:#174EA6
+
+    classDef route fill:#FCE8E6,stroke:#EA4335,stroke-width:2px,color:#A50E0E
     classDef data fill:#E8F0FE,stroke:#4285F4,stroke-width:2px,color:#174EA6
     classDef config fill:#FEF7E0,stroke:#F9AB00,stroke-width:2px,color:#7A5A00
     classDef compute fill:#E6F4EA,stroke:#34A853,stroke-width:2px,color:#0D652D
-    class TASK,Q_UNSTRUCT data
-    class Q_TRAIN compute
+    class TASK route
+    class Q_UNSTRUCT compute
+    class Q_TRAIN data
     class Q_OPS config
 ```
 

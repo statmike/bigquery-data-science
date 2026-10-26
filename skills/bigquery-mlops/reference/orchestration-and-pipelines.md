@@ -28,11 +28,12 @@ All **8 production pipelines** in this repository operationalize the **exact sam
 Whether you use SQL Scripting, Cloud Workflows, Vertex KFP, or Airflow, structure every production pipeline around four idempotent stages:
 
 ```mermaid
+%%{init: {'flowchart': {'wrappingWidth': 460, 'nodeSpacing': 24, 'rankSpacing': 26}}}%%
 flowchart TD
-    S1["Stage 1: Drift & Readiness Gate<br/>ML.VALIDATE_DATA_DRIFT(baseline, serving)<br/>or incremental row-count / partition check"]
-    S2["Stage 2: Conditional Retrain or Refresh<br/>CREATE OR REPLACE MODEL ...<br/>or incremental AI.EMBED + ALTER VECTOR INDEX"]
-    S3["Stage 3: Champion vs Challenger Gate<br/>ML.EVALUATE / ML.METRICS (with useQueryCache=false)<br/>or Dataform / dbt quality assertion"]
-    S4["Stage 4: Batch Scoring & Alert Synthesis<br/>ML.PREDICT / AI.FORECAST / AI.CLASSIFY<br/>Optional AI.AGG executive drift brief"]
+    S1["<b>Stage 1: Drift &amp; Readiness Gate</b><br/>ML.VALIDATE_DATA_DRIFT(baseline, serving) · or incremental row-count / partition check"]
+    S2["<b>Stage 2: Conditional Retrain or Refresh</b><br/>CREATE OR REPLACE MODEL ... · or incremental AI.EMBED + ALTER VECTOR INDEX"]
+    S3["<b>Stage 3: Champion vs Challenger Gate</b><br/>ML.EVALUATE / ML.METRICS (with useQueryCache=false) · or Dataform / dbt assertion"]
+    S4["<b>Stage 4: Batch Scoring &amp; Alert Synthesis</b><br/>ML.PREDICT / AI.FORECAST / AI.CLASSIFY · Optional AI.AGG executive drift brief"]
 
     S1 --> S2 --> S3 --> S4
 
