@@ -1,147 +1,108 @@
-<svg width="1040" height="820" viewBox="0 0 1040 820" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
+<svg width="1280" height="504" viewBox="0 0 1280 504" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif">
   <defs>
-    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
-      <path d="M 0 1 L 10 5 L 0 9 z" fill="#5F6368"/>
-    </marker>
-    <marker id="arrow-red" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse">
-      <path d="M 0 1 L 10 5 L 0 9 z" fill="#C5221F"/>
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#4A4E54"/>
     </marker>
   </defs>
 
-  <rect width="1040" height="820" fill="#FFFFFF"/>
+  <rect width="1280" height="504" fill="#FFFFFF"/>
 
   <!-- ===================================================================== -->
   <!-- STAGE 1: 1. Ground-Truth Notebooks, SQL & Reference Hubs (GitHub)     -->
   <!-- ===================================================================== -->
-  <rect x="24" y="18" width="992" height="170" rx="8" fill="#F8FAFF" stroke="#AECBFA" stroke-width="1.8"/>
-  <text x="520" y="44" text-anchor="middle" font-size="15.5" font-weight="700" fill="#174EA6">
+  <rect x="40" y="6" width="1200" height="114" rx="6" fill="#F8FAFF" stroke="#AECBFA" stroke-width="1.6"/>
+  <text x="640" y="25" text-anchor="middle" font-size="13.5" font-weight="700" fill="#174EA6">
     1. Ground-Truth Notebooks, SQL &amp; Reference Hubs (GitHub)
   </text>
 
-  <!-- Box 1A: bigquery-ml/ -->
-  <rect x="44" y="60" width="304" height="110" rx="6" fill="#E8F0FE" stroke="#4285F4" stroke-width="2"/>
-  <text x="196" y="85" text-anchor="middle" font-size="14" font-weight="700" fill="#174EA6">bigquery-ml/ (61 Notebooks &middot; 58 SQL)</text>
-  <text x="196" y="108" text-anchor="middle" font-size="12.5" fill="#174EA6">23 CREATE MODEL Types &middot; 12 ML.* Families</text>
-  <text x="196" y="129" text-anchor="middle" font-size="12.5" fill="#174EA6">18 Applied Workflows &middot; 8 MLOps Pipelines</text>
-  <text x="196" y="150" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1967D2">Colab &middot; Workbench &middot; BigQuery Studio</text>
+  <!-- BQML -->
+  <rect x="64" y="34" width="364" height="76" rx="4" fill="#E8F0FE" stroke="#4285F4" stroke-width="2"/>
+  <text x="246" y="54" text-anchor="middle" font-size="13" fill="#174EA6"><tspan font-weight="700">bigquery-ml/</tspan> (61 Notebooks &middot; 58 SQL)</text>
+  <text x="246" y="73" text-anchor="middle" font-size="12" fill="#174EA6">23 CREATE MODEL &middot; 12 ML.* Families</text>
+  <text x="246" y="92" text-anchor="middle" font-size="12" fill="#174EA6">18 Applied Workflows &middot; 8 MLOps Pipelines</text>
 
-  <!-- Box 1B: bigquery-ai/ -->
-  <rect x="368" y="60" width="304" height="110" rx="6" fill="#E8F0FE" stroke="#4285F4" stroke-width="2"/>
-  <text x="520" y="85" text-anchor="middle" font-size="14" font-weight="700" fill="#174EA6">bigquery-ai/ (43 Notebooks &middot; 29 SQL)</text>
-  <text x="520" y="108" text-anchor="middle" font-size="12.5" fill="#174EA6">29 AI.* &amp; Cloud AI SQL Functions</text>
-  <text x="520" y="129" text-anchor="middle" font-size="12.5" fill="#174EA6">14 Composed Multi-Function Workflows</text>
-  <text x="520" y="150" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1967D2">Gemini &middot; TimesFM &middot; TabFM &middot; Vector Search</text>
+  <!-- BQAI -->
+  <rect x="458" y="34" width="364" height="76" rx="4" fill="#E8F0FE" stroke="#4285F4" stroke-width="2"/>
+  <text x="640" y="54" text-anchor="middle" font-size="13" fill="#174EA6"><tspan font-weight="700">bigquery-ai/</tspan> (43 Notebooks &middot; 29 SQL)</text>
+  <text x="640" y="73" text-anchor="middle" font-size="12" fill="#174EA6">29 AI.* &amp; Cloud AI SQL Functions</text>
+  <text x="640" y="92" text-anchor="middle" font-size="12" fill="#174EA6">14 Multi-Function Workflows</text>
 
-  <!-- Box 1C: 13 Deep Reference Guides -->
-  <rect x="692" y="60" width="304" height="110" rx="6" fill="#FEF7E0" stroke="#F9AB00" stroke-width="2"/>
-  <text x="844" y="85" text-anchor="middle" font-size="14" font-weight="700" fill="#7A5A00">13 Deep Reference Guides</text>
-  <text x="844" y="108" text-anchor="middle" font-size="12.5" fill="#7A5A00">bigquery-ml/reference/ (5 Guides)</text>
-  <text x="844" y="129" text-anchor="middle" font-size="12.5" fill="#7A5A00">bigquery-ai/reference/ (8 Guides)</text>
-  <text x="844" y="150" text-anchor="middle" font-size="11.5" font-weight="600" fill="#8C6200">Options &middot; Gotchas &middot; pinned-models.json</text>
+  <!-- REFS -->
+  <rect x="852" y="34" width="364" height="76" rx="4" fill="#FEF7E0" stroke="#F9AB00" stroke-width="2"/>
+  <text x="1034" y="54" text-anchor="middle" font-size="13" font-weight="700" fill="#7A5A00">13 Deep Reference Guides</text>
+  <text x="1034" y="73" text-anchor="middle" font-size="12" fill="#7A5A00">bigquery-ml/reference/ (5 Guides)</text>
+  <text x="1034" y="92" text-anchor="middle" font-size="12" fill="#7A5A00">bigquery-ai/reference/ (8 Guides)</text>
 
-  <!-- Connector Stage 1 -> Stage 2 -->
-  <line x1="520" y1="188" x2="520" y2="218" stroke="#5F6368" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- Arrow Stage 1 -> Stage 2 -->
+  <line x1="640" y1="120" x2="640" y2="138" stroke="#4A4E54" stroke-width="1.8" marker-end="url(#arrow)"/>
 
   <!-- ===================================================================== -->
-  <!-- STAGE 2: 2. 4 Composable Agent Skills (skills/)                       -->
+  <!-- STAGE 2: 2. 4 Composable Agent Skills                                 -->
   <!-- ===================================================================== -->
-  <rect x="24" y="224" width="992" height="288" rx="8" fill="#F8FAFF" stroke="#AECBFA" stroke-width="1.8"/>
-  <text x="520" y="250" text-anchor="middle" font-size="15.5" font-weight="700" fill="#174EA6">
+  <rect x="40" y="142" width="1200" height="216" rx="6" fill="#F8FAFF" stroke="#AECBFA" stroke-width="1.6"/>
+  <text x="640" y="161" text-anchor="middle" font-size="13.5" font-weight="700" fill="#174EA6">
     2. 4 Composable Agent Skills (skills/ &middot; .agents/skills/ &middot; .claude/skills/)
   </text>
 
-  <!-- Umbrella Router Box -->
-  <rect x="140" y="266" width="760" height="84" rx="6" fill="#FCE8E6" stroke="#EA4335" stroke-width="2"/>
-  <text x="520" y="291" text-anchor="middle" font-size="14.5" font-weight="700" fill="#A50E0E">
-    bigquery-data-science &mdash; Umbrella Router &amp; Multi-Skill Composer
-  </text>
-  <text x="520" y="314" text-anchor="middle" font-size="12.5" fill="#A50E0E">
-    ML.* vs AI.* Prerequisite Matrix (namespace-matrix.md) &middot; 10 Empirical Head-to-Head Task Comparisons
-  </text>
-  <text x="520" y="335" text-anchor="middle" font-size="12.5" font-weight="600" fill="#A50E0E">
-    6 Multi-Skill Composition Playbooks (cross-skill-playbooks.md) &middot; 7-Stage Problem-First Lifecycle Navigator
-  </text>
+  <!-- ROUTER -->
+  <rect x="330" y="170" width="620" height="68" rx="4" fill="#FCE8E6" stroke="#EA4335" stroke-width="2"/>
+  <text x="640" y="190" text-anchor="middle" font-size="13" fill="#A50E0E"><tspan font-weight="700">bigquery-data-science</tspan> (Umbrella Router)</text>
+  <text x="640" y="208" text-anchor="middle" font-size="12" fill="#A50E0E">ML.* vs AI.* Matrix &middot; 10 Head-to-Head Comparisons</text>
+  <text x="640" y="226" text-anchor="middle" font-size="12" fill="#A50E0E">6 Multi-Skill Playbooks &middot; 7-Stage Lifecycle Navigator</text>
 
-  <!-- 3 Routing Arrows from Router to 3 Specialist Skills -->
-  <path d="M 320 350 L 196 382" stroke="#C5221F" stroke-width="1.8" fill="none" marker-end="url(#arrow-red)"/>
-  <line x1="520" y1="350" x2="520" y2="382" stroke="#C5221F" stroke-width="1.8" marker-end="url(#arrow-red)"/>
-  <path d="M 720 350 L 844 382" stroke="#C5221F" stroke-width="1.8" fill="none" marker-end="url(#arrow-red)"/>
+  <!-- 3 Curved Arrows from ROUTER to S_ML, S_AI, S_OPS -->
+  <path d="M 450 238 C 350 250, 246 254, 246 268" stroke="#4A4E54" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
+  <line x1="640" y1="238" x2="640" y2="268" stroke="#4A4E54" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <path d="M 830 238 C 930 250, 1034 254, 1034 268" stroke="#4A4E54" stroke-width="1.6" fill="none" marker-end="url(#arrow)"/>
 
-  <!-- Specialist Skill 1: bigquery-ml -->
-  <rect x="44" y="388" width="304" height="106" rx="6" fill="#E8F0FE" stroke="#4285F4" stroke-width="2"/>
-  <text x="196" y="413" text-anchor="middle" font-size="14" font-weight="700" fill="#174EA6">bigquery-ml (Trained Models)</text>
-  <text x="196" y="435" text-anchor="middle" font-size="12.5" fill="#174EA6">23 CREATE MODEL Types &amp; TRANSFORM</text>
-  <text x="196" y="456" text-anchor="middle" font-size="12.5" fill="#174EA6">49 ML.* Evaluation, Explain &amp; Scalers</text>
-  <text x="196" y="477" text-anchor="middle" font-size="11.5" font-weight="600" fill="#1967D2">Forecasting &middot; Causal Inference &middot; Tuning</text>
+  <!-- S_ML -->
+  <rect x="64" y="272" width="364" height="76" rx="4" fill="#E8F0FE" stroke="#4285F4" stroke-width="2"/>
+  <text x="246" y="292" text-anchor="middle" font-size="13" fill="#174EA6"><tspan font-weight="700">bigquery-ml</tspan> (Trained Models)</text>
+  <text x="246" y="311" text-anchor="middle" font-size="12" fill="#174EA6">23 CREATE MODEL &middot; 49 ML.* Functions</text>
+  <text x="246" y="330" text-anchor="middle" font-size="12" fill="#174EA6">Preprocessing &middot; Causal &middot; Explain</text>
 
-  <!-- Specialist Skill 2: bigquery-ai -->
-  <rect x="368" y="388" width="304" height="106" rx="6" fill="#E6F4EA" stroke="#34A853" stroke-width="2"/>
-  <text x="520" y="413" text-anchor="middle" font-size="14" font-weight="700" fill="#0D652D">bigquery-ai (Foundation Models)</text>
-  <text x="520" y="435" text-anchor="middle" font-size="12.5" fill="#0D652D">AI.GENERATE* &middot; AI.IF / SCORE / CLASSIFY / AGG</text>
-  <text x="520" y="456" text-anchor="middle" font-size="12.5" fill="#0D652D">AI.EMBED &middot; VECTOR_SEARCH &middot; AI.SEARCH</text>
-  <text x="520" y="477" text-anchor="middle" font-size="11.5" font-weight="600" fill="#137333">TimesFM &middot; TabFM &middot; Document &amp; Cloud AI</text>
+  <!-- S_AI -->
+  <rect x="458" y="272" width="364" height="76" rx="4" fill="#E6F4EA" stroke="#34A853" stroke-width="2"/>
+  <text x="640" y="292" text-anchor="middle" font-size="13" fill="#0D652D"><tspan font-weight="700">bigquery-ai</tspan> (Foundation Models)</text>
+  <text x="640" y="311" text-anchor="middle" font-size="12" fill="#0D652D">29 AI.* &amp; Cloud AI &middot; TimesFM &middot; TabFM</text>
+  <text x="640" y="330" text-anchor="middle" font-size="12" fill="#0D652D">Embeddings &middot; Vector &amp; Hybrid Search</text>
 
-  <!-- Specialist Skill 3: bigquery-mlops -->
-  <rect x="692" y="388" width="304" height="106" rx="6" fill="#FEF7E0" stroke="#F9AB00" stroke-width="2"/>
-  <text x="844" y="413" text-anchor="middle" font-size="14" font-weight="700" fill="#7A5A00">bigquery-mlops (Production Ops)</text>
-  <text x="844" y="435" text-anchor="middle" font-size="12.5" fill="#7A5A00">8 Orchestrators (SQL, Dataform, dbt, KFP, Airflow)</text>
-  <text x="844" y="456" text-anchor="middle" font-size="12.5" fill="#7A5A00">Vertex AI Registry &middot; EXPORT / IMPORT MODEL</text>
-  <text x="844" y="477" text-anchor="middle" font-size="11.5" font-weight="600" fill="#8C6200">ML.VALIDATE_DATA_DRIFT &middot; Feature Store</text>
+  <!-- S_OPS -->
+  <rect x="852" y="272" width="364" height="76" rx="4" fill="#FEF7E0" stroke="#F9AB00" stroke-width="2"/>
+  <text x="1034" y="292" text-anchor="middle" font-size="13" fill="#7A5A00"><tspan font-weight="700">bigquery-mlops</tspan> (Production Ops)</text>
+  <text x="1034" y="311" text-anchor="middle" font-size="12" fill="#7A5A00">8 Orchestrators &middot; Vertex AI Registry</text>
+  <text x="1034" y="330" text-anchor="middle" font-size="12" fill="#7A5A00">EXPORT / IMPORT &middot; Drift &amp; Feature Store</text>
 
-  <!-- Connector Stage 2 -> Stage 3 -->
-  <line x1="520" y1="512" x2="520" y2="542" stroke="#5F6368" stroke-width="2" marker-end="url(#arrow)"/>
+  <!-- Arrow Stage 2 -> Stage 3 -->
+  <line x1="640" y1="358" x2="640" y2="376" stroke="#4A4E54" stroke-width="1.8" marker-end="url(#arrow)"/>
 
   <!-- ===================================================================== -->
   <!-- STAGE 3: 3. 4-Lens Progressive Disclosure & Zero-Dependency Delivery  -->
   <!-- ===================================================================== -->
-  <rect x="24" y="548" width="992" height="252" rx="8" fill="#F8FAFF" stroke="#AECBFA" stroke-width="1.8"/>
-  <text x="520" y="574" text-anchor="middle" font-size="15.5" font-weight="700" fill="#174EA6">
+  <rect x="40" y="380" width="1200" height="114" rx="6" fill="#F8FAFF" stroke="#AECBFA" stroke-width="1.6"/>
+  <text x="640" y="399" text-anchor="middle" font-size="13.5" font-weight="700" fill="#174EA6">
     3. 4-Lens Progressive Disclosure &amp; Zero-Dependency Delivery
   </text>
 
-  <!-- Row 3A: 4 Progressive Lenses side-by-side -->
-  <!-- Lens 1 -->
-  <rect x="44" y="590" width="222" height="82" rx="6" fill="#FCE8E6" stroke="#EA4335" stroke-width="2"/>
-  <text x="155" y="614" text-anchor="middle" font-size="13" font-weight="700" fill="#A50E0E">Lens 1: 4 SKILL.md</text>
-  <text x="155" y="635" text-anchor="middle" font-size="12" fill="#A50E0E">Routers &amp; Guardrails (~8 KB)</text>
-  <text x="155" y="655" text-anchor="middle" font-size="11.5" font-weight="600" fill="#A50E0E">Always Loaded First</text>
+  <!-- L12 -->
+  <rect x="64" y="408" width="364" height="76" rx="4" fill="#FEF7E0" stroke="#F9AB00" stroke-width="2"/>
+  <text x="246" y="428" text-anchor="middle" font-size="13" font-weight="700" fill="#7A5A00">Lens 1 &amp; Lens 2 &mdash; Route &amp; Compare</text>
+  <text x="246" y="447" text-anchor="middle" font-size="12" fill="#7A5A00">4 SKILL.md Routers (~8 KB)</text>
+  <text x="246" y="466" text-anchor="middle" font-size="12" fill="#7A5A00">20 Decision &amp; Playbook Guides (~25 KB)</text>
 
-  <line x1="266" y1="631" x2="282" y2="631" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="428" y1="446" x2="454" y2="446" stroke="#4A4E54" stroke-width="1.6" marker-end="url(#arrow)"/>
 
-  <!-- Lens 2 -->
-  <rect x="286" y="590" width="222" height="82" rx="6" fill="#FEF7E0" stroke="#F9AB00" stroke-width="2"/>
-  <text x="397" y="614" text-anchor="middle" font-size="13" font-weight="700" fill="#7A5A00">Lens 2: 20 Reference Guides</text>
-  <text x="397" y="635" text-anchor="middle" font-size="12" fill="#7A5A00">Matrices &amp; Playbooks (~25 KB)</text>
-  <text x="397" y="655" text-anchor="middle" font-size="11.5" font-weight="600" fill="#7A5A00">Family &amp; Architecture Choice</text>
+  <!-- L34 -->
+  <rect x="458" y="408" width="364" height="76" rx="4" fill="#E6F4EA" stroke="#34A853" stroke-width="2"/>
+  <text x="640" y="428" text-anchor="middle" font-size="13" font-weight="700" fill="#0D652D">Lens 3 &amp; Lens 4 &mdash; Write &amp; Build</text>
+  <text x="640" y="447" text-anchor="middle" font-size="12" fill="#0D652D">137 Surgical Syntax Cards (&lt; 25 KB)</text>
+  <text x="640" y="466" text-anchor="middle" font-size="12" fill="#0D652D">104 Worked Walkthroughs (~20 KB)</text>
 
-  <line x1="508" y1="631" x2="524" y2="631" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
+  <line x1="822" y1="446" x2="848" y2="446" stroke="#4A4E54" stroke-width="1.6" marker-end="url(#arrow)"/>
 
-  <!-- Lens 3 -->
-  <rect x="528" y="590" width="222" height="82" rx="6" fill="#E6F4EA" stroke="#34A853" stroke-width="2"/>
-  <text x="639" y="614" text-anchor="middle" font-size="13" font-weight="700" fill="#0D652D">Lens 3: 137 Syntax Cards</text>
-  <text x="639" y="635" text-anchor="middle" font-size="12" fill="#0D652D">H2-Sliced DDL &amp; TVFs (&lt; 25 KB)</text>
-  <text x="639" y="655" text-anchor="middle" font-size="11.5" font-weight="600" fill="#0D652D">Surgical SQL Generation</text>
-
-  <line x1="750" y1="631" x2="766" y2="631" stroke="#5F6368" stroke-width="1.6" marker-end="url(#arrow)"/>
-
-  <!-- Lens 4 -->
-  <rect x="770" y="590" width="226" height="82" rx="6" fill="#E6F4EA" stroke="#34A853" stroke-width="2"/>
-  <text x="883" y="614" text-anchor="middle" font-size="13" font-weight="700" fill="#0D652D">Lens 4: 104 Narratives</text>
-  <text x="883" y="635" text-anchor="middle" font-size="12" fill="#0D652D">Worked Walkthroughs (~20 KB)</text>
-  <text x="883" y="655" text-anchor="middle" font-size="11.5" font-weight="600" fill="#0D652D">IAM &middot; SQL &middot; BigFrames &middot; Pipelines</text>
-
-  <!-- Arrow Down to Delivery Bar -->
-  <line x1="520" y1="672" x2="520" y2="698" stroke="#5F6368" stroke-width="1.8" marker-end="url(#arrow)"/>
-
-  <!-- Row 3B: Zero-Dependency Package, CLI, MCP & ADK -->
-  <rect x="44" y="704" width="952" height="78" rx="6" fill="#E8F0FE" stroke="#4285F4" stroke-width="2"/>
-  <text x="520" y="730" text-anchor="middle" font-size="14" font-weight="700" fill="#174EA6">
-    Zero-Dependency Package (&lt; 1.5 MB Wheel) &middot; CLI &middot; Stdio MCP Server &middot; Google ADK Toolset (get_bigquery_tools)
-  </text>
-  <text x="520" y="753" text-anchor="middle" font-size="12.5" font-family="SFMono-Regular, Consolas, 'Liberation Mono', Menlo, monospace" fill="#174EA6">
-    uvx bigquery-data-science install | list | triage | lookup | search | review-sql | mcp &nbsp;&middot;&nbsp; automated 6-gate sweep
-  </text>
-  <text x="520" y="772" text-anchor="middle" font-size="11.5" fill="#1967D2">
-    Antigravity / Gemini CLI &middot; Claude Code &middot; Cursor &middot; OpenAI Codex &middot; Windsurf &middot; Google ADK
-  </text>
+  <!-- DELIV -->
+  <rect x="852" y="408" width="364" height="76" rx="4" fill="#E8F0FE" stroke="#4285F4" stroke-width="2"/>
+  <text x="1034" y="428" text-anchor="middle" font-size="13" font-weight="700" fill="#174EA6">Zero-Dependency CLI, MCP &amp; ADK</text>
+  <text x="1034" y="447" text-anchor="middle" font-size="12" fill="#174EA6">uvx bigquery-data-science install &middot; mcp</text>
+  <text x="1034" y="466" text-anchor="middle" font-size="12" fill="#174EA6">triage &middot; lookup &middot; search &middot; review-sql</text>
 </svg>
