@@ -3,6 +3,7 @@
 **Production Agent Skills, zero-dependency CLI, stdio MCP server & Google ADK tools for BigQuery ML, BigQuery AI, and BigQuery MLOps — distilled directly from 104 live-executed notebooks and 87 SQL scripts in Google Cloud.**
 
 [![PyPI](https://img.shields.io/pypi/v/bigquery-data-science?style=for-the-badge&logo=pypi&logoColor=white)](https://pypi.org/project/bigquery-data-science/)
+[![skills.sh](https://img.shields.io/badge/skills.sh-4%20Agent%20Skills-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://skills.sh/statmike/bigquery-data-science)
 [![BigQuery ML Hub](https://img.shields.io/badge/BigQuery%20ML-61%20Notebooks%20%26%2058%20SQL-4285F4?style=for-the-badge&logo=google-cloud&logoColor=white)](bigquery-ml/README.md)
 [![BigQuery AI Hub](https://img.shields.io/badge/BigQuery%20AI-43%20Notebooks%20%26%2029%20SQL-0F9D58?style=for-the-badge&logo=google-cloud&logoColor=white)](bigquery-ai/README.md)
 [![BigQuery MLOps Skill](https://img.shields.io/badge/BigQuery%20MLOps-8%20Pipelines%20%C2%B7%20Registry%20%C2%B7%20Drift-F9AB00?style=for-the-badge&logo=google-cloud&logoColor=white)](skills/bigquery-mlops/SKILL.md)
