@@ -66,4 +66,54 @@ Returns a STRUCT with:
 
 **BigFrames API:** `bigframes.bigquery.ai.generate()` — Scalar function returning a Series of structs. Supports `output_schema` as `Mapping[str, str]`. Prompt is a tuple of string literals and Series: `bbq.ai.generate(("Summarize: ", df["text"]), output_schema={"summary": "STRING"})`. Access result via `.struct.field("result")`.
 
+### Reusable column aliases for unpacking `AI.*` outputs
+
+Calling `AI.GENERATE` (or `AI.GENERATE_BOOL` / `_DOUBLE` / `_INT` / `AI.TRANSLATE(..., return_details => TRUE)`) returns a `STRUCT`. Historically, unpacking multiple `STRUCT` fields and filtering `WHERE status = ''` without invoking the model multiple times per row required wrapping the call in a `WITH` CTE or subquery. With **reusable column aliases** ([column aliases guide](https://docs.cloud.google.com/bigquery/docs/column-aliases) · [query syntax](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#using_aliases)), a `SELECT`-list alias can be referenced laterally to the right in the **same** `SELECT` list and in `WHERE`, evaluating `AI.GENERATE` once per row:
+
+```sql
+-- Check whether reusable_column_aliases_mode is enabled in the region:
+SELECT option_name, option_value
+FROM `region-us`.INFORMATION_SCHEMA.EFFECTIVE_PROJECT_OPTIONS
+WHERE option_name = 'reusable_column_aliases_mode';
+
+-- Enable project-wide for a region (requires bigquery.projects.update / roles/bigquery.admin; bigquery.organizations.update at org level):
+ALTER PROJECT `your-gcp-project-id`
+SET OPTIONS (`region-us.reusable_column_aliases_mode` = 'on');
+
+-- Single-SELECT unpacking + WHERE filtering (AI.GENERATE runs once per row):
+SELECT
+  review_id,
+  AI.GENERATE(
+    ('Extract sentiment and 1-sentence summary: ', review_text),
+    endpoint => 'gemini-2.5-flash',
+    output_schema => 'sentiment STRING, summary STRING'
+  ) AS ai_gen,
+  ai_gen.sentiment,
+  ai_gen.summary,
+  JSON_VALUE(ai_gen.full_response, '$.modelVersion') AS model_version
+FROM `your-gcp-project-id.DATASET_ID.reviews`
+WHERE ai_gen.status = '';
+```
+
+**GOTCHA — 5-tier name resolution & 2 silent shadowing traps:**
+When `reusable_column_aliases_mode = 'on'`, GoogleSQL resolves bare identifiers in strict precedence order from highest (`#1`) to lowest (`#5`):
+1. `FROM` clause table column names *(highest — silently shadows a `SELECT` alias of the same name!)*
+2. Reusable column aliases defined to the left in the current `SELECT` list *(silently shadows `#3`–`#5`!)*
+3. Correlated column names from outer query scopes
+4. SQL UDF / TVF parameter names
+5. Procedural language (`DECLARE`) script variables *(lowest)*
+
+Two silent shadowing traps follow directly from this order:
+- **Trap 1 (`FROM` column shadows `SELECT` alias):** If the input table already has a column named `gen`, `result`, or `score`, defining `AI.GENERATE(...) AS gen` and referencing `gen.sentiment` (or `WHERE score > 0.8`) resolves to the **`FROM` table column**, ignoring your `SELECT` alias with no warning!
+- **Trap 2 (`SELECT` alias shadows outer/UDF/script names):** A `SELECT` alias silently overrides correlated outer columns (`#3`), UDF/TVF parameters (`#4`), and `DECLARE` variables (`#5`) of the same name. Always pick a distinct alias prefix (such as `ai_gen`) that never collides with table columns, parameters, or variables.
+
+**Documented limitations:**
+1. In queries with grouping or aggregation (`GROUP BY` or aggregate functions), aliases to unaggregated expressions (grouping columns or projections of grouping columns) cannot be referenced in the `WHERE` clause or as arguments to aggregate functions.
+2. Aliases over **aggregate** (`AI.AGG`, `COUNT`) or **window** functions cannot be referenced in `WHERE` or nested inside another aggregate function (filter aggregates in `HAVING` and window outputs in `QUALIFY`).
+3. A **window function** cannot reference an alias defined by another window function in the same `SELECT` list.
+4. **Not supported in pipe query syntax (`|>`)** — pipe syntax natively provides `|> EXTEND AI.GENERATE(...) AS ai_gen |> SELECT ai_gen.result` without any project option.
+5. **Not supported in Graph Query Language (`GRAPH_TABLE` / GQL)**.
+
+**Portability guidance:** Because `reusable_column_aliases_mode = 'on'` is an opt-in regional project option, keep a standard `WITH generated AS (...)` CTE in shared SQL scripts, public notebooks, and cross-project templates that must run unmodified in projects where the option is unset.
+
 ---

@@ -242,8 +242,7 @@ def build_syntax_cards_for_domain(
                 local_anchors=local_anchors,
             )
             provenance = (
-                f"> **Source:** [`{ref_rel}#{anchor}`]"
-                f"({GITHUB_BLOB_BASE}/{ref_rel}#{anchor})"
+                f"> **Source:** [`{ref_rel}#{anchor}`]({GITHUB_BLOB_BASE}/{ref_rel}#{anchor})"
             )
             card_content = (
                 f"# {h2_title}\n\n{provenance}\n\n{rewritten_body}\n"
@@ -340,8 +339,7 @@ def sync_all_syntax(
         skill_dirs = [
             skills_root / name
             for name in DOMAIN_SKILLS
-            if (skills_root / name).is_dir()
-            and (skill_name is None or name == skill_name)
+            if (skills_root / name).is_dir() and (skill_name is None or name == skill_name)
         ]
 
     for sdir in skill_dirs:
@@ -368,8 +366,7 @@ def check_syntax_sync(
         skill_dirs = [
             skills_root / name
             for name in DOMAIN_SKILLS
-            if (skills_root / name).is_dir()
-            and (skill_name is None or name == skill_name)
+            if (skills_root / name).is_dir() and (skill_name is None or name == skill_name)
         ]
 
     for sdir in skill_dirs:

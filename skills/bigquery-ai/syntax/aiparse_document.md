@@ -2,14 +2,13 @@
 
 > **Source:** [`bigquery-ai/reference/document-processing.md#aiparse_document`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/document-processing.md#aiparse_document)
 
-- **⚠️ Status (as of 2026-09-01): OFFLINE, and reference documentation now WITHDRAWN.** The function (Preview) was taken offline by Google for revision on 2026-06-01 and does not execute. As of this audit the situation has escalated: the reference page `.../bigqueryml-syntax-ai-parse-document` returns **HTTP 404**, the function no longer appears in the BigQuery docs navigation tree, and it is absent from the generative AI overview page. Google has published no release note explaining the withdrawal.
-  - **Interim alternative:** use [`ML.PROCESS_DOCUMENT`](mlprocess_document.md) for OCR and document extraction. It reaches the same Document AI processors but requires a remote model and a `CREATE MODEL` step — precisely the setup AI.PARSE_DOCUMENT was introduced to remove.
-  - **Affected content:** `functions/ai_parse_document/` and `workflows/document_rag/` carry warning banners. Their committed outputs are a record of the function working before 2026-06-01, not current behavior. Do not re-run them.
-  - **Re-check** the [BigQuery release notes](https://docs.cloud.google.com/bigquery/docs/release-notes). If it returns, reverse this note, remove the notebook banners, and re-run to verify (precedent: AI.AGG disable Apr 2026 → re-enable May 2026). Documentation below is retained from the last published version of the page — treat it as an archived snapshot, not a live reference.
-- **Description:** (Preview) Table-valued function that parses documents using the Document AI Layout Parser. Combines OCR, layout parsing, and chunking into a single SQL function call — no `CREATE MODEL` step required. The `endpoint` parameter points directly to a Document AI Layout Parser processor.
-- **Use cases:** Document text extraction, chunking for RAG pipelines, OCR from scanned documents, layout-aware document parsing.
-- [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-parse-document) — **dead link (HTTP 404 as of 2026-09-01)**, retained so the page can be re-checked if the function returns
-- **Type:** Table-valued function (returns a table) — Preview
+- **⚠️ Status (as of 2026-09-01): OFFLINE, and reference documentation WITHDRAWN — superseded by GA [`AI.CHUNK_DOCUMENT`](aichunk_document.md).** The function (Preview) was taken offline by Google for revision on 2026-06-01 and does not execute; its reference page `.../bigqueryml-syntax-ai-parse-document` returns **HTTP 404**.
+  - **GA replacement:** Use [`AI.CHUNK_DOCUMENT`](aichunk_document.md) for zero-DDL layout-aware chunking of PDFs, HTML, DOCX, PPTX, and XLSX/XLSM — it removes both `CREATE MODEL` and manual Document AI processor setup by auto-provisioning `bq-created-layout-parser`. Use [`ML.PROCESS_DOCUMENT`](mlprocess_document.md) when you need specialized Document AI processors (invoice, receipt, form, OCR on standalone images, custom extractors) or custom `PROCESS_OPTIONS`.
+  - **Affected content:** `functions/ai_parse_document/` carries an archival retirement banner. Its committed outputs are a historical record of the function before 2026-06-01, not current behavior. Do not re-run it. Documentation below is retained from the last published version of the page as an archived snapshot.
+- **Description:** (Preview — retired) Table-valued function that parsed documents using the Document AI Layout Parser without a `CREATE MODEL` step.
+- **Use cases:** Historical reference only — migrate RAG chunking to [`AI.CHUNK_DOCUMENT`](aichunk_document.md).
+- [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-parse-document) — **dead link (HTTP 404 as of 2026-09-01)**, retained as an archival record
+- **Type:** Table-valued function (returns a table) — Preview (⚠️ offline)
 
 **Syntax:**
 ```sql
@@ -88,4 +87,4 @@ This is useful for ad-hoc parsing of specific documents without creating an obje
 
 **BigFrames API:** No direct equivalent. Use `%%bigquery` magics or `session.read_gbq_query()` to execute AI.PARSE_DOCUMENT SQL from BigFrames.
 
-**Relationship to ML.PROCESS_DOCUMENT:** AI.PARSE_DOCUMENT is to ML.PROCESS_DOCUMENT what AI.GENERATE is to AI.GENERATE_TEXT — a simplified alternative that skips the `CREATE MODEL` step. Use ML.PROCESS_DOCUMENT when you need specialized processors (invoice, form, custom) or full `PROCESS_OPTIONS` control. Use AI.PARSE_DOCUMENT for straightforward OCR + chunking workflows.
+**Relationship to `AI.CHUNK_DOCUMENT` and `ML.PROCESS_DOCUMENT`:** [`AI.CHUNK_DOCUMENT`](aichunk_document.md) supersedes `AI.PARSE_DOCUMENT` at GA by eliminating manual Document AI processor creation (`endpoint` is replaced by auto-provisioned `bq-created-layout-parser`) and adding a per-row `status` column plus direct `'gs://...'` string inputs up to 500 PDF pages. Use [`ML.PROCESS_DOCUMENT`](mlprocess_document.md) when you need specialized Document AI processors (invoice, form, OCR on images, custom) or fine-grained `PROCESS_OPTIONS`.

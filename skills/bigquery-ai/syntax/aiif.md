@@ -2,10 +2,10 @@
 
 > **Source:** [`bigquery-ai/reference/managed-functions.md#aiif`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/managed-functions.md#aiif)
 
-- **Description:** (Preview) Scalar function that uses a Vertex AI Gemini model to evaluate a condition described in natural language and returns a BOOL. BigQuery automatically structures (optimizes) your prompts to improve the quality of the output.
-- **Use cases:** Sentiment analysis (find negative reviews), topic analysis (identify articles on a subject), image analysis (select images containing a specific item), security (identify suspicious emails), filtering in WHERE clauses, joining tables based on semantic or multimodal conditions.
+- **Description:** Scalar function that uses a Vertex AI Gemini model to evaluate a condition described in natural language and returns a `BOOL`. BigQuery automatically structures (optimizes) your prompts to improve output quality.
+- **Use cases:** Sentiment analysis (find negative reviews), topic analysis (identify articles on a subject), image analysis (select images containing a specific item), security (identify suspicious emails), filtering in `WHERE` clauses, joining tables based on semantic or multimodal conditions.
 - [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-if)
-- **Type:** Scalar function -- returns a single BOOL value per row (Preview)
+- **Type:** Scalar function -- returns a single BOOL value per row (GA)
 
 **Syntax:**
 ```sql
@@ -39,18 +39,18 @@ AI.IF(
 | BOOL | The result of evaluating the condition in the input prompt. |
 | NULL | Returned if the call to Vertex AI is unsuccessful for any reason. |
 
-**Supported models:** Any GA or preview Gemini model. If no endpoint specified, BigQuery dynamically chooses for best cost-to-quality tradeoff. Uses various `gemini-2.5-*` models.
+**Supported models:** Any GA or preview Gemini model. If no endpoint specified, BigQuery dynamically chooses for best cost-to-quality tradeoff.
 
 **Best practices:**
-- BigQuery optimizes queries to reduce Gemini calls. Place non-AI filters alongside AI.IF -- non-AI filters are evaluated first (e.g., `WHERE AI.IF(...) AND category = 'tech'`).
+- BigQuery optimizes queries to reduce Gemini calls. Place non-AI filters alongside `AI.IF` -- non-AI filters are evaluated first (e.g., `WHERE AI.IF(...) AND category = 'tech'`).
 - Do not use the global endpoint if you have data processing location requirements.
 
-**Limitations:** Preview status. Returns NULL on error (no detailed error info). No model parameter control (temperature, top_p, etc.) unlike AI.GENERATE_BOOL. At most one video object per input. Optimized mode requires ~3,000 rows minimum; only string columns supported for multi-column prompts in optimized mode.
+**Limitations:** Returns `NULL` on error (no detailed error info). No model parameter control (`temperature`, `top_p`, etc.) unlike `AI.GENERATE_BOOL`. At most one video object per input. Optimized mode (`embeddings` / `optimization_mode`, Preview) requires ~3,000 rows minimum; only string columns are supported for multi-column prompts in optimized mode.
 
 **Locations:** All regions supporting Gemini models, plus US and EU multi-regions.
 
 **Provisioned throughput:** Not supported. Uses dynamic shared quota (DSQ) only.
 
-**BigFrames API:** `bigframes.bigquery.ai.if_(prompt)` — Returns a Series of BOOL directly (not a struct, unlike generate_bool). No endpoint param -- auto-selects model. Example: `bbq.ai.if_((df["review"], " is a positive review"))`. Can be used for boolean indexing: `df[bbq.ai.if_(...)]`.
+**BigFrames API:** `bigframes.bigquery.ai.if_(prompt)` — Returns a Series of BOOL directly (not a struct, unlike `generate_bool`). No `endpoint` param -- auto-selects model. Example: `bbq.ai.if_((df["review"], " is a positive review"))`. Can be used for boolean indexing: `df[bbq.ai.if_(...)]`.
 
 ---

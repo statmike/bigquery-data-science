@@ -6,7 +6,9 @@ import json
 import shutil
 from pathlib import Path
 
-from bigquery_data_science.cli import main
+import pytest
+
+from bigquery_data_science.cli import _count_syntax_cards, main
 from bigquery_data_science.tooling.bump_version import (
     bump_version,
     check_version_lockstep,
@@ -43,8 +45,10 @@ from bigquery_data_science.tooling.pinned_models import (
 )
 from bigquery_data_science.tooling.reference_structure import check_reference
 from bigquery_data_science.tooling.run_notebook import (
+    _build_execution_env,
     execute_notebook,
     sanitize_notebook_outputs,
+    scrub_output,
 )
 from bigquery_data_science.tooling.sql_companions import (
     check_sql_companions,
@@ -53,6 +57,7 @@ from bigquery_data_science.tooling.sql_companions import (
 from bigquery_data_science.tooling.status_labels import (
     check_status_labels,
     normalize_status,
+    parse_namespace_matrix_statuses,
 )
 from bigquery_data_science.tooling.sync_syntax import (
     MAX_SYNTAX_CARD_BYTES,
@@ -66,10 +71,7 @@ SKILLS_ROOT = REPO_ROOT / "skills"
 
 def test_markdown_anchors_slugify_and_fenced_headings(tmp_path: Path) -> None:
     assert slugify("ML.EVALUATE") == "mlevaluate"
-    assert (
-        slugify("1. `model_type` Catalog")
-        == "1-model_type-catalog"
-    )
+    assert slugify("1. `model_type` Catalog") == "1-model_type-catalog"
     sample = tmp_path / "sample.md"
     sample.write_text(
         "# Title\n\n```sql\n# Not a heading\n```\n\n## Section\n\n## Section\n",
@@ -93,9 +95,7 @@ def test_validate_all_passes_on_repository_skills() -> None:
     }
     for name, res in results.items():
         assert res.ok, f"Skill {name} failed validation: {res.errors}"
-        assert not res.warnings, (
-            f"Skill {name} emitted warnings: {res.warnings}"
-        )
+        assert not res.warnings, f"Skill {name} emitted warnings: {res.warnings}"
 
 
 def test_validate_skill_rejects_missing_frontmatter_and_broken_link(
@@ -163,10 +163,13 @@ def test_check_syntax_sync_passes_and_detects_drift_and_orphans(
         sync_skill_syntax,
     )
 
+    assert (SKILLS_ROOT / "bigquery-ai" / "syntax" / "aichunk_document.md").is_file()
+    assert (SKILLS_ROOT / "bigquery-ai" / "syntax" / "aitranslate.md").is_file()
     assert check_syntax_sync(SKILLS_ROOT, REPO_ROOT) == []
 
     tmp_skills = tmp_path / "skills"
     shutil.copytree(SKILLS_ROOT, tmp_skills)
+    sync_skill_syntax(tmp_skills / "bigquery-ml", REPO_ROOT)
     target = tmp_skills / "bigquery-ai" / "syntax" / "aigenerate.md"
     target.write_text("# Drifted\n\nModified content.\n", encoding="utf-8")
     orphan = tmp_skills / "bigquery-ai" / "syntax" / "orphan-card.md"
@@ -196,8 +199,11 @@ def test_check_syntax_sync_passes_and_detects_drift_and_orphans(
 
 def test_convert_notebook_and_narrative_drift_detection(tmp_path: Path) -> None:
     results = check_all_narratives(SKILLS_ROOT, REPO_ROOT)
-    assert results["bigquery-ml"].ok and results["bigquery-ml"].checked == 61
-    assert results["bigquery-ai"].ok and results["bigquery-ai"].checked == 43
+    assert results["bigquery-ml"].checked == 61
+    assert results["bigquery-ai"].checked == 45
+    assert results["bigquery-ml"].ok
+    assert results["bigquery-ai"].ok
+    assert not (SKILLS_ROOT / "bigquery-ai" / "narrative" / "overview.md").exists()
 
     converted = convert_notebook(
         REPO_ROOT / "bigquery-ml" / "models" / "arima_plus" / "arima_plus.ipynb",
@@ -227,9 +233,7 @@ def test_convert_notebook_and_narrative_drift_detection(tmp_path: Path) -> None:
     drift = check_skill_narratives(tmp_skill, REPO_ROOT)
     assert drift is not None and not drift.ok
     assert "arima_plus.md" in drift.stale
-    assert any(
-        "nonexistent_topic_xyz.md" in msg for msg in drift.missing_source
-    )
+    assert any("nonexistent_topic_xyz.md" in msg for msg in drift.missing_source)
     assert any("ambiguous" in msg for msg in drift.missing_source)
 
 
@@ -272,9 +276,7 @@ def test_reference_structure_passes_and_rejects_orphan_page(
     proj = tmp_path / "proj"
     (proj / "reference").mkdir(parents=True)
     (proj / "RESOURCES.md").write_text("# Resources\n", encoding="utf-8")
-    (proj / "reference" / "orphan-page.md").write_text(
-        "# Orphan Page\n", encoding="utf-8"
-    )
+    (proj / "reference" / "orphan-page.md").write_text("# Orphan Page\n", encoding="utf-8")
     bad_ref = check_reference(proj)
     assert not bad_ref.ok
     assert any("orphan-page.md" in err for err in bad_ref.errors)
@@ -288,9 +290,7 @@ def test_pinned_models_passes_and_rejects_unpinned_model(
 
     allow_file = find_allow_file(REPO_ROOT / ".agents" / "skills")
     assert allow_file is not None
-    allowed = load_allow_list(
-        allow_file, REPO_ROOT / "bigquery-ai", REPO_ROOT
-    )
+    allowed = load_allow_list(allow_file, REPO_ROOT / "bigquery-ai", REPO_ROOT)
     assert check_pinned_models(REPO_ROOT / "bigquery-ai", allowed).ok
 
     bad_proj = tmp_path / "bigquery-ai"
@@ -313,9 +313,7 @@ def test_manifest_generation_and_verification(tmp_path: Path) -> None:
     manifest_path, version = write_manifest(tmp_skill, version="0.7.0")
     assert version == "0.7.0"
     committed = json.loads(
-        (SKILLS_ROOT / "bigquery-ml" / "skill.manifest.json").read_text(
-            encoding="utf-8"
-        )
+        (SKILLS_ROOT / "bigquery-ml" / "skill.manifest.json").read_text(encoding="utf-8")
     )
     generated = build_manifest(tmp_skill, version="0.7.0")
     assert generated["syntax_files"] == committed["syntax_files"]
@@ -365,10 +363,7 @@ def test_bump_version_and_lockstep_parity_check(tmp_path: Path) -> None:
     updated = bump_version(tmp_path, "1.2.3", release_date="2026-10-21")
     assert len(updated) == 14
     assert check_version_lockstep(tmp_path, expected_version="1.2.3") == []
-    assert (
-        'date-released: "2026-10-21"'
-        in (tmp_path / "CITATION.cff").read_text(encoding="utf-8")
-    )
+    assert 'date-released: "2026-10-21"' in (tmp_path / "CITATION.cff").read_text(encoding="utf-8")
 
     # Introduce drift in plugin.json and verify CLI --check fails
     (tmp_path / "plugin.json").write_text(
@@ -390,6 +385,23 @@ def test_status_labels_passes_on_repo_and_detects_drift(tmp_path: Path) -> None:
     assert normalize_status("Preview (⚠️ offline)") == "Retired"
     assert check_status_labels(REPO_ROOT, SKILLS_ROOT) == []
     assert main(["check-status-labels", "--repo-root", str(REPO_ROOT)]) == 0
+    matrix_statuses = parse_namespace_matrix_statuses(
+        SKILLS_ROOT / "bigquery-data-science" / "reference" / "namespace-matrix.md"
+    )
+    for ga_sym in (
+        "AI.CHUNK_DOCUMENT",
+        "AI.TRANSLATE",
+        "AI.COUNT_TOKENS",
+        "AI.IF",
+        "AI.SCORE",
+        "AI.CLASSIFY",
+        "AI.EMBED",
+        "AI.SIMILARITY",
+    ):
+        assert matrix_statuses.get(ga_sym) in ("GA", "GA / Preview"), (
+            f"Expected GA status in namespace-matrix for {ga_sym}, "
+            f"got {matrix_statuses.get(ga_sym)!r}"
+        )
 
     # Negative fixture with Preview vs GA mismatch
     matrix_dir = tmp_path / "skills" / "bigquery-data-science" / "reference"
@@ -692,10 +704,215 @@ def test_sql_companions_and_single_source_pinned_models(
         )
         == 1
     )
-    assert "AI.FORECAST" in extract_sql_symbols(
-        "SELECT * FROM AI.FORECAST(TABLE `t`)"
+    assert "AI.FORECAST" in extract_sql_symbols("SELECT * FROM AI.FORECAST(TABLE `t`)")
+
+
+def test_build_execution_env_sets_quota_project_from_dotenv_and_preserves_override(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("GOOGLE_CLOUD_PROJECT", raising=False)
+    monkeypatch.delenv("GOOGLE_CLOUD_QUOTA_PROJECT", raising=False)
+
+    nb_dir = tmp_path / "sub"
+    nb_dir.mkdir()
+    (tmp_path / ".env").write_text(
+        "GOOGLE_CLOUD_PROJECT=my-test-proj-001\n",
+        encoding="utf-8",
     )
 
+    env = _build_execution_env(nb_dir)
+    assert env["GOOGLE_CLOUD_PROJECT"] == "my-test-proj-001"
+    assert env["GOOGLE_CLOUD_QUOTA_PROJECT"] == "my-test-proj-001"
+
+    # Empty or placeholder GOOGLE_CLOUD_QUOTA_PROJECT in os.environ falls back to project_id
+    monkeypatch.setenv("GOOGLE_CLOUD_QUOTA_PROJECT", "")
+    assert _build_execution_env(nb_dir)["GOOGLE_CLOUD_QUOTA_PROJECT"] == "my-test-proj-001"
+    monkeypatch.setenv("GOOGLE_CLOUD_QUOTA_PROJECT", "   ")
+    assert _build_execution_env(nb_dir)["GOOGLE_CLOUD_QUOTA_PROJECT"] == "my-test-proj-001"
+    monkeypatch.setenv("GOOGLE_CLOUD_QUOTA_PROJECT", "your-gcp-project-id")
+    assert _build_execution_env(nb_dir)["GOOGLE_CLOUD_QUOTA_PROJECT"] == "my-test-proj-001"
+
+    # Explicit environment GOOGLE_CLOUD_QUOTA_PROJECT wins over fallback
+    monkeypatch.setenv("GOOGLE_CLOUD_QUOTA_PROJECT", "custom-quota-proj-002")
+    env_override = _build_execution_env(nb_dir)
+    assert env_override["GOOGLE_CLOUD_QUOTA_PROJECT"] == "custom-quota-proj-002"
+
+    # Explicit .env GOOGLE_CLOUD_QUOTA_PROJECT wins when os.environ is unset
+    monkeypatch.delenv("GOOGLE_CLOUD_QUOTA_PROJECT", raising=False)
+    (tmp_path / ".env").write_text(
+        "GOOGLE_CLOUD_PROJECT=my-test-proj-001\nGOOGLE_CLOUD_QUOTA_PROJECT=dotenv-quota-proj-003\n",
+        encoding="utf-8",
+    )
+    env_dotenv_quota = _build_execution_env(nb_dir)
+    assert env_dotenv_quota["GOOGLE_CLOUD_QUOTA_PROJECT"] == "dotenv-quota-proj-003"
 
 
+def test_scrub_output_and_sanitize_notebook_outputs_project_numbers() -> None:
+    import nbformat
 
+    raw = (
+        "URI1: projects/123456789012/locations/us-central1/endpoints/gemini-2.5-flash\n"
+        "URI2: projects/98765432109/locations/us/processors/proc1\n"
+        "URI3: projects/1234567890123/datasets/ds1\n"
+        "SA1: bqcx-123456789012-abcd@gcp-sa-bigquery-condel.iam.gserviceaccount.com\n"
+        "SA2: service-123456789012@gcp-sa-aiplatform.iam.gserviceaccount.com\n"
+        "Keep10: projects/1234567890/x Keep14: projects/12345678901234/x\n"
+        "Epoch: 1730500000123 Float: 0.123456789012 Proj: my-demo-proj-777"
+    )
+    scrubbed = scrub_output(raw, ["my-demo-proj-777"])
+    assert scrubbed != raw
+    assert "projects/000000000000/locations/us-central1" in scrubbed
+    assert "projects/000000000000/locations/us/processors/proc1" in scrubbed
+    assert "projects/000000000000/datasets/ds1" in scrubbed
+    assert "bqcx-000000000000-abcd@gcp-sa-bigquery-condel.iam.gserviceaccount.com" in scrubbed
+    assert "service-000000000000@gcp-sa-aiplatform.iam.gserviceaccount.com" in scrubbed
+    assert "projects/1234567890/x" in scrubbed
+    assert "projects/12345678901234/x" in scrubbed
+    assert "1730500000123" in scrubbed
+    assert "0.123456789012" in scrubbed
+    assert "your-gcp-project-id" in scrubbed
+    assert "123456789012" not in scrubbed.replace("0.123456789012", "").replace(
+        "12345678901234", ""
+    )
+
+    # Idempotency check on already-scrubbed text and ANSI color sequences
+    rescrubbed = scrub_output(scrubbed, ["my-demo-proj-777"])
+    assert rescrubbed == scrubbed
+
+    ansi_raw = (
+        "\x1b[31mbqcx-123456789012-abcd@gcp-sa-bigquery-condel.iam.gserviceaccount.com\x1b[0m "
+        "\x1b[33mservice-123456789012@gcp-sa-aiplatform.iam.gserviceaccount.com\x1b[0m "
+        "\x1b[36mprojects/123456789012\x1b[0m "
+        "https://bigquery.googleapis.com/bigquery/v2/projects/123456789012?prettyPrint=false"
+    )
+    ansi_scrubbed = scrub_output(ansi_raw, [])
+    assert "123456789012" not in ansi_scrubbed
+    assert "bqcx-000000000000-abcd@" in ansi_scrubbed
+    assert "service-000000000000@" in ansi_scrubbed
+    assert "projects/000000000000\x1b[0m" in ansi_scrubbed
+    assert "projects/000000000000?prettyPrint=false" in ansi_scrubbed
+
+    # Notebook sanitization works even when targets=[] and scrubs dict keys + output metadata
+    nb = nbformat.v4.new_notebook()
+    code_cell = nbformat.v4.new_code_cell("pass")
+    code_cell.outputs = [
+        nbformat.v4.new_output(
+            "execute_result",
+            data={
+                "application/json": {
+                    "modelVersion": (
+                        "projects/123456789012/locations/us/publishers/google/models/m1"
+                    ),
+                    "projects/123456789012/locations/us": "key_test",
+                    "agents": [
+                        "bqcx-123456789012-xy12@gcp-sa-bigquery-condel.iam.gserviceaccount.com",
+                        "service-987654321098@gcp-sa-aiplatform.iam.gserviceaccount.com",
+                    ],
+                }
+            },
+            metadata={"source_uri": "projects/123456789012/datasets/ds1"},
+            execution_count=1,
+        ),
+        nbformat.v4.new_output(
+            "display_data",
+            data={"text/plain": ["Endpoint projects/123456789012/locations/us/e1"]},
+        ),
+    ]
+    nb.cells = [code_cell]
+    sanitized_count = sanitize_notebook_outputs(nb, [])
+    assert sanitized_count == 2
+    serialized = nbformat.writes(nb)
+    assert "123456789012" not in serialized
+    assert "987654321098" not in serialized
+    assert "projects/000000000000/locations/us" in serialized
+    assert "projects/000000000000/datasets/ds1" in serialized
+    assert "bqcx-000000000000-xy12@" in serialized
+    assert "service-000000000000@" in serialized
+
+
+def test_execute_notebook_captures_update_display_data_messages(
+    tmp_path: Path,
+) -> None:
+    import nbformat
+
+    from bigquery_data_science.tooling.run_notebook import execute_notebook
+
+    nb_path = tmp_path / "display_update.ipynb"
+    nb = nbformat.v4.new_notebook(
+        cells=[
+            nbformat.v4.new_code_cell(
+                "from IPython.display import display, update_display\n"
+                'display({"text/plain": "step 1: projects/123456789012/locations/us"}, '
+                'raw=True, display_id="job-1")\n'
+                'update_display({"text/plain": "step 2: projects/123456789012/locations/us"}, '
+                'raw=True, display_id="job-1")\n'
+                'update_display({"text/plain": "orphan update"}, '
+                'raw=True, display_id="job-2")\n'
+            )
+        ]
+    )
+    nbformat.write(nb, nb_path)
+    res = execute_notebook(nb_path, kernel_name="python3", timeout_seconds=60)
+    assert res.ok is True
+    executed = nbformat.read(nb_path, as_version=4)
+    outputs = executed.cells[0].outputs
+    assert len(outputs) == 2
+    assert outputs[0]["data"]["text/plain"] == "step 2: projects/000000000000/locations/us"
+    assert outputs[1]["data"]["text/plain"] == "orphan update"
+
+
+def test_pinned_models_allows_translation_models_and_flags_retired_preview(
+    tmp_path: Path,
+) -> None:
+    allow_file = find_allow_file(SKILLS_ROOT)
+    assert allow_file is not None
+    allowed_ai = load_allow_list(allow_file, "bigquery-ai")
+    assert {
+        "nmt",
+        "translation-llm",
+        "gemini-3.1-flash-lite",
+        "gemini-embedding-2",
+    } <= allowed_ai
+    assert "gemini-embedding-2-preview" not in allowed_ai
+    raw_config = json.loads(allow_file.read_text(encoding="utf-8"))
+    assert (
+        raw_config.get("deprecated", {}).get("gemini-3.1-flash-lite-preview")
+        == "gemini-3.1-flash-lite"
+    )
+
+    skill_dir = tmp_path / "bigquery-ai"
+    skill_dir.mkdir()
+    good_md = skill_dir / "SKILL.md"
+    good_md.write_text(
+        "```sql\n"
+        "SELECT AI.TRANSLATE('hello', 'es', model => 'nmt'),\n"
+        "       AI.TRANSLATE('hello', 'fr', model => 'translation-llm');\n"
+        "```\n",
+        encoding="utf-8",
+    )
+    assert check_pinned_models(skill_dir, allowed_ai).ok
+
+    bad_md = skill_dir / "retired.md"
+    bad_md.write_text(
+        "```sql\nCREATE MODEL `p.d.m` OPTIONS (ENDPOINT = 'gemini-3.1-flash-lite-preview');\n```\n",
+        encoding="utf-8",
+    )
+    res = check_pinned_models(skill_dir, allowed_ai)
+    assert not res.ok
+    assert any(pin.value == "gemini-3.1-flash-lite-preview" for pin in res.unlisted)
+
+
+def test_count_syntax_cards_dynamic_helper(tmp_path: Path) -> None:
+    assert _count_syntax_cards(tmp_path) == 0
+    ml_syn = tmp_path / "bigquery-ml" / "syntax"
+    ai_syn = tmp_path / "bigquery-ai" / "syntax"
+    ml_syn.mkdir(parents=True)
+    ai_syn.mkdir(parents=True)
+    (ml_syn / "mlpredict.md").write_text("# ML.PREDICT\n", encoding="utf-8")
+    (ai_syn / "aitranslate.md").write_text("# AI.TRANSLATE\n", encoding="utf-8")
+    (ai_syn / "aichunk_document.md").write_text("# AI.CHUNK_DOCUMENT\n", encoding="utf-8")
+    (ai_syn / "INDEX.md").write_text("# Index\n", encoding="utf-8")
+    (ai_syn / "notes.txt").write_text("ignored\n", encoding="utf-8")
+    assert _count_syntax_cards(tmp_path) == 3
+    assert _count_syntax_cards(SKILLS_ROOT) == 139

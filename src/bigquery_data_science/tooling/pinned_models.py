@@ -199,11 +199,7 @@ def find_allow_file(
     """Locate `pinned-models.json` walking up from `skills_root` and child skills."""
     starts = [skills_root.resolve()]
     if skills_root.is_dir():
-        starts += [
-            child.resolve()
-            for child in sorted(skills_root.iterdir())
-            if child.is_dir()
-        ]
+        starts += [child.resolve() for child in sorted(skills_root.iterdir()) if child.is_dir()]
     seen: set[Path] = set()
     for start in starts:
         for candidate_dir in [start, *start.parents]:

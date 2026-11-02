@@ -1,12 +1,14 @@
 {
-  "_comment": "Allow list for `bigquery-data-science check-pinned-models` (also run by `bigquery-data-science sweep`). Keys are repo-relative project paths; `*` applies to every project. A model or endpoint literal pinned anywhere in a project (notebook code cells, .sql, fenced code in markdown, .py) that is not listed here fails the check. Add a value when a new model is adopted; remove it when the model is retired, and the check then lists every file still naming it.",
+  "_comment": "Allow list for `bigquery-data-science check-pinned-models` (also run by `bigquery-data-science sweep`). Keys are repo-relative project paths; `*` applies to every project, and `deprecated` maps retired model/endpoint literals to their recommended replacements for `review-sql`. A model or endpoint literal pinned anywhere in a project (notebook code cells, .sql, fenced code in markdown, .py) that is not listed in `*` or the project key fails the check.",
   "*": [
     "text-embedding-005",
     "text-multilingual-embedding-002",
     "gemini-embedding-001",
     "gemini-embedding-2",
     "multimodalembedding@001",
-    "embeddinggemma-300m"
+    "embeddinggemma-300m",
+    "nmt",
+    "translation-llm"
   ],
   "bigquery-ai": [
     "gemini-2.5-flash",
@@ -21,9 +23,14 @@
     "gemini-4-argon",
     "TimesFM 2.5",
     "TimesFM 3.0",
-    "claude-sonnet-4-20250514"
+    "claude-sonnet-4-20250514",
+    "nmt",
+    "translation-llm"
   ],
   "bigquery-ml": [
     "TimesFM 2.5"
-  ]
+  ],
+  "deprecated": {
+    "gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite"
+  }
 }

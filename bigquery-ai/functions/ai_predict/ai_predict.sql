@@ -27,7 +27,9 @@
 -- Official docs: https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-predict
 --
 -- Companion: AI.EVALUATE's TabFM branch takes the same two inputs and returns
--- accuracy metrics instead of predictions — see ../ai_evaluate/.
+-- accuracy metrics instead of predictions — see ../ai_evaluate/. To score a
+-- materialized AI.PREDICT table deterministically with zero extra TabFM calls,
+-- use ML.METRICS — see ../../../bigquery-ml/functions/evaluation/.
 
 
 -- =============================================================================
@@ -294,7 +296,7 @@ FROM AI.PREDICT(
 -- (c) The workaround: EXTRACT the date into INT64 parts. This is a modeling
 --     decision as much as a workaround — year, month and day-of-week are
 --     periodic features, while a day offset from a fixed origin is a trend
---     feature. Watch the 20-column budget as you add them.
+--     feature. Watch the 50-column budget as you add them.
 WITH dated AS (
   SELECT
     p.*,
@@ -334,20 +336,24 @@ LIMIT 5;
 -- Cost today: during Preview, usage bills in slots on Enterprise and Enterprise
 -- Plus editions, or by bytes processed under on-demand pricing.
 --
--- Cost from 2026-10-30 (announced, not yet in effect): TabFM in BigQuery moves
--- to token-based pricing — TabFM tokens for the model inference plus the usual
--- slots or bytes processed for the rest of the query. Published formulas:
+-- Cost from 2026-11-17 (updated on https://cloud.google.com/bigquery/pricing#bigquery-ml-pricing
+-- as of 2026-11-02; the AI.PREDICT syntax page still prints 10/30/2026): TabFM
+-- in BigQuery moves to token-based pricing — TabFM tokens for the model
+-- inference plus the usual slots or bytes processed for the rest of the query.
+-- Published formulas:
 --   input tokens  = (train_rows * columns + predict_rows * (columns - 1)) * n_ensembles
 --   output tokens = predict_rows * n_ensembles
 -- at $0.05 / mtok input and $0.20 / mtok output. n_ensembles has no documented
 -- value and no argument to control it, so a dollar figure is not computable
 -- from the documentation as written. The query below reports the per-pass token
 -- counts, i.e. everything above except the n_ensembles multiplier. On or after
--- 2026-10-30, re-check https://docs.cloud.google.com/bigquery/pricing.
+-- 2026-11-17, re-check https://cloud.google.com/bigquery/pricing#bigquery-ml-pricing.
 --
 -- AI.EVALUATE does not reuse an AI.PREDICT result: its TabFM branch takes the
 -- same two inputs and runs the same inference again, so running both over one
--- split pays for the model twice.
+-- split pays for the model twice. To compute regression or classification
+-- metrics deterministically over a single saved AI.PREDICT table with zero
+-- extra model calls, use ML.METRICS (../../../bigquery-ml/functions/evaluation/).
 WITH penguins AS (
   SELECT MOD(ABS(FARM_FINGERPRINT(TO_JSON_STRING(p))), 10) AS split_bucket
   FROM `bigquery-public-data.ml_datasets.penguins` AS p

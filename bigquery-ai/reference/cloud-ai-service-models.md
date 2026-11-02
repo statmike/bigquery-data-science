@@ -50,7 +50,7 @@ Five BigQuery ML functions call a **pre-trained Google Cloud AI service** — no
 | `ML.TRANSCRIBE` | `CLOUD_AI_SPEECH_TO_TEXT_V2` | [Speech-to-Text V2](https://cloud.google.com/speech-to-text/v2/docs) | Object table of audio | [notebook](../functions/ml_transcribe/ml_transcribe.ipynb) · [sql](../functions/ml_transcribe/ml_transcribe.sql) |
 | `ML.PROCESS_DOCUMENT` | `CLOUD_AI_DOCUMENT_V1` | [Document AI](https://cloud.google.com/document-ai/docs) | Object table of documents | [notebook](../functions/ml_process_document/ml_process_document.ipynb) · [sql](../functions/ml_process_document/ml_process_document.sql) · [reference](document-processing.md#mlprocess_document) |
 
-`ML.PROCESS_DOCUMENT` is documented in full on the [Document Processing](document-processing.md) page, beside `AI.PARSE_DOCUMENT`, which solves the same problem without a model object. It is listed here because everything on this page about setup, permissions, per-row failures and the model object applies to it identically.
+`ML.PROCESS_DOCUMENT` is documented in full on the [Document Processing](document-processing.md) page alongside [`AI.CHUNK_DOCUMENT`](document-processing.md#aichunk_document), the GA zero-DDL layout-chunking TVF that auto-provisions `bq-created-layout-parser` (superseding retired `AI.PARSE_DOCUMENT`). Similarly, `ML.TRANSLATE` now has a zero-DDL scalar counterpart, [`AI.TRANSLATE`](managed-functions.md#aitranslate), documented on the [Managed Functions](managed-functions.md) page. Both Cloud AI service models remain listed here because everything on this page about `CREATE MODEL`, Cloud resource connection service-account auth, per-row failures, and data residency applies to them identically.
 
 ---
 
@@ -141,7 +141,7 @@ FROM ML.TRANSLATE(
 
 ## `ML.TRANSLATE`
 
-- **Description:** Table-valued function that translates a text column, or detects its language, using the Cloud Translation V3 API.
+- **Description:** Table-valued function that translates a text column, detects its language, or transliterates text using the Cloud Translation V3 API via a Cloud resource connection. For zero-DDL scalar translation or per-row dynamic `target_language` columns under end-user credentials, see [`AI.TRANSLATE`](managed-functions.md#aitranslate).
 - [documentation](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-translate) · [notebook](../functions/ml_translate/ml_translate.ipynb) · [sql](../functions/ml_translate/ml_translate.sql)
 
 ```sql
@@ -153,13 +153,14 @@ SELECT * FROM ML.TRANSLATE(
 
 | Argument | Values | Notes |
 |---|---|---|
-| `translate_mode` | `'TRANSLATE_TEXT'`, `'DETECT_LANGUAGE'` | Two modes in one function |
+| `translate_mode` | `'TRANSLATE_TEXT'`, `'DETECT_LANGUAGE'`, `'TRANSLITERATE_TEXT'` | Task modes on the Cloud Translation V3 remote model |
 | `target_language_code` | ISO-639 code | **Required** for `TRANSLATE_TEXT`; `DETECT_LANGUAGE` does not take one |
 
-**Output:** `ml_translate_result` (JSON), `ml_translate_status`, plus the input columns including `text_content`.
+**Output:** `ml_translate_result` (JSON), `ml_translate_status` (`''` on success), plus the input columns including `text_content`.
 
 **Worth knowing:**
-- **One target language per call, and it cannot come from a column.** `target_language_code` is a scalar in the `STRUCT`, evaluated once for the whole call; a column reference fails to compile with `Unrecognized name`. Fanning out over three languages is three calls unioned together, each re-reading and re-billing the source text.
+- **One target language per call, and it cannot come from a column.** `target_language_code` is a scalar in the `STRUCT`, evaluated once for the whole call; a column reference fails to compile with `Unrecognized name`. When each row needs its own `target_language` (or you want `model => 'translation-llm'` with zero `CREATE MODEL` setup), use [`AI.TRANSLATE`](managed-functions.md#aitranslate).
+- **When to keep `ML.TRANSLATE` over `AI.TRANSLATE`:** `ML.TRANSLATE` authenticates via a Cloud resource connection service account (rather than caller EUC), supports standalone `DETECT_LANGUAGE` and `TRANSLITERATE_TEXT` modes, and does not route single-region queries to the global endpoint (`AI.TRANSLATE` guarantees regional residency only in the `US` and `EU` multi-regions). Also note the status convention difference: `ml_translate_status = ''` on success, whereas `AI.TRANSLATE(..., return_details => TRUE)` returns `status = 'OK'`.
 - **The source language is detected for free** in `TRANSLATE_TEXT` mode — the result carries `detected_language_code` beside `translated_text`, so there is no reason to run `DETECT_LANGUAGE` first just to route rows. The two modes return different JSON shapes: `translations[]` versus `languages[]` with a confidence.
 - **It is stable across runs.** The notebook compares run-to-run output with the query cache off, and puts `AI.GENERATE` on the same rows for contrast.
 
@@ -264,10 +265,12 @@ Whether the retry can succeed depends on the cause: a `RESOURCE EXHAUSTED` row f
 
 ## Choosing between these and the `AI.*` functions
 
-Every member has a generative alternative — [`AI.GENERATE`](general-purpose-functions.md) over an `ObjectRef` reads audio and images directly, and a prompt can translate, score sentiment or extract entities. Each notebook runs both over the same rows so the comparison is measured rather than argued. What the comparisons keep showing:
+Two members now have **zero-DDL Cloud AI counterparts** in the `AI.*` namespace — [`AI.TRANSLATE`](managed-functions.md#aitranslate) for Cloud Translation and [`AI.CHUNK_DOCUMENT`](document-processing.md#aichunk_document) for Document AI Layout Parser — while every member also has a generative alternative via [`AI.GENERATE`](general-purpose-functions.md) over text or an `ObjectRef`. Each notebook runs both over the same rows so the comparison is measured rather than argued. What the comparisons keep showing:
 
-**Reach for a Cloud AI service model** when the output is a record: a fixed API version, a published per-unit price, a closed vocabulary, and behavior that does not move when a model default does. When the service cannot do something, it says so — an unsupported language, an unsupported feature, an unreadable file all arrive as errors in a status column.
+**Reach for [`AI.TRANSLATE`](managed-functions.md#aitranslate) or [`AI.CHUNK_DOCUMENT`](document-processing.md#aichunk_document) first** when your task is pure translation (especially with per-row target languages) or layout-aware RAG chunking of PDFs/Office/HTML — you get the deterministic Cloud AI service without `CREATE MODEL` DDL. Switch to `ML.TRANSLATE` when you need Cloud resource connection service-account auth, single-region data residency, or `DETECT_LANGUAGE` / `TRANSLITERATE_TEXT`; switch to `ML.PROCESS_DOCUMENT` when you need specialized Document AI processors (Invoice, Expense, Form, OCR on standalone images, Custom).
 
-**Reach for an `AI.*` function** when the deliverable is not the service's output: a summary rather than a transcript, your categories rather than the taxonomy's, translate-and-rewrite rather than translate. It will also answer questions the service refuses — and that is the trade, because it answers them the same confident way whether or not it is right, with no status column and no confidence beside the answer. A refusal is information; a fluent guess is not.
+**Reach for a Cloud AI service model** when the output is a record: a fixed API version, a published per-unit price, a closed vocabulary, connection-based service-account auth, and behavior that does not move when a model default does. When the service cannot do something, it says so — an unsupported language, an unsupported feature, an unreadable file all arrive as errors in a status column.
+
+**Reach for a generative `AI.*` function** when the deliverable is not the service's output: a summary rather than a transcript, your categories rather than the taxonomy's, translate-and-rewrite rather than translate. It will also answer questions the service refuses — and that is the trade, because it answers them the same confident way whether or not it is right, with no status column and no confidence beside the answer. A refusal is information; a fluent guess is not.
 
 **Use both** when the record and the analysis are different artifacts: the service output as the durable, priced, inspectable column, and the generative function over *that column* — where the input is text you can read instead of media you cannot.

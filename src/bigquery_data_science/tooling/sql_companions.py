@@ -81,11 +81,7 @@ def check_sql_companions(
     resolved_skills = (
         skills_root.resolve()
         if skills_root is not None
-        else (
-            resolved_repo / "skills"
-            if (resolved_repo / "skills").is_dir()
-            else get_skills_dir()
-        )
+        else (resolved_repo / "skills" if (resolved_repo / "skills").is_dir() else get_skills_dir())
     )
     errors: list[str] = []
 
@@ -100,9 +96,7 @@ def check_sql_companions(
             sql_path = nb_path.with_suffix(".sql")
             rel_nb = nb_path.relative_to(resolved_repo).as_posix()
             if not sql_path.is_file():
-                errors.append(
-                    f"{rel_nb}: missing paired SQL companion '{sql_path.name}'"
-                )
+                errors.append(f"{rel_nb}: missing paired SQL companion '{sql_path.name}'")
 
     # 2. Verify symbol parity and static SQL review across all .sql files
     for project_name in ("bigquery-ml", "bigquery-ai"):
@@ -123,27 +117,16 @@ def check_sql_companions(
             for finding in rev.findings:
                 if finding.severity != "ERROR":
                     continue
-                if (
-                    finding.rule == "RETIRED_FUNCTION"
-                    and sql_path.stem == "ai_parse_document"
-                ):
+                if finding.rule == "RETIRED_FUNCTION" and sql_path.stem == "ai_parse_document":
                     continue
-                errors.append(
-                    f"{rel_sql}: [{finding.rule}] {finding.message}"
-                )
+                errors.append(f"{rel_sql}: [{finding.rule}] {finding.message}")
 
             # Compare against paired .ipynb if present (P4.2)
             nb_path = sql_path.with_suffix(".ipynb")
             if not nb_path.is_file():
                 continue
-            if (
-                "pipelines" in sql_path.parts
-                and sql_path.stem in _DELEGATED_PIPELINE_STEMS
-            ):
-                if (
-                    "sql_scripting" not in sql_text
-                    and "ga4_churn_prediction" not in sql_text
-                ):
+            if "pipelines" in sql_path.parts and sql_path.stem in _DELEGATED_PIPELINE_STEMS:
+                if "sql_scripting" not in sql_text and "ga4_churn_prediction" not in sql_text:
                     errors.append(
                         f"{rel_sql}: delegated pipeline SQL companion must reference "
                         "'pipelines/sql_scripting' or 'workflows/ga4_churn_prediction'"

@@ -12,6 +12,7 @@
 **Alternatives:**
 - `functions/ai_forecast` (`AI.FORECAST`) — the built-in TimesFM model for time series: use it when you are extending a value forward in time rather than labeling rows
 - `functions/ai_evaluate` (`AI.EVALUATE`) — the companion metrics function; its TabFM branch takes the same training and prediction inputs and returns accuracy metrics instead of predictions
+- `bigquery-ml/functions/evaluation` (`ML.METRICS`) — model-free deterministic evaluation over a materialized prediction table: save `AI.PREDICT` output once and score it with `ML.METRICS` to get reproducible regression or classification metrics without paying for a second TabFM inference pass
 - `CREATE MODEL` plus `ML.PREDICT` in `bigquery-ml/models` (`../bigquery-ml/models/`) — trained BigQuery ML models: use them when you need a persisted, reusable model, more than 50 features, more than 10 classes, explainability, or control over the algorithm and its hyperparameters
 
 **The task type comes from the label column's type, not from an argument:** a `STRING` or `BOOL` label runs classification, and an `INT64`, `FLOAT64`, `NUMERIC`, or `BIGNUMERIC` label runs regression. A categorical label stored as `0`/`1` therefore runs as regression — cast it to `STRING` first. Example 6 runs one label both ways and prints what each call returns.
@@ -478,9 +479,9 @@ print(f'Holdout rows carrying a NULL feature: {len(null_feature)} — '
 
 **Cost today.** During Preview, `AI.PREDICT` bills the ordinary way: in slots on Enterprise and Enterprise Plus editions, or by bytes processed under on-demand pricing.
 
-**Pricing changes on 2026-10-30 (announced, not yet in effect).** Google has announced that TabFM in BigQuery moves to token-based pricing on that date — TabFM tokens for the model inference, plus the usual slots or bytes processed for the rest of the query. The published formulas are `input tokens = (train_rows * columns + predict_rows * (columns - 1)) * n_ensembles` and `output tokens = predict_rows * n_ensembles`, at $0.05 per million input tokens and $0.20 per million output tokens. `n_ensembles` — the number of differently shuffled passes the model averages — has no documented value and no argument to control it, so a dollar figure is **not** computable from the documentation as written. The query below reports the per-pass token counts: everything in those formulas except the `n_ensembles` multiplier. If you are reading this on or after 2026-10-30, re-check the [BigQuery pricing page](https://docs.cloud.google.com/bigquery/pricing) before relying on either the formulas or the rates.
+**Token-based pricing effective 2026-11-17 (updated on the pricing page; syntax page still lists `10/30/2026`).** As of 2026-11-02, the [BigQuery pricing page](https://cloud.google.com/bigquery/pricing#bigquery-ml-pricing) states that TabFM in BigQuery moves to token-based pricing from **2026-11-17** (`11/17/2026`) onwards (superseding the earlier `10/30/2026` date still shown on the `AI.PREDICT` syntax reference page) — billing TabFM tokens for model inference plus ordinary BigQuery slots or bytes processed for the rest of the query. The published formulas are `input tokens = (train_rows * columns + predict_rows * (columns - 1)) * n_ensembles` and `output tokens = predict_rows * n_ensembles`, at $0.05 per million input tokens and $0.20 per million output tokens. `n_ensembles` — the number of differently shuffled passes the model averages — still has no documented value or SQL argument on the `AI.PREDICT` reference page, so a dollar figure is **not** computable from the syntax documentation alone. The query below reports the per-pass token counts: everything in those formulas except the `n_ensembles` multiplier. Re-check the [BigQuery pricing page](https://cloud.google.com/bigquery/pricing#bigquery-ml-pricing) on or after 2026-11-17 before relying on either the formulas or the rates.
 
-Note that `AI.EVALUATE` does not reuse an `AI.PREDICT` result — its TabFM branch takes the same two inputs and runs the same inference again. Running both over one split pays for the model twice.
+Note that `AI.EVALUATE` does not reuse an `AI.PREDICT` result — its TabFM branch takes the same two inputs and runs the same inference again, so running both over one split pays for the model twice. To compute regression or classification metrics deterministically over a single saved `AI.PREDICT` table with zero additional model calls, use `bigquery-ml/functions/evaluation` (`ML.METRICS`).
 
 ```python
 query = """
@@ -536,7 +537,7 @@ LIMIT 5
 ---
 ## Examples — BigFrames
 
-There is no native BigFrames API for `AI.PREDICT` yet — `bigframes.bigquery.ai` exposes no `predict` (checked against bigframes 2.39.0, this project's pin in `uv.lock`). Use `session.read_gbq_query()` to run the SQL and return a BigFrames DataFrame.
+`bigframes.bigquery.ai.predict(training_df, prediction_df, *, label_col='label')` wraps `AI.PREDICT` natively over BigFrames DataFrames (available in `bigframes` 2.51.0 alongside `bigframes.bigquery.ai.evaluate(..., label_col=...)`). You can also execute full `AI.PREDICT` SQL directly via `bpd.read_gbq_query()` when you want split logic or passthrough keys inside a single `WITH` query, as shown below.
 
 Two things about that round trip. `read_gbq_query()` re-materializes the result and does not preserve the query's `ORDER BY`, so the sort is reapplied on the DataFrame below rather than trusted from the SQL. And because the predictions are not reproducible (example 7), the same SQL run here and in the magics cell above can return different values — that is the model, not BigFrames.
 

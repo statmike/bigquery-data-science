@@ -2,10 +2,10 @@
 
 > **Source:** [`bigquery-ai/reference/embedding-generation-and-semantic-search.md#aisimilarity`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/embedding-generation-and-semantic-search.md#aisimilarity)
 
-- **Description:** (Preview) Scalar function that computes the cosine similarity between two inputs (text or images). Creates embeddings for both inputs at runtime and computes the cosine similarity between them. Values closer to 1 indicate more similar inputs.
+- **Description:** Scalar function that computes the cosine similarity between two inputs (text or multimodal objects). Creates embeddings for both inputs at runtime and returns their cosine similarity (`FLOAT64`), where values closer to `1` indicate higher semantic similarity.
 - **Use cases:** Semantic search without precomputed embeddings, recommendation, classification, prototyping similarity queries.
 - [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-similarity)
-- **Type:** Scalar function (returns FLOAT64) -- Preview
+- **Type:** Scalar function (returns FLOAT64) -- GA
 
 **Syntax (text with endpoint):**
 ```sql
@@ -74,6 +74,6 @@ AI.SIMILARITY(
 
 **Provisioned throughput:** Not specified in documentation.
 
-**BigFrames API:** No direct equivalent. Use `%%bigquery` magics or `session.read_gbq_query()` to execute AI.SIMILARITY SQL from BigFrames.
+**BigFrames API:** `bigframes.bigquery.ai.similarity(content1, content2, *, endpoint=..., model=..., connection_id=..., model_params=...)` (available in `bigframes 2.51.0+`) — Scalar wrapper returning a Series of `FLOAT64` cosine similarity scores directly.
 
 ---

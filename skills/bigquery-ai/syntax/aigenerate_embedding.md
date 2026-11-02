@@ -105,4 +105,28 @@ Also supports PCA, autoencoder, and matrix factorization models.
 
 **BigFrames API:** `bigframes.bigquery.ai.generate_embedding(model, data)` — TVF wrapper that takes a model name string and DataFrame/Series. Generates `AI.GENERATE_EMBEDDING` SQL. Also available as `bigframes.ml.llm.TextEmbeddingGenerator` (sklearn-style: create model, then `.predict()`) and `bigframes.ml.llm.MultimodalEmbeddingGenerator` for multimodal.
 
+### Remote embedding models as MaaS (`CREATE MODEL`)
+
+Google publishes a dedicated reference page for creating BigQuery ML remote models over managed embedding Model-as-a-Service (MaaS) endpoints on Vertex AI / Gemini Enterprise Agent Platform: [CREATE MODEL for remote embedding models (MaaS)](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-create-remote-model-embedding-maas).
+
+```sql
+-- Text or multimodal MaaS remote embedding model
+CREATE OR REPLACE MODEL `your-gcp-project-id.DATASET_ID.embedding_maas_model`
+  REMOTE WITH CONNECTION `your-gcp-project-id.us.CONNECTION_ID`
+  OPTIONS (
+    ENDPOINT = 'text-embedding-005'
+  );
+
+-- Multimodal Gemini Embedding 2 MaaS remote model (multi-regional us / eu / global)
+CREATE OR REPLACE MODEL `your-gcp-project-id.DATASET_ID.multimodal_embedding_maas`
+  REMOTE WITH CONNECTION `your-gcp-project-id.us.CONNECTION_ID`
+  OPTIONS (
+    ENDPOINT = 'gemini-embedding-2'
+  );
+```
+
+- **IAM & service agents:** Grant `roles/aiplatform.user` (and `roles/storage.objectViewer` when embedding Cloud Storage `ObjectRef` inputs) to the Cloud resource connection's service account (`bqcx-000000000000-xxxx@gcp-sa-bigquery-condel.iam.gserviceaccount.com`); Vertex AI endpoint provisioning in the host project uses the Vertex AI service agent (`service-000000000000@gcp-sa-aiplatform.iam.gserviceaccount.com`).
+- **Supported MaaS endpoints:** First-party Vertex AI text and multimodal embedding endpoints (`gemini-embedding-001`, `text-embedding-005`, `text-multilingual-embedding-002`, `gemini-embedding-2`, `multimodalembedding@001`) as well as Vertex AI MaaS open/partner text embedding endpoints (such as `multilingual-e5-small` and `multilingual-e5-large` in Preview).
+- **When to use [`AI.EMBED`](aiembed.md) vs `CREATE MODEL` + `AI.GENERATE_EMBEDDING`:** Prefer scalar `AI.EMBED` when you want zero DDL, inline `SELECT`/`WHERE` expressions, or autonomous table embedding generation (`GENERATED ALWAYS AS (AI.EMBED(...).result) STORED`). Reach for `CREATE MODEL` + `AI.GENERATE_EMBEDDING` when you need governed model-level IAM via a connection, MaaS open embedding models (`multilingual-e5-*`), video segment embedding (`start_second` / `end_second` / `interval_seconds`), or local BQML PCA / Autoencoder / Matrix Factorization models.
+
 ---

@@ -45,11 +45,7 @@ class Violation:
     def format(self, project_root: Path) -> str:
         """Format the violation relative to `project_root`."""
         where = str(self.file.relative_to(project_root))
-        where += (
-            f" cell {self.cell}:{self.line}"
-            if self.cell is not None
-            else f":{self.line}"
-        )
+        where += f" cell {self.cell}:{self.line}" if self.cell is not None else f":{self.line}"
         return f"{where}: {self.reason} [{self.kind}] {self.target}"
 
 
@@ -99,12 +95,7 @@ def _looks_like_path(candidate: str) -> bool:
 
 def _resolve(target: str, base: Path) -> Path:
     """Resolve a markdown link target against `base`."""
-    cleaned = (
-        target.split("#")[0]
-        .replace("%20", " ")
-        .replace("%28", "(")
-        .replace("%29", ")")
-    )
+    cleaned = target.split("#")[0].replace("%20", " ").replace("%28", "(").replace("%29", ")")
     return (base / cleaned).resolve()
 
 
@@ -127,9 +118,8 @@ def _classify(
 
 def _is_readme_allowed(resolved: Path, repo_root: Path) -> bool:
     """Return True when a README link/mention points to `skills/` or root `README.md`."""
-    return (
-        resolved.is_relative_to(repo_root / README_ALLOWED_PREFIX)
-        or resolved == (repo_root / "README.md")
+    return resolved.is_relative_to(repo_root / README_ALLOWED_PREFIX) or resolved == (
+        repo_root / "README.md"
     )
 
 
@@ -179,25 +169,17 @@ def check_project(
                 reason = (
                     ""
                     if skip_policy
-                    else _classify(
-                        resolved, project_root, resolved_siblings, repo_root
-                    )
+                    else _classify(resolved, project_root, resolved_siblings, repo_root)
                 )
                 if not reason and not resolved.exists():
                     reason = "" if policy_exempt else "link target does not exist"
                 if reason:
                     line = _line_of(text, match.start())
-                    result.violations.append(
-                        Violation(path, cell, line, "link", target, reason)
-                    )
+                    result.violations.append(Violation(path, cell, line, "link", target, reason))
                     continue
 
                 anchor = target.partition("#")[2]
-                if (
-                    not anchor
-                    or resolved.suffix not in {".md", ".ipynb"}
-                    or not resolved.exists()
-                ):
+                if not anchor or resolved.suffix not in {".md", ".ipynb"} or not resolved.exists():
                     continue
                 if anchor not in anchors_of(resolved):
                     line = _line_of(text, match.start())
@@ -225,15 +207,11 @@ def check_project(
                         continue
                     if is_readme and _is_readme_allowed(resolved, repo_root):
                         break
-                    reason = _classify(
-                        resolved, project_root, resolved_siblings, repo_root
-                    )
+                    reason = _classify(resolved, project_root, resolved_siblings, repo_root)
                     if reason:
                         line = _line_of(text, match.start())
                         result.violations.append(
-                            Violation(
-                                path, cell, line, "mention", candidate, reason
-                            )
+                            Violation(path, cell, line, "mention", candidate, reason)
                         )
                     break
 

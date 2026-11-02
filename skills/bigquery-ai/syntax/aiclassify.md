@@ -2,10 +2,10 @@
 
 > **Source:** [`bigquery-ai/reference/managed-functions.md#aiclassify`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/managed-functions.md#aiclassify)
 
-- **Description:** (Preview) Scalar function that uses a Vertex AI Gemini model to classify inputs into categories that you provide. BigQuery automatically structures your input to improve the quality of the classification.
+- **Description:** Scalar function that uses a Vertex AI Gemini model to classify inputs into categories that you provide. BigQuery automatically structures your input to improve classification quality.
 - **Use cases:** Classify reviews by sentiment, classify products by categories, classify support tickets by topic, image classification by style or contents, multi-label classification.
 - [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-classify)
-- **Type:** Scalar function -- returns STRING or ARRAY\<STRING\> per row (Preview)
+- **Type:** Scalar function -- returns STRING or ARRAY\<STRING\> per row (GA)
 
 **Syntax:**
 ```sql
@@ -54,14 +54,15 @@ FROM `bigquery-public-data.bbc_news.fulltext`;
 | OUTPUT_MODE = 'multi' | ARRAY\<STRING\> | Array of 0 to N categories. Empty array if no category applies. |
 | Error | NULL | Returned if the call to Vertex AI is unsuccessful. |
 
-**Supported models:** Any GA or preview Gemini model. Uses various `gemini-2.5-*` models.
+**Supported models:** Any GA or preview Gemini model.
 
 **Best practices:**
-- Include an 'Other' category to handle input that doesn't closely match any category.
+- Include an `'Other'` category to handle input that doesn't closely match any category.
 - Use categories with descriptions for more nuanced classification.
 - Use `output_mode => 'multi'` when items may belong to multiple categories.
+- Materialize `AI.CLASSIFY` predictions once to a table and score them against ground-truth labels with model-free [`ML.METRICS`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ml/reference/model-free-functions.md#mlmetrics) to compute deterministic `precision`, `recall`, `accuracy`, and `f1_score` (overall or per segment via `segment_by_cols`) at zero additional token cost.
 
-**Limitations:** Preview status. Returns NULL on error. Categories must be string literals in the array (unless using a variable). No model parameter control. `output_mode => 'multi'` is not supported in optimized mode. Optimized mode requires ~3,000 rows minimum; only string columns supported for multi-column inputs.
+**Limitations:** Returns `NULL` on error. Categories must be string literals in the array (unless using a `DECLARE` variable). No model parameter control. `output_mode => 'multi'` is not supported in optimized mode. Optimized mode (`embeddings` / `optimization_mode`, Preview) requires ~3,000 rows minimum; only string columns are supported for multi-column inputs.
 
 **Locations:** All regions supporting Gemini models, plus US and EU multi-regions.
 

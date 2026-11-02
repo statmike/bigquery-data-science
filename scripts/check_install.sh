@@ -98,6 +98,12 @@ grep -qi "ARIMA_PLUS" <<<"$ARIMA_OUT" || fail "lookup ARIMA_PLUS output missing 
 FORECAST_OUT="$("$BIN/bigquery-data-science" lookup AI.FORECAST)" || fail "lookup AI.FORECAST failed"
 grep -qi "AI.FORECAST" <<<"$FORECAST_OUT" || fail "lookup AI.FORECAST output missing AI.FORECAST"
 
+CHUNK_OUT="$("$BIN/bigquery-data-science" lookup AI.CHUNK_DOCUMENT)" || fail "lookup AI.CHUNK_DOCUMENT failed"
+grep -qi "AI.CHUNK_DOCUMENT" <<<"$CHUNK_OUT" || fail "lookup AI.CHUNK_DOCUMENT output missing AI.CHUNK_DOCUMENT"
+
+TRANS_OUT="$("$BIN/bigquery-data-science" lookup AI.TRANSLATE)" || fail "lookup AI.TRANSLATE failed"
+grep -qi "AI.TRANSLATE" <<<"$TRANS_OUT" || fail "lookup AI.TRANSLATE output missing AI.TRANSLATE"
+
 TRIAGE_OUT="$("$BIN/bigquery-data-science" triage "forecast daily sales")" || fail "triage failed"
 grep -qi "forecast" <<<"$TRIAGE_OUT" || fail "triage output missing forecast guidance"
 

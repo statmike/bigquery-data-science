@@ -58,6 +58,6 @@ FROM AI.DETECT_ANOMALIES(
 
 **Provisioned throughput:** Not specified. Billed at the evaluation, inspection, and prediction rate.
 
-**BigFrames API:** No direct equivalent for TimesFM-based anomaly detection. Use `%%bigquery` magics or `session.read_gbq_query()` to execute AI.DETECT_ANOMALIES SQL from BigFrames. Note: `bigframes.ml.forecasting.ARIMAPlus.detect_anomalies()` exists but uses ARIMA_PLUS, not TimesFM.
+**BigFrames API:** No direct equivalent for TimesFM-based anomaly detection in `bigframes 2.51.0`. Use `%%bigquery` magics or `session.read_gbq_query()` to execute AI.DETECT_ANOMALIES SQL from BigFrames. Note: `bigframes.ml.forecasting.ARIMAPlus.detect_anomalies()` exists but uses ARIMA_PLUS, not TimesFM.
 
 ---

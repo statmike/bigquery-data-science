@@ -68,13 +68,9 @@ def _check_frontmatter(skill_md_text: str, result: ValidationResult) -> None:
         if len(name) > 64:
             result.errors.append(f"name '{name}' exceeds 64 chars")
         if not _VALID_NAME_RE.match(name):
-            result.errors.append(
-                f"name '{name}' must be lowercase letters/digits/hyphens only"
-            )
+            result.errors.append(f"name '{name}' must be lowercase letters/digits/hyphens only")
         if "claude" in name.lower() or "anthropic" in name.lower():
-            result.errors.append(
-                f"name '{name}' must not contain 'claude' or 'anthropic'"
-            )
+            result.errors.append(f"name '{name}' must not contain 'claude' or 'anthropic'")
 
     description = _extract_description(frontmatter)
     if description is None:
@@ -97,9 +93,7 @@ def _check_frontmatter(skill_md_text: str, result: ValidationResult) -> None:
         if not description:
             result.errors.append("description is empty")
         if len(description) > 1024:
-            result.errors.append(
-                f"description exceeds 1024 chars ({len(description)})"
-            )
+            result.errors.append(f"description exceeds 1024 chars ({len(description)})")
 
 
 def _has_toc(text: str) -> bool:
@@ -126,8 +120,7 @@ def _check_line_budget(
             )
     else:
         result.warnings.append(
-            f"{path.name} is {line_count} lines (budget {budget}) — "
-            "should stay under budget"
+            f"{path.name} is {line_count} lines (budget {budget}) — should stay under budget"
         )
 
 
@@ -171,8 +164,7 @@ def _check_links(
         resolved = (path.parent / rel_path).resolve()
         if not resolved.exists():
             result.errors.append(
-                f"{path.relative_to(skill_dir)}: broken link "
-                f"[{link_text}]({raw_target})"
+                f"{path.relative_to(skill_dir)}: broken link [{link_text}]({raw_target})"
             )
 
 

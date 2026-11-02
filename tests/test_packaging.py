@@ -5,11 +5,12 @@ from __future__ import annotations
 import ast
 import json
 import re
+import struct
 import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.10.0"
+EXPECTED_VERSION = "0.11.0"
 SKILL_NAMES: tuple[str, ...] = (
     "bigquery-data-science",
     "bigquery-ml",
@@ -48,21 +49,14 @@ def _extract_init_fallback_version(init_path: Path) -> str:
 
 
 def test_pyproject_metadata_and_zero_runtime_dependencies() -> None:
-    pyproject = tomllib.loads(
-        (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    )
+    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     project = pyproject["project"]
     assert project["name"] == "bigquery-data-science"
     assert project["version"] == EXPECTED_VERSION
     assert project["dependencies"] == []
+    assert project["scripts"]["bigquery-data-science"] == "bigquery_data_science.cli:main"
     assert (
-        project["scripts"]["bigquery-data-science"]
-        == "bigquery_data_science.cli:main"
-    )
-    assert (
-        project["entry-points"]["statmike.agent_skills"][
-            "bigquery_data_science"
-        ]
+        project["entry-points"]["statmike.agent_skills"]["bigquery_data_science"]
         == "bigquery_data_science:get_skills_dir"
     )
 
@@ -70,9 +64,7 @@ def test_pyproject_metadata_and_zero_runtime_dependencies() -> None:
 def test_version_parity_across_code_manifests_and_docs() -> None:
     import bigquery_data_science
 
-    pyproject = tomllib.loads(
-        (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    )
+    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     pyproject_version = pyproject["project"]["version"]
     assert pyproject_version == EXPECTED_VERSION
     assert bigquery_data_science.__version__ == pyproject_version
@@ -90,48 +82,39 @@ def test_version_parity_across_code_manifests_and_docs() -> None:
         f"version: {pyproject_version}" in citation
     )
 
-    plugin_json = json.loads(
-        (REPO_ROOT / "plugin.json").read_text(encoding="utf-8")
-    )
+    plugin_json = json.loads((REPO_ROOT / "plugin.json").read_text(encoding="utf-8"))
     assert plugin_json["version"] == pyproject_version
 
     marketplace = json.loads(
-        (REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text(
-            encoding="utf-8"
-        )
+        (REPO_ROOT / ".claude-plugin" / "marketplace.json").read_text(encoding="utf-8")
     )
-    assert marketplace["plugins"][0]["version"] == pyproject_version
+    assert marketplace["version"] == pyproject_version
+    assert marketplace["metadata"]["version"] == pyproject_version
+    assert len(marketplace["plugins"]) == 4
+    for entry in marketplace["plugins"]:
+        assert entry["version"] == pyproject_version
 
     for skill_name in SKILL_NAMES:
         manifest = json.loads(
-            (
-                REPO_ROOT / "skills" / skill_name / "skill.manifest.json"
-            ).read_text(encoding="utf-8")
+            (REPO_ROOT / "skills" / skill_name / "skill.manifest.json").read_text(encoding="utf-8")
         )
         assert manifest["version"] == pyproject_version
-        skill_md = (REPO_ROOT / "skills" / skill_name / "SKILL.md").read_text(
-            encoding="utf-8"
-        )
+        skill_md = (REPO_ROOT / "skills" / skill_name / "SKILL.md").read_text(encoding="utf-8")
         assert (
-            f'version: "{pyproject_version}"' in skill_md[:600]
-            or f"version: {pyproject_version}" in skill_md[:600]
+            f'version: "{pyproject_version}"' in skill_md[:1000]
+            or f"version: {pyproject_version}" in skill_md[:1000]
         )
 
 
 def test_wheel_and_sdist_hatch_configuration() -> None:
-    pyproject = tomllib.loads(
-        (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    )
+    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     wheel_cfg = pyproject["tool"]["hatch"]["build"]["targets"]["wheel"]
     assert wheel_cfg["packages"] == ["src/bigquery_data_science"]
     force_include = wheel_cfg["force-include"]
     assert any(
-        str(val).startswith("bigquery_data_science/_skills")
-        for val in force_include.values()
+        str(val).startswith("bigquery_data_science/_skills") for val in force_include.values()
     )
-    sdist_excludes = pyproject["tool"]["hatch"]["build"]["targets"]["sdist"][
-        "exclude"
-    ]
+    sdist_excludes = pyproject["tool"]["hatch"]["build"]["targets"]["sdist"]["exclude"]
     for required_exclude in ("/.github", "/.agents", "/.claude", "/uv.lock"):
         assert required_exclude in sdist_excludes
 
@@ -143,23 +126,17 @@ def test_readme_relative_links_resolve_on_disk() -> None:
     for match in matches:
         target = match.group(2).strip()
         resolved = (REPO_ROOT / target).resolve()
-        assert resolved.exists(), (
-            f"Broken relative link in README.md: {target} -> {resolved}"
-        )
+        assert resolved.exists(), f"Broken relative link in README.md: {target} -> {resolved}"
 
 
 def test_hatch_fancy_pypi_readme_substitutions_leave_zero_relative_links() -> None:
-    pyproject = tomllib.loads(
-        (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    )
+    pyproject = tomllib.loads((REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     hook = pyproject["tool"]["hatch"]["metadata"]["hooks"]["fancy-pypi-readme"]
     rendered = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     for sub in hook["substitutions"]:
         rendered = re.sub(sub["pattern"], sub["replacement"], rendered)
     remaining = list(RELATIVE_LINK_RE.finditer(rendered))
-    assert not remaining, (
-        f"Un-rewritten relative links after fancy-pypi-readme: {remaining}"
-    )
+    assert not remaining, f"Un-rewritten relative links after fancy-pypi-readme: {remaining}"
     assert "https://github.com/statmike/bigquery-data-science/blob/main/" in rendered
     assert "```mermaid" not in rendered
     assert (
@@ -182,13 +159,58 @@ def test_governance_and_ci_workflow_files_exist() -> None:
     assert (REPO_ROOT / "scripts" / "check_install.sh").is_file()
 
 
-def test_all_107_notebooks_have_unified_kernelspec_and_clean_links() -> None:
+def test_social_card_png_dimensions_and_html_source_exist() -> None:
+    png_path = REPO_ROOT / "docs" / "assets" / "social_card.png"
+    html_path = REPO_ROOT / "docs" / "assets" / "social_card.html"
+    assert png_path.is_file() and html_path.is_file()
+    raw = png_path.read_bytes()
+    assert raw[:8] == b"\x89PNG\r\n\x1a\n"
+    width, height = struct.unpack(">II", raw[16:24])
+    assert (width, height) == (1280, 640)
+
+
+def test_ci_and_release_workflows_use_native_node24_actions() -> None:
+    for rel in (".github/workflows/ci.yml", ".github/workflows/release.yml"):
+        text = (REPO_ROOT / rel).read_text(encoding="utf-8")
+        assert "FORCE_JAVASCRIPT_ACTIONS_TO_NODE24" not in text, rel
+        assert not re.search(
+            r"actions/(checkout|upload-artifact|download-artifact)@v[1-6]\b",
+            text,
+        ), rel
+        assert not re.search(r"astral-sh/setup-uv@v([1-6]|8|9|10)(?!\.)\b", text), rel
+        assert "actions/checkout@v7" in text, rel
+        assert re.search(r"astral-sh/setup-uv@v(10\.\d+\.\d+|7)\b", text), rel
+    release_text = (REPO_ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    assert "actions/upload-artifact@v7" in release_text
+    assert "actions/download-artifact@v8" in release_text
+    assert "pypa/gh-action-pypi-publish@release/v1" in release_text
+
+
+def test_all_109_notebooks_have_unified_kernelspec_and_clean_links() -> None:
     notebooks = sorted((REPO_ROOT / "bigquery-ml").rglob("*.ipynb")) + sorted(
         (REPO_ROOT / "bigquery-ai").rglob("*.ipynb")
     )
-    assert len(notebooks) == 107
+    assert len(notebooks) == 109
+    leak_proj_num_re = re.compile(r"projects/[1-9]\d{10,12}/")
+    v0110_executed = (
+        "bigquery-ai/functions/ai_chunk_document/ai_chunk_document.ipynb",
+        "bigquery-ai/functions/ai_translate/ai_translate.ipynb",
+        "bigquery-ai/workflows/document_rag/document_rag.ipynb",
+        "bigquery-ai/workflows/content_analysis/content_analysis.ipynb",
+        "bigquery-ai/workflows/content_moderation/content_moderation.ipynb",
+        "bigquery-ai/workflows/document_intelligence/document_intelligence.ipynb",
+        "bigquery-ai/workflows/log_analysis/log_analysis.ipynb",
+        "bigquery-ai/overview.ipynb",
+    )
+    for rel_nb in v0110_executed:
+        nb_path = REPO_ROOT / rel_nb
+        raw_text = nb_path.read_text(encoding="utf-8")
+        assert not leak_proj_num_re.search(raw_text), (
+            f"Unscrubbed numeric GCP project number in {nb_path}"
+        )
     for nb_path in notebooks:
-        data = json.loads(nb_path.read_text(encoding="utf-8"))
+        raw_text = nb_path.read_text(encoding="utf-8")
+        data = json.loads(raw_text)
         for cell in data.get("cells", []):
             cell_source = "".join(cell.get("source", []))
             assert "vertex-ai-mlops/blob/main/data+ai" not in cell_source

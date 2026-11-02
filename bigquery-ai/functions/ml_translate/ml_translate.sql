@@ -11,6 +11,11 @@
 -- Input:   a table or query with a column named exactly text_content
 -- Returns: the input columns + ml_translate_result (JSON) + ml_translate_status
 --          (per-row, empty on success)
+-- Companion: For zero-DDL scalar translation (SELECT AI.TRANSLATE(col, 'en'))
+-- with dynamic per-row target languages and 'nmt' or 'translation-llm' models
+-- under end-user credentials, see AI.TRANSLATE (../ai_translate/). Reach for
+-- ML.TRANSLATE when you need DETECT_LANGUAGE mode or a Cloud Resource
+-- connection service account.
 --
 -- Full reference: ../../RESOURCES.md
 -- Official docs: https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-translate

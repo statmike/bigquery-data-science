@@ -129,6 +129,56 @@ Returns a STRUCT with:
 
 **BigFrames API:** `bigframes.bigquery.ai.generate()` — Scalar function returning a Series of structs. Supports `output_schema` as `Mapping[str, str]`. Prompt is a tuple of string literals and Series: `bbq.ai.generate(("Summarize: ", df["text"]), output_schema={"summary": "STRING"})`. Access result via `.struct.field("result")`.
 
+### Reusable column aliases for unpacking `AI.*` outputs
+
+Calling `AI.GENERATE` (or `AI.GENERATE_BOOL` / `_DOUBLE` / `_INT` / `AI.TRANSLATE(..., return_details => TRUE)`) returns a `STRUCT`. Historically, unpacking multiple `STRUCT` fields and filtering `WHERE status = ''` without invoking the model multiple times per row required wrapping the call in a `WITH` CTE or subquery. With **reusable column aliases** ([column aliases guide](https://docs.cloud.google.com/bigquery/docs/column-aliases) · [query syntax](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/query-syntax#using_aliases)), a `SELECT`-list alias can be referenced laterally to the right in the **same** `SELECT` list and in `WHERE`, evaluating `AI.GENERATE` once per row:
+
+```sql
+-- Check whether reusable_column_aliases_mode is enabled in the region:
+SELECT option_name, option_value
+FROM `region-us`.INFORMATION_SCHEMA.EFFECTIVE_PROJECT_OPTIONS
+WHERE option_name = 'reusable_column_aliases_mode';
+
+-- Enable project-wide for a region (requires bigquery.projects.update / roles/bigquery.admin; bigquery.organizations.update at org level):
+ALTER PROJECT `your-gcp-project-id`
+SET OPTIONS (`region-us.reusable_column_aliases_mode` = 'on');
+
+-- Single-SELECT unpacking + WHERE filtering (AI.GENERATE runs once per row):
+SELECT
+  review_id,
+  AI.GENERATE(
+    ('Extract sentiment and 1-sentence summary: ', review_text),
+    endpoint => 'gemini-2.5-flash',
+    output_schema => 'sentiment STRING, summary STRING'
+  ) AS ai_gen,
+  ai_gen.sentiment,
+  ai_gen.summary,
+  JSON_VALUE(ai_gen.full_response, '$.modelVersion') AS model_version
+FROM `your-gcp-project-id.DATASET_ID.reviews`
+WHERE ai_gen.status = '';
+```
+
+**GOTCHA — 5-tier name resolution & 2 silent shadowing traps:**
+When `reusable_column_aliases_mode = 'on'`, GoogleSQL resolves bare identifiers in strict precedence order from highest (`#1`) to lowest (`#5`):
+1. `FROM` clause table column names *(highest — silently shadows a `SELECT` alias of the same name!)*
+2. Reusable column aliases defined to the left in the current `SELECT` list *(silently shadows `#3`–`#5`!)*
+3. Correlated column names from outer query scopes
+4. SQL UDF / TVF parameter names
+5. Procedural language (`DECLARE`) script variables *(lowest)*
+
+Two silent shadowing traps follow directly from this order:
+- **Trap 1 (`FROM` column shadows `SELECT` alias):** If the input table already has a column named `gen`, `result`, or `score`, defining `AI.GENERATE(...) AS gen` and referencing `gen.sentiment` (or `WHERE score > 0.8`) resolves to the **`FROM` table column**, ignoring your `SELECT` alias with no warning!
+- **Trap 2 (`SELECT` alias shadows outer/UDF/script names):** A `SELECT` alias silently overrides correlated outer columns (`#3`), UDF/TVF parameters (`#4`), and `DECLARE` variables (`#5`) of the same name. Always pick a distinct alias prefix (such as `ai_gen`) that never collides with table columns, parameters, or variables.
+
+**Documented limitations:**
+1. In queries with grouping or aggregation (`GROUP BY` or aggregate functions), aliases to unaggregated expressions (grouping columns or projections of grouping columns) cannot be referenced in the `WHERE` clause or as arguments to aggregate functions.
+2. Aliases over **aggregate** (`AI.AGG`, `COUNT`) or **window** functions cannot be referenced in `WHERE` or nested inside another aggregate function (filter aggregates in `HAVING` and window outputs in `QUALIFY`).
+3. A **window function** cannot reference an alias defined by another window function in the same `SELECT` list.
+4. **Not supported in pipe query syntax (`|>`)** — pipe syntax natively provides `|> EXTEND AI.GENERATE(...) AS ai_gen |> SELECT ai_gen.result` without any project option.
+5. **Not supported in Graph Query Language (`GRAPH_TABLE` / GQL)**.
+
+**Portability guidance:** Because `reusable_column_aliases_mode = 'on'` is an opt-in regional project option, keep a standard `WITH generated AS (...)` CTE in shared SQL scripts, public notebooks, and cross-project templates that must run unmodified in projects where the option is unset.
+
 ---
 
 ## `AI.GENERATE_TEXT`
@@ -559,10 +609,10 @@ When `flatten_json_output` is TRUE:
 ---
 
 ## `AI.COUNT_TOKENS`
-- **Description:** (Preview) Utility scalar function that estimates the **input** token count of a text prompt. Token counting happens inside BigQuery and **incurs no Vertex AI charges** — unlike the generative functions, it does not send a generation request. Use it to estimate the cost or size of prompts before calling the paid AI functions.
+- **Description:** Utility scalar function that estimates the **input** token count of a text prompt. Token counting happens inside BigQuery and **incurs no Vertex AI charges** — unlike the generative functions, it does not send a generation request. Use it to estimate the cost or size of prompts before calling the paid AI functions.
 - **Use cases:** Estimating the cost of an `AI.GENERATE` / `AI.GENERATE_TABLE` job before running it, checking prompts against a model's input token limit, comparing prompt sizes across rows/templates/models.
 - [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-count-tokens)
-- **Type:** Scalar function (returns a STRUCT value per row) — Preview
+- **Type:** Scalar function (returns a STRUCT value per row) — GA
 
 **Syntax:**
 ```sql
@@ -592,16 +642,16 @@ AI.COUNT_TOKENS(
 
 **Limitations:**
 - Counts **input** tokens only — **thinking and output tokens are not included**. To see actual token counts (input + thinking + output) for a query, view the **Job information** tab of the Query results pane.
-- **Text input only (verified 2026-07-17, re-verified 2026-09-15, Preview).** The `INPUT` argument coerces to `STRING` only — multimodal/ObjectRef prompts are rejected: a STRUCT prompt (`STRUCT(text AS prompt, [...] AS object_refs)`, the AI.GENERATE pattern), the older `ObjectRefRuntime` spelling of the same STRUCT, and a bare `ObjectRef` all fail. **The rejection outlived the sweep that unwrapped everything else:** when the other eleven functions started taking a bare `ObjectRef`, this one did not, so the re-test covered both field names rather than assuming the rename carried the old result forward. The error is now wrapped in a signature mismatch that prints the full signature, with the original text preserved inside it:
+- **Text input only (re-verified at GA on 2026-11-02).** At GA, the `INPUT` argument still coerces strictly to `STRING` only — multimodal/`ObjectRef` prompts remain unsupported: a `STRUCT` prompt (`STRUCT(text AS prompt, [...] AS object_refs)`), the `ObjectRefRuntime` spelling, and a bare `ObjectRef` all fail coercion with:
   ```
   No matching signature for function BIGQUERYGOOGLESQL:AI.COUNT_TOKENS
     Argument types: STRUCT<uri STRING, version STRING, authorizer STRING, ...>
     Signature: AI.COUNT_TOKENS(STRING, [endpoint => STRING], [title => STRING], [model => STRING])
       Argument 1: Unable to coerce type STRUCT<...> to expected type STRING
   ```
-  That printed signature is also the cleanest confirmation of the undocumented `title`/`model` parameters described below. Accordingly, `full_response.promptTokensDetails[].modality` is always `TEXT`. **This is a Preview function — re-evaluate multimodal support when it reaches GA, and re-test ObjectRef at that time** (AI.PARSE_DOCUMENT is precedent for multimodal input arriving without an obvious signature change).
+  Accordingly, `full_response.promptTokensDetails[].modality` is always `TEXT`.
 
-**Undocumented parameters (verified 2026-07-17):** the function's actual signature is `AI.COUNT_TOKENS(STRING, [endpoint => STRING], [title => STRING], [model => STRING])` — but only `endpoint` is documented and usable. `model` is mutually exclusive with `endpoint` and rejected every tested value (bare Gemini strings and a remote MODEL reference: "Unsupported model"); `title` errors with "Title argument is not supported for gemini-2.5-flash." Both appear reserved (likely for non-Gemini/open models or a future capability). Do not teach these until they are documented and functional — re-check at GA.
+**Undocumented parameters (re-verified at GA on 2026-11-02):** the engine's printed signature remains `AI.COUNT_TOKENS(STRING, [endpoint => STRING], [title => STRING], [model => STRING])`, with only `endpoint` documented and general-purpose. `model` is mutually exclusive with `endpoint`, and `title` is rejected on Gemini generation endpoints; keep queries restricted to `(INPUT [, endpoint => ENDPOINT])`.
 
 **Locations:** All BigQuery regions supporting the generative AI functions (US and EU multi-regions, plus supported Gemini regions).
 

@@ -5,7 +5,7 @@
 - **Description:** Aggregate function that uses a Vertex AI Gemini model to aggregate data based on natural language instructions. Automatically performs multi-level aggregation through batching, so it can analyze data exceeding the Gemini context window. Returns a single STRING per group (or a structured STRUCT when `output_schema` is specified).
 - **Use cases:** Sentiment analysis across reviews, content summarization of text or images, log analysis and incident investigation, agent performance analysis, finding common categories or patterns across data, summarizing grouped data.
 - [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-agg)
-- **Type:** Aggregate function -- returns a single STRING value per group (or STRUCT with `output_schema`). Use with GROUP BY for per-group results; without GROUP BY, aggregates all rows.
+- **Type:** Aggregate function -- returns a single STRING value per group (or STRUCT with `output_schema`). Use with GROUP BY for per-group results; without GROUP BY, aggregates all rows (GA)
 
 **Syntax:**
 ```sql
@@ -56,6 +56,7 @@ AI.AGG(
 **Limitations:** Returns NULL on total failure (no detailed error info). No model parameter control (temperature, top_p, etc.). Output capped at 10,000 tokens per group. Recommended limit of 20 million rows per query and 1,000 distinct groups. Cannot use Gemini models that require thinking budget.
 
 **Known issues:**
+- Passing a `NULL` instruction string might return an internal error instead of an invalid-query error.
 - Input rows with 10 or more images in a single row might be skipped.
 - Input rows with arrays of ObjectRefRuntime objects that call `OBJ.GET_ACCESS_URL` might be skipped.
 - Some ObjectRefRuntime **image** objects created by `OBJ.GET_ACCESS_URL` might fail to process.
@@ -72,3 +73,5 @@ AI.AGG(
 **Provisioned throughput:** Not supported. Uses dynamic shared quota (DSQ) only.
 
 **BigFrames API:** No native BigFrames API. Use `bpd.read_gbq_query(sql)` to execute AI.AGG queries and get results as a BigFrames DataFrame.
+
+---

@@ -6,9 +6,7 @@ import json
 import re
 from pathlib import Path
 
-_REL_TOPIC_LINK_RE = re.compile(
-    r"\(\.\./\.\./((?:functions|models|workflows)/[a-z0-9_]+)"
-)
+_REL_TOPIC_LINK_RE = re.compile(r"\(\.\./\.\./((?:functions|models|workflows)/[a-z0-9_]+)")
 _BACKTICK_SYMBOL_RE = re.compile(r"`([A-Z][A-Z0-9_.*]*)`")
 _WORKFLOW_USES_KEYS: tuple[str, ...] = (
     "**Functions used:**",
@@ -86,9 +84,7 @@ def check_domain_crossrefs(domain_root: Path) -> list[str]:
                 continue
             back_links = featured_in_links.get(target_key)
             if back_links is None:
-                errors.append(
-                    f"{domain_root.name}/{wf_key}: links to missing topic '{target_key}'"
-                )
+                errors.append(f"{domain_root.name}/{wf_key}: links to missing topic '{target_key}'")
             elif wf_key not in back_links:
                 errors.append(
                     f"{domain_root.name}/{wf_key} -> {target_key}: missing back-link "
@@ -113,8 +109,7 @@ def check_domain_crossrefs(domain_root: Path) -> list[str]:
                 continue
             has_direct_link = topic_key in workflow_links[wf_key]
             has_symbol_match = bool(
-                topic_symbols.get(topic_key, set())
-                & workflow_symbols.get(wf_key, set())
+                topic_symbols.get(topic_key, set()) & workflow_symbols.get(wf_key, set())
             )
             if not (has_direct_link or has_symbol_match):
                 errors.append(

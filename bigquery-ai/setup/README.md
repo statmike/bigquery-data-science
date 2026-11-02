@@ -134,7 +134,7 @@ brew install poppler
 | `pydantic` | Schema helpers — define `output_schema` as Python classes |
 | `matplotlib` | Visualization for forecasting notebooks |
 | `google-cloud-storage` | Cloud Storage client — upload documents for object tables |
-| `google-cloud-documentai` | Document AI client — create and manage processors |
+| `google-cloud-documentai` | Document AI client — create and manage custom/specialized processors for `ML.PROCESS_DOCUMENT` (`AI.CHUNK_DOCUMENT` auto-provisions `bq-created-layout-parser` via `documentai.googleapis.com` without client setup; `AI.TRANSLATE` calls `translate.googleapis.com` directly) |
 
 ---
 
@@ -148,17 +148,23 @@ Not all AI functions require the same setup. Here's a quick reference:
 | `AI.GENERATE_BOOL` | Optional | No | Optional (default: gemini-3.5-flash-lite) | |
 | `AI.GENERATE_DOUBLE` | Optional | No | Optional (default: gemini-3.5-flash-lite) | |
 | `AI.GENERATE_INT` | Optional | No | Optional (default: gemini-3.5-flash-lite) | |
+| `AI.COUNT_TOKENS` | No | No | Optional (default: gemini-3.5-flash-lite) | Free local input-token estimation (`STRING` only) |
 | `AI.IF` | Optional | No | Optional (auto-selected) | |
 | `AI.SCORE` | Optional | No | Optional (auto-selected) | |
 | `AI.CLASSIFY` | Optional | No | Optional (auto-selected) | |
-| `AI.EMBED` | Text: Optional, Multimodal: Required | No | Required | Must include model version |
-| `AI.SIMILARITY` | Text: Optional, Multimodal: Required | No | Required | |
+| `AI.AGG` | Optional | No | Optional (auto-selected) | Aggregate across `GROUP BY` groups |
+| `AI.TRANSLATE` | No (EUC only) | No | No (`model => 'nmt'` \| `'translation-llm'`) | Needs `translate.googleapis.com` + `roles/cloudtranslate.user` on caller |
+| `AI.CHUNK_DOCUMENT` | Optional | No | No | Needs `documentai.googleapis.com`; auto-provisions `bq-created-layout-parser` |
+| `AI.EMBED` | Text: Optional, Multimodal: Required | No | Required (unless `model => 'embeddinggemma-300m'`) | Must include model version |
+| `AI.SIMILARITY` | Text: Optional, Multimodal: Required | No | Required (unless `model => 'embeddinggemma-300m'`) | |
 | `AI.FORECAST` | No | No | No | Uses built-in TimesFM |
 | `AI.DETECT_ANOMALIES` | No | No | No | Uses built-in TimesFM |
-| `AI.EVALUATE` | No | No | No | Uses built-in TimesFM |
+| `AI.PREDICT` | No | No | No | Uses built-in TabFM (zero-shot regression & classification) |
+| `AI.EVALUATE` | No | No | No | Uses built-in TimesFM or TabFM |
+| `AI.KEY_DRIVERS` | No | No | No | Model-free contribution analysis |
 | `AI.GENERATE_TEXT` | Yes (via model) | **Yes** | Set at CREATE MODEL | Gemini, Claude, Llama, Mistral, Open |
 | `AI.GENERATE_TABLE` | Yes (via model) | **Yes** | Set at CREATE MODEL | Gemini only |
-| `AI.GENERATE_EMBEDDING` | Yes (via model) | **Yes** | Set at CREATE MODEL | |
+| `AI.GENERATE_EMBEDDING` | Yes (via model) | **Yes** | Set at CREATE MODEL | Includes Vertex AI MaaS embedding endpoints |
 | `ML.GENERATE_TEXT` | Yes (via model) | **Yes** | Set at CREATE MODEL | Legacy — use AI.GENERATE_TEXT |
 | `ML.GENERATE_EMBEDDING` | Yes (via model) | **Yes** | Set at CREATE MODEL | Legacy — use AI.GENERATE_EMBEDDING |
 | `VECTOR_SEARCH` | No | No | No | Operates on pre-computed embeddings |
@@ -169,7 +175,7 @@ Not all AI functions require the same setup. Here's a quick reference:
 | `ML.ANNOTATE_IMAGE` | Yes (via model + object table) | **Yes** | N/A | `REMOTE_SERVICE_TYPE = 'CLOUD_AI_VISION_V1'`; also needs an object table of images |
 | `ML.TRANSCRIBE` | Yes (via model + object table) | **Yes** | N/A | `REMOTE_SERVICE_TYPE = 'CLOUD_AI_SPEECH_TO_TEXT_V2'`; also needs an object table of audio |
 
-**Summary:** The newer `AI.*` scalar functions (AI.GENERATE, AI.IF, AI.SCORE, AI.CLASSIFY, AI.EMBED, AI.SIMILARITY) and the forecasting functions (AI.FORECAST, AI.DETECT_ANOMALIES, AI.EVALUATE) require minimal or no setup. The table-valued generation and embedding functions (AI.GENERATE_TEXT, AI.GENERATE_TABLE, AI.GENERATE_EMBEDDING) require creating a connection and a remote model first. `ML.PROCESS_DOCUMENT` additionally requires an object table pointing to documents in Cloud Storage and a Document AI processor.
+**Summary:** Zero-DDL `AI.*` functions (`AI.GENERATE*`, `AI.COUNT_TOKENS`, `AI.IF`, `AI.SCORE`, `AI.CLASSIFY`, `AI.AGG`, `AI.TRANSLATE`, `AI.CHUNK_DOCUMENT`, `AI.EMBED`, `AI.SIMILARITY`) and foundation/model-free analytics functions (`AI.FORECAST`, `AI.DETECT_ANOMALIES`, `AI.PREDICT`, `AI.EVALUATE`, `AI.KEY_DRIVERS`) require no `CREATE MODEL` step. The table-valued remote-model functions (`AI.GENERATE_TEXT`, `AI.GENERATE_TABLE`, `AI.GENERATE_EMBEDDING`) require creating a connection and a remote model first. `ML.PROCESS_DOCUMENT` additionally requires an object table pointing to documents in Cloud Storage and a pre-created Document AI processor (whereas `AI.CHUNK_DOCUMENT` auto-provisions `bq-created-layout-parser` for layout chunking).
 
 The five **Cloud AI service models** — `ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE` and `ML.PROCESS_DOCUMENT` — share a setup story of their own: a remote model that trains nothing, one service API to enable, and a service-specific role that is not the same for any two of them. That story is collected in [Cloud AI Service Models](../reference/cloud-ai-service-models.md), and each function's notebook performs its own grants and offers a matching teardown.
 
@@ -186,7 +192,7 @@ A [BigQuery connection](https://cloud.google.com/bigquery/docs/create-cloud-reso
 - **Required** for functions that use a remote model (AI.GENERATE_TEXT, AI.GENERATE_TABLE, AI.GENERATE_EMBEDDING, ML.PROCESS_DOCUMENT, ML.* functions) — the connection is specified in the `CREATE MODEL` statement.
 - **Required** for object tables used with ML.PROCESS_DOCUMENT — the connection is specified in the `CREATE EXTERNAL TABLE` statement.
 - **Required** for multimodal operations with AI.EMBED and AI.SIMILARITY (image/video content).
-- **Optional** for scalar AI functions (AI.GENERATE, AI.IF, etc.) — if not specified, end-user credentials are used. Use a connection when:
+- **Optional** for scalar AI functions (`AI.GENERATE`, `AI.IF`, etc.) and `AI.CHUNK_DOCUMENT` — if not specified, end-user credentials are used (`AI.TRANSLATE` runs strictly under end-user credentials and rejects `connection_id`). Use a connection when:
   - The query job may run longer than 48 hours
   - You want to use a service account instead of user credentials
   - You need consistent permissions across users
@@ -257,11 +263,13 @@ Only for the table-valued functions:
 - `ML.PROCESS_DOCUMENT`, `ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE` — the Cloud AI service models, with `REMOTE_SERVICE_TYPE` rather than an endpoint
 
 You do **not** need a remote model for:
-- AI.GENERATE, AI.GENERATE_BOOL/DOUBLE/INT (specify endpoint directly)
-- AI.IF, AI.SCORE, AI.CLASSIFY (auto-select model)
-- AI.EMBED, AI.SIMILARITY (specify endpoint directly)
-- AI.FORECAST, AI.DETECT_ANOMALIES, AI.EVALUATE (use built-in TimesFM)
-- VECTOR_SEARCH, AI.SEARCH (operate on existing data)
+- `AI.GENERATE`, `AI.GENERATE_BOOL`/`DOUBLE`/`INT`, `AI.COUNT_TOKENS` (specify `endpoint` directly or use default)
+- `AI.IF`, `AI.SCORE`, `AI.CLASSIFY`, `AI.AGG` (auto-select Gemini model)
+- `AI.TRANSLATE` (managed Cloud Translation scalar; `model => 'nmt'` or `'translation-llm'`)
+- `AI.CHUNK_DOCUMENT` (auto-provisions Document AI `bq-created-layout-parser`)
+- `AI.EMBED`, `AI.SIMILARITY` (specify `endpoint` or built-in `model` directly)
+- `AI.FORECAST`, `AI.DETECT_ANOMALIES`, `AI.PREDICT`, `AI.EVALUATE`, `AI.KEY_DRIVERS` (built-in TimesFM, TabFM, or model-free)
+- `VECTOR_SEARCH`, `AI.SEARCH` (operate on existing data)
 
 ### How to create one
 
@@ -335,7 +343,7 @@ An endpoint identifies which AI model to use. For Gemini models, you can specify
 
 - For embedding models, you **must** include the model version: `text-embedding-005`, not `text-embedding`.
 - For Gemini models in scalar functions, you can use short names: `gemini-2.5-flash`.
-- When no endpoint is specified, AI.GENERATE defaults to `gemini-2.5-flash`; managed functions (AI.IF, AI.SCORE, AI.CLASSIFY) auto-select a model optimized for cost-to-quality tradeoff.
+- When no endpoint is specified, `AI.GENERATE` (and its typed variants and `AI.COUNT_TOKENS`) defaults to `gemini-3.5-flash-lite`; managed functions (`AI.IF`, `AI.SCORE`, `AI.CLASSIFY`, `AI.AGG`) auto-select a model optimized for cost-to-quality tradeoff.
 
 ### Global endpoints
 
@@ -365,7 +373,7 @@ Functions that support Provisioned Throughput accept a `request_type` parameter:
 
 **Functions that support `request_type`:** AI.GENERATE, AI.GENERATE_BOOL, AI.GENERATE_DOUBLE, AI.GENERATE_INT, AI.GENERATE_TEXT, AI.GENERATE_TABLE, AI.GENERATE_EMBEDDING, ML.GENERATE_TEXT, ML.GENERATE_EMBEDDING.
 
-**Functions that do NOT support `request_type`:** AI.IF, AI.SCORE, AI.CLASSIFY (DSQ only), AI.FORECAST, AI.DETECT_ANOMALIES, AI.EVALUATE (BigQuery ML pricing), VECTOR_SEARCH, AI.SEARCH.
+**Functions that do NOT support `request_type`:** `AI.IF`, `AI.SCORE`, `AI.CLASSIFY`, `AI.AGG` (DSQ only), `AI.TRANSLATE` (Cloud Translation quota), `AI.CHUNK_DOCUMENT` (Document AI quota), `AI.COUNT_TOKENS` (local estimation), `AI.FORECAST`, `AI.DETECT_ANOMALIES`, `AI.PREDICT`, `AI.EVALUATE`, `AI.KEY_DRIVERS`, `VECTOR_SEARCH`, `AI.SEARCH`.
 
 ### Purchasing Provisioned Throughput
 
@@ -385,12 +393,15 @@ When API call volume exceeds quota, some rows may return `RESOURCE_EXHAUSTED` er
 
 The user running the query needs:
 - `roles/bigquery.user` or `roles/bigquery.jobUser` — to run queries
-- Access to Vertex AI is implicit through the user's own credentials
+- Access to Vertex AI is implicit through the user's own credentials for Gemini and Vertex AI embedding calls
+- **`AI.TRANSLATE` (EUC only):** Enable `translate.googleapis.com` and grant `roles/cloudtranslate.user` on the caller identity (`connection_id` is not accepted)
+- **`AI.CHUNK_DOCUMENT` (EUC default):** Enable `documentai.googleapis.com`, grant `roles/storage.objectViewer` on the bucket, and grant `roles/documentai.editor` on the **first** invocation in a region so BigQuery can auto-provision `bq-created-layout-parser` (`roles/documentai.viewer` suffices on subsequent runs once `bq-created-layout-parser` exists)
 
 ### For connection-based flows
 
 The connection's service account needs:
 - `roles/aiplatform.user` — to call Vertex AI endpoints
+- For `AI.CHUNK_DOCUMENT(..., connection_id => ...)`: `roles/storage.objectViewer` plus `roles/documentai.editor` on first run in a region (`roles/documentai.viewer` thereafter)
 
 The user running the query needs:
 - `roles/bigquery.user` or `roles/bigquery.jobUser` — to run queries
@@ -443,7 +454,7 @@ An [object table](https://cloud.google.com/bigquery/docs/object-table-introducti
 ### When do you need one?
 
 - **Required** for `ML.PROCESS_DOCUMENT`, `ML.ANNOTATE_IMAGE` and `ML.TRANSCRIBE` — these functions read their documents, images and audio through an object table
-- Useful for any workflow that processes unstructured files from Cloud Storage within BigQuery
+- Useful for any workflow that processes unstructured files from Cloud Storage within BigQuery (`AI.CHUNK_DOCUMENT` can read an object table, an `OBJ.LIST` / `OBJ.MAKE_REF` subquery, or a `'gs://...'` URI literal directly)
 
 ### How to create one
 
@@ -478,7 +489,8 @@ A [Document AI processor](https://cloud.google.com/document-ai/docs/overview) is
 
 ### When do you need one?
 
-- **Required** for `ML.PROCESS_DOCUMENT` — you create a remote model that points to a processor, and the function uses that model to process documents.
+- **Required** for `ML.PROCESS_DOCUMENT` — you create a processor and a remote model that points to it, and the function uses that model to process documents.
+- **Auto-provisioned (zero manual setup)** for [`AI.CHUNK_DOCUMENT`](../reference/document-processing.md#aichunk_document) — on its first invocation in a region, BigQuery automatically creates and reuses a Layout Parser processor named `bq-created-layout-parser` (which incurs zero idle hosting fee).
 
 ### How to create one
 

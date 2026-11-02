@@ -2,8 +2,8 @@
 
 > **Source:** [`bigquery-ai/reference/document-processing.md#mlprocess_document`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/document-processing.md#mlprocess_document)
 
-- **Description:** Table-valued function that processes unstructured documents from an object table using the Document AI API. Sends documents stored in Cloud Storage (referenced via a BigQuery object table) to a Document AI processor and returns structured extraction results (entities, key-value pairs, parsed content) directly as BigQuery columns.
-- **Use cases:** Invoice parsing, expense/receipt extraction, form key-value extraction, OCR text extraction, document layout analysis and chunking (for RAG pipelines), bank statement parsing, W2/tax form parsing, utility bill parsing, pay slip parsing, US passport and driver license parsing, identity document proofing, custom document classification, custom document splitting, document summarization.
+- **Description:** Table-valued function that processes unstructured documents from an object table using the Document AI API. Sends documents stored in Cloud Storage (referenced via a BigQuery object table) to a Document AI processor and returns structured extraction results (entities, key-value pairs, parsed content) directly as BigQuery columns. For zero-DDL layout-aware RAG chunking of PDFs (up to 500 pages), HTML, DOCX, PPTX, and XLSX/XLSM without `CREATE MODEL`, prefer [`AI.CHUNK_DOCUMENT`](aichunk_document.md).
+- **Use cases:** Invoice parsing, expense/receipt extraction, form key-value extraction, OCR text extraction on standalone images and scans, document layout analysis and chunking (when custom `PROCESS_OPTIONS` are needed), bank statement parsing, W2/tax form parsing, utility bill parsing, pay slip parsing, US passport and driver license parsing, identity document proofing, custom document classification, custom document splitting, document summarization.
 - [documentation](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-process-document)
 - **Type:** Table-valued function (returns a table)
 

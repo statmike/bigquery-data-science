@@ -54,7 +54,7 @@ These functions create vector embeddings from text and multimodal data, compute 
 | Feature | AI.EMBED | AI.GENERATE_EMBEDDING | ML.GENERATE_EMBEDDING | AI.SIMILARITY | VECTOR_SEARCH | AI.SEARCH |
 |---------|----------|----------------------|----------------------|---------------|---------------|-----------|
 | **Type** | Scalar | TVF | TVF | Scalar | TVF | TVF |
-| **Status** | Preview | GA (some Preview) | GA (some Preview) | Preview | GA (single search Preview) | GA (`mode` Preview) |
+| **Status** | GA (`model` Preview) | GA (some Preview) | GA (some Preview) | GA (`model` Preview) | GA (single search Preview) | GA (`mode` Preview) |
 | **Requires Model Object** | No (endpoint param) | Yes (MODEL reference) | Yes (MODEL reference) | No (endpoint param) | No | No (uses table config) |
 | **Input Data** | Single value | Table/Query | Table/Query | Two values | Table/Query + Table/Query or single value | Table/Query + string literal |
 | **Output** | STRUCT(result, status) | Table with embedding + stats | Table with ml_generate_embedding_* cols | FLOAT64 | Table with query/base/distance | Table with base/distance |
@@ -67,10 +67,10 @@ These functions create vector embeddings from text and multimodal data, compute 
 ---
 
 ## `AI.EMBED`
-- **Description:** (Preview) Scalar function that creates embeddings from text or image data. Sends a request to a stable Vertex AI embedding model and returns the model's response. No pre-created model object required.
+- **Description:** Scalar function that creates embeddings from text or multimodal data. Sends a request to a Vertex AI embedding model (or runs the built-in Preview `embeddinggemma-300m` model) and returns a `STRUCT` with the embedding vector and status. No pre-created model object required.
 - **Use cases:** Semantic search, recommendation, classification, clustering, outlier detection.
 - [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-embed)
-- **Type:** Scalar function (returns a STRUCT value per row) -- Preview
+- **Type:** Scalar function (returns a STRUCT value per row) -- GA
 
 **Syntax (text embedding with endpoint):**
 ```sql
@@ -145,7 +145,7 @@ Returns a STRUCT with:
 
 **Provisioned throughput:** Not specified in documentation.
 
-**BigFrames API:** No direct equivalent. Use `%%bigquery` magics or `session.read_gbq_query()` to execute AI.EMBED SQL from BigFrames. For table-valued embedding generation, use `bbq.ai.generate_embedding()` instead.
+**BigFrames API:** `bigframes.bigquery.ai.embed(content, *, endpoint=..., model=..., connection_id=..., task_type=..., title=..., model_params=...)` (available in `bigframes 2.51.0+`) — Scalar wrapper returning a Series of `STRUCT<result ARRAY<FLOAT64>, status STRING>`. Access vectors with `.struct.field("result")`. For table-valued remote models, `bbq.ai.generate_embedding()` is also available.
 
 ---
 
@@ -253,6 +253,30 @@ Also supports PCA, autoencoder, and matrix factorization models.
 
 **BigFrames API:** `bigframes.bigquery.ai.generate_embedding(model, data)` — TVF wrapper that takes a model name string and DataFrame/Series. Generates `AI.GENERATE_EMBEDDING` SQL. Also available as `bigframes.ml.llm.TextEmbeddingGenerator` (sklearn-style: create model, then `.predict()`) and `bigframes.ml.llm.MultimodalEmbeddingGenerator` for multimodal.
 
+### Remote embedding models as MaaS (`CREATE MODEL`)
+
+Google publishes a dedicated reference page for creating BigQuery ML remote models over managed embedding Model-as-a-Service (MaaS) endpoints on Vertex AI / Gemini Enterprise Agent Platform: [CREATE MODEL for remote embedding models (MaaS)](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-create-remote-model-embedding-maas).
+
+```sql
+-- Text or multimodal MaaS remote embedding model
+CREATE OR REPLACE MODEL `your-gcp-project-id.DATASET_ID.embedding_maas_model`
+  REMOTE WITH CONNECTION `your-gcp-project-id.us.CONNECTION_ID`
+  OPTIONS (
+    ENDPOINT = 'text-embedding-005'
+  );
+
+-- Multimodal Gemini Embedding 2 MaaS remote model (multi-regional us / eu / global)
+CREATE OR REPLACE MODEL `your-gcp-project-id.DATASET_ID.multimodal_embedding_maas`
+  REMOTE WITH CONNECTION `your-gcp-project-id.us.CONNECTION_ID`
+  OPTIONS (
+    ENDPOINT = 'gemini-embedding-2'
+  );
+```
+
+- **IAM & service agents:** Grant `roles/aiplatform.user` (and `roles/storage.objectViewer` when embedding Cloud Storage `ObjectRef` inputs) to the Cloud resource connection's service account (`bqcx-000000000000-xxxx@gcp-sa-bigquery-condel.iam.gserviceaccount.com`); Vertex AI endpoint provisioning in the host project uses the Vertex AI service agent (`service-000000000000@gcp-sa-aiplatform.iam.gserviceaccount.com`).
+- **Supported MaaS endpoints:** First-party Vertex AI text and multimodal embedding endpoints (`gemini-embedding-001`, `text-embedding-005`, `text-multilingual-embedding-002`, `gemini-embedding-2`, `multimodalembedding@001`) as well as Vertex AI MaaS open/partner text embedding endpoints (such as `multilingual-e5-small` and `multilingual-e5-large` in Preview).
+- **When to use [`AI.EMBED`](#aiembed) vs `CREATE MODEL` + `AI.GENERATE_EMBEDDING`:** Prefer scalar `AI.EMBED` when you want zero DDL, inline `SELECT`/`WHERE` expressions, or autonomous table embedding generation (`GENERATED ALWAYS AS (AI.EMBED(...).result) STORED`). Reach for `CREATE MODEL` + `AI.GENERATE_EMBEDDING` when you need governed model-level IAM via a connection, MaaS open embedding models (`multilingual-e5-*`), video segment embedding (`start_second` / `end_second` / `interval_seconds`), or local BQML PCA / Autoencoder / Matrix Factorization models.
+
 ---
 
 ## `ML.GENERATE_EMBEDDING`
@@ -288,10 +312,10 @@ All other inputs are the same as AI.GENERATE_EMBEDDING. Additionally, when using
 ---
 
 ## `AI.SIMILARITY`
-- **Description:** (Preview) Scalar function that computes the cosine similarity between two inputs (text or images). Creates embeddings for both inputs at runtime and computes the cosine similarity between them. Values closer to 1 indicate more similar inputs.
+- **Description:** Scalar function that computes the cosine similarity between two inputs (text or multimodal objects). Creates embeddings for both inputs at runtime and returns their cosine similarity (`FLOAT64`), where values closer to `1` indicate higher semantic similarity.
 - **Use cases:** Semantic search without precomputed embeddings, recommendation, classification, prototyping similarity queries.
 - [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-similarity)
-- **Type:** Scalar function (returns FLOAT64) -- Preview
+- **Type:** Scalar function (returns FLOAT64) -- GA
 
 **Syntax (text with endpoint):**
 ```sql
@@ -360,7 +384,7 @@ AI.SIMILARITY(
 
 **Provisioned throughput:** Not specified in documentation.
 
-**BigFrames API:** No direct equivalent. Use `%%bigquery` magics or `session.read_gbq_query()` to execute AI.SIMILARITY SQL from BigFrames.
+**BigFrames API:** `bigframes.bigquery.ai.similarity(content1, content2, *, endpoint=..., model=..., connection_id=..., model_params=...)` (available in `bigframes 2.51.0+`) — Scalar wrapper returning a Series of `FLOAT64` cosine similarity scores directly.
 
 ---
 

@@ -53,13 +53,11 @@ def _check_mermaid_block(
         elif stripped == "end":
             subgraph_depth -= 1
             if subgraph_depth < 0:
-                issues.append(
-                    f"{label}:{line_no}: unmatched 'end' in mermaid block"
-                )
+                issues.append(f"{label}:{line_no}: unmatched 'end' in mermaid block")
         if _UNQUOTED_PAREN_LABEL_RE.search(stripped):
             issues.append(
                 f"{label}:{line_no}: unquoted parentheses in Mermaid node label "
-                "(wrap label in double quotes: id[\"Label (Detail)\"])"
+                '(wrap label in double quotes: id["Label (Detail)"])'
             )
         edge_match = _MERMAID_EDGE_RE.match(stripped)
         if edge_match and "-->" in stripped and stripped.count("-->") == 1:
@@ -112,11 +110,7 @@ def check_markdown_text(text: str, label: str) -> list[str]:
                 fence_lines = []
                 table_expected_cols = None
                 continue
-            if (
-                marker[0] == fence_char
-                and len(marker) >= fence_len
-                and not rest
-            ):
+            if marker[0] == fence_char and len(marker) >= fence_len and not rest:
                 if fence_lang == "mermaid":
                     issues.extend(
                         _check_mermaid_block(
@@ -178,15 +172,10 @@ def check_markdown_files(repo_root: Path) -> list[str]:
         ):
             continue
         rel = str(md_path.relative_to(resolved_root))
-        issues.extend(
-            check_markdown_text(md_path.read_text(encoding="utf-8"), rel)
-        )
+        issues.extend(check_markdown_text(md_path.read_text(encoding="utf-8"), rel))
 
     for nb_path in sorted(resolved_root.rglob("*.ipynb")):
-        if any(
-            part in nb_path.parts
-            for part in (".venv", ".git", "node_modules")
-        ):
+        if any(part in nb_path.parts for part in (".venv", ".git", "node_modules")):
             continue
         rel_nb = str(nb_path.relative_to(resolved_root))
         try:

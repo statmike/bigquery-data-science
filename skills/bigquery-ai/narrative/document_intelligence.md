@@ -73,7 +73,7 @@ print(f'Dataset {PROJECT_ID}.{DATASET_ID} ready')
 ```
 
 ```python
-import subprocess as _sp, json as _json
+import subprocess as _sp, json as _json, re as _re
 
 # Create connection (idempotent)
 _sp.run(['bq', 'mk', '--connection', '--location', LOCATION,
@@ -86,11 +86,12 @@ r = _sp.run(['bq', 'show', '--connection', '--format=json',
              '--project_id', PROJECT_ID, '--location', LOCATION, CONNECTION_ID],
             capture_output=True, text=True, check=True)
 sa = _json.loads(r.stdout)['cloudResource']['serviceAccountId']
+sa_display = _re.sub(r'bqcx-\d+-', 'bqcx-000000000000-', sa)
 for role in ['roles/aiplatform.user', 'roles/storage.objectViewer']:
     _sp.run(['gcloud', 'projects', 'add-iam-policy-binding', PROJECT_ID,
              f'--member=serviceAccount:{sa}', f'--role={role}', '--quiet'],
             capture_output=True, text=True)
-print(f'Connection {CONNECTION_ID} ready (SA: {sa})')
+print(f'Connection {CONNECTION_ID} ready (SA: {sa_display})')
 ```
 
 ---
@@ -478,4 +479,36 @@ for _, row in df_agg.iterrows():
     print(f'=== {row["doc_type"]} ===')
     print(row["doc_type_summary"])
     print()
+```
+
+### Typed portfolio audit with `AI.AGG(..., output_schema => ...)`
+
+To feed automated accounting and vendor-compliance pipelines without regex-parsing prose, pass `output_schema` to `AI.AGG`. Below we group the extracted and scored documents by `doc_type` (`invoice` vs `receipt`) and combine SQL aggregates (`COUNT(*)`, `AVG(quality_score)`) with a typed `STRUCT` returned directly by `AI.AGG` (which exposes only the declared `output_schema` fields, with no `status` or `full_response` metadata wrapper, and supports up to **10,000 rows per group**).
+
+```python
+# Portfolio-level structured audit combining SQL quality scores with typed AI.AGG(output_schema => ...)
+query = f"""
+WITH portfolio_audit AS (
+  SELECT
+    e.doc_type,
+    COUNT(*) AS document_count,
+    ROUND(AVG(s.quality_score), 2) AS avg_quality_score,
+    AI.AGG(
+      TO_JSON_STRING(STRUCT(e.entity_name, e.reference_number, e.total_amount, e.document_date, s.quality_score)),
+      'Summarize the primary vendor or store pattern, whether manual AP audit hold is recommended, and the key data-quality observation. Keep it concise.',
+      output_schema => 'vendor_or_store_pattern STRING, manual_hold_recommended BOOL, key_audit_observation STRING'
+    ) AS audit
+  FROM `{PROJECT_ID}.{DATASET_ID}.workflow_di_extracted` e
+  JOIN `{PROJECT_ID}.{DATASET_ID}.workflow_di_scored` s ON e.uri = s.uri
+  GROUP BY e.doc_type
+)
+SELECT
+  doc_type,
+  document_count,
+  avg_quality_score,
+  audit.*
+FROM portfolio_audit
+ORDER BY doc_type
+"""
+client.query(query).to_dataframe()
 ```

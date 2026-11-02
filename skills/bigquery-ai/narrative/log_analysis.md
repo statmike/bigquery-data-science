@@ -71,7 +71,7 @@ print(f'Dataset {PROJECT_ID}.{DATASET_ID} ready')
 ```
 
 ```python
-import subprocess as _sp, json as _json
+import subprocess as _sp, json as _json, re as _re
 
 # Create connection (idempotent)
 _sp.run(['bq', 'mk', '--connection', '--location', LOCATION,
@@ -84,10 +84,11 @@ r = _sp.run(['bq', 'show', '--connection', '--format=json',
              '--project_id', PROJECT_ID, '--location', LOCATION, CONNECTION_ID],
             capture_output=True, text=True, check=True)
 sa = _json.loads(r.stdout)['cloudResource']['serviceAccountId']
+sa_display = _re.sub(r'bqcx-\d+-', 'bqcx-000000000000-', sa)
 _sp.run(['gcloud', 'projects', 'add-iam-policy-binding', PROJECT_ID,
          f'--member=serviceAccount:{sa}', '--role=roles/aiplatform.user', '--quiet'],
         capture_output=True, text=True)
-print(f'Connection {CONNECTION_ID} ready (SA: {sa})')
+print(f'Connection {CONNECTION_ID} ready (SA: {sa_display})')
 ```
 
 ```python
@@ -117,12 +118,19 @@ output_schema = """user_name STRING OPTIONS(description = "The employee who subm
 
 query = f'''
 CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_log_tickets` AS
-SELECT ticket_id, error_code, user_name, ticket_description, resolution, resolution_hours
+SELECT
+  ticket_id,
+  error_code,
+  IFNULL(user_name, CONCAT('Employee ', CAST(ticket_id AS STRING))) AS user_name,
+  IFNULL(ticket_description, CONCAT('Employee reported ', scenario, ' (error code ', error_code, ').')) AS ticket_description,
+  IFNULL(resolution, 'Investigating issue') AS resolution,
+  resolution_hours
 FROM AI.GENERATE_TABLE(
   MODEL `{PROJECT_ID}.{DATASET_ID}.gemini_flash`,
   (SELECT
     ticket_id,
     error_code,
+    scenario,
     CONCAT(
       'Generate one realistic IT support ticket. Category: ', category,
       '. Scenario: ', scenario,
@@ -193,14 +201,17 @@ SELECT
   ticket_description,
   resolution,
   resolution_hours,
-  AI.CLASSIFY(
-    ticket_description,
-    [('access', 'Account access, permissions, authentication, SSO, VPN credentials'),
-     ('hardware', 'Physical device issues: laptops, monitors, keyboards, docking stations'),
-     ('software', 'Application bugs, crashes, license issues, build failures'),
-     ('network', 'Connectivity, Wi-Fi, DNS, latency, printer discovery'),
-     ('security', 'Suspicious activity, phishing, unauthorized access, data leaks'),
-     ('data', 'Database issues, ETL failures, backups, query performance')]
+  IFNULL(
+    AI.CLASSIFY(
+      ticket_description,
+      [('access', 'Account access, permissions, authentication, SSO, VPN credentials'),
+       ('hardware', 'Physical device issues: laptops, monitors, keyboards, docking stations'),
+       ('software', 'Application bugs, crashes, license issues, build failures'),
+       ('network', 'Connectivity, Wi-Fi, DNS, latency, printer discovery'),
+       ('security', 'Suspicious activity, phishing, unauthorized access, data leaks'),
+       ('data', 'Database issues, ETL failures, backups, query performance')]
+    ),
+    'software'
   ) AS category
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_log_tickets`
 '''
@@ -301,7 +312,7 @@ GROUP BY category
 '''
 df_analysis = client.query(query).to_dataframe()
 for _, row in df_analysis.iterrows():
-    print(f'=== {row["category"].upper()} ===')
+    print(f'=== {str(row["category"] or "unclassified").upper()} ===')
     print(row['category_analysis'])
     print()
 ```
@@ -677,3 +688,40 @@ Two things about hybrid retrieval are worth carrying out of Step 5:
 
 - **It is a re-ranking that also widens.** The lexical leg changes the fused score of every row, so a row it adds arrives at the expense of a row the semantic search would have returned. Step 5 prints both sides of that trade rather than claiming only the upside.
 - **`top_k` decides how far the widening reaches, through two gates.** BM25 only ever sees the top `10 * top_k` rows by semantic rank, and inside that pool a match is worth `1/62 ≈ 0.0161` of lift against the row holding the last slot. The tighter of the two fixes the deepest rank a matched row can climb from: 10 at `top_k => 5`, 110 at `top_k => 30`, 640 at `top_k => 64`. Size `top_k` short of that reach and the lexical leg does its work while the row it found never appears. For a code expected at semantic rank `R`, `R/10` is the floor and not the recipe — under a few hundred ranks deep the score gate binds first, so take the value from the reach table in Step 5. When an identifier is the whole question and the answer has to be certain, `WHERE error_code = @code` is the right tool — a predicate has no pool and cannot be outranked by a fusion score.
+
+### Structured escalation triage with `AI.AGG(..., output_schema => ...)`
+
+Free-text `AI.AGG` is ideal for human-readable status emails, but downstream pager and incident-routing workflows need **typed columns** rather than prose paragraphs. Passing `output_schema` to `AI.AGG` returns a `STRUCT` with user-defined SQL types per `GROUP BY` group — **no `status` or `full_response` metadata fields are added**, so you unpack fields directly (`triage.*`).
+
+> **Reliability & scale guardrails:**
+> - **Return shape & error behavior:** Without `output_schema`, `AI.AGG` returns `STRING`; with `output_schema`, it returns a `STRUCT` matching your schema (and unpacks via `triage.*` in an outer `SELECT` so `AI.AGG` is evaluated once per group). If a group fails, `AI.AGG` returns `NULL` for the group (`max_error_ratio` controls the failure threshold).
+> - **Input row limit:** `AI.AGG` supports up to **10,000 rows per group** (recommended). For massive log tables, pre-filter (`WHERE priority >= 7`) or sample (`QUALIFY ROW_NUMBER() OVER (...) <= 500`) before aggregating.
+
+```python
+# Structured per-category escalation rollup using AI.AGG with output_schema
+query = f"""
+WITH grouped_triage AS (
+  SELECT
+    category,
+    COUNT(*) AS ticket_count,
+    ROUND(AVG(priority), 1) AS avg_priority,
+    ROUND(MAX(priority), 1) AS max_priority,
+    AI.AGG(
+      CONCAT('[', error_code, '] ', ticket_description),
+      'Summarize the dominant root cause, whether on-call escalation is needed, and the primary remediation step for this category. Keep it concise.',
+      output_schema => 'top_root_cause STRING, escalation_required BOOL, recommended_remediation STRING'
+    ) AS triage
+  FROM `{PROJECT_ID}.{DATASET_ID}.workflow_log_scored`
+  GROUP BY category
+)
+SELECT
+  category,
+  ticket_count,
+  avg_priority,
+  max_priority,
+  triage.*
+FROM grouped_triage
+ORDER BY avg_priority DESC
+"""
+client.query(query).to_dataframe()
+```

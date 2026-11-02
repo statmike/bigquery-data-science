@@ -2,13 +2,13 @@
 
 > **Source:** [`bigquery-ai/reference/unstructured-data-infrastructure.md#multimodal-input-patterns-by-function`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/unstructured-data-infrastructure.md#multimodal-input-patterns-by-function)
 
-**Every multimodal AI function takes an `ObjectRef`.** What differs between them is only *where the reference goes in the call*: a field of a STRUCT prompt, the second slot of a tuple, a bare positional argument, or a named `content` parameter. There are four shapes, not four pipelines.
+**Every multimodal AI function takes an `ObjectRef`.** What differs between them is only *where the reference goes in the call*: a field of a STRUCT prompt, the second slot of a tuple, a bare positional argument, a named `content` parameter, or a document-chunking TVF input relation. There are five shapes, not five pipelines.
 
 Where the `ObjectRef` comes from is an independent choice:
 
 ```sql
 OBJ.MAKE_REF('gs://bucket/doc.pdf', 'PROJECT.REGION.CONNECTION')  -- inline, no table
-ref                                                                -- object table column
+ref                                                                -- object table or OBJ.LIST column
 ```
 
 ### Shape 1: STRUCT Prompt (most generation functions + AI.IF)
@@ -93,7 +93,7 @@ FROM `project.dataset.docs`;
 
 ### Shape 4: `content` Parameter (Embedding and similarity functions)
 
-Embedding and similarity functions take the reference as the content argument rather than in a prompt. Requires a multimodal embedding endpoint (e.g., `multimodalembedding@001`).
+Embedding and similarity functions take the reference as the content argument rather than in a prompt. Requires a multimodal embedding endpoint (e.g., `multimodalembedding@001` or `gemini-embedding-2`).
 
 **Functions:** `AI.EMBED`, `AI.GENERATE_EMBEDDING`, `ML.GENERATE_EMBEDDING`, `AI.SIMILARITY`
 
@@ -114,6 +114,27 @@ SELECT AI.SIMILARITY(
 ) AS similarity;
 ```
 
+### Shape 5: Document Chunking TVF (`AI.CHUNK_DOCUMENT`)
+
+[`AI.CHUNK_DOCUMENT`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/document-processing.md#aichunk_document) accepts **three** document input forms: a `'gs://...'` URI or wildcard literal (`13` output columns), `TABLE object_table` (`13` output columns), or a `(SELECT ...)` subquery returning an `OBJECTREF` column **named `ref`** (`5 + passthrough` output columns). When a subquery projects only `OBJ.MAKE_REF(uri) AS ref`, the result has **6 columns** (`chunk_id`, `content`, `start_page`, `end_page`, `status`, `ref`) with **no top-level `uri`** — read `ref.uri` and filter `WHERE status = ''`:
+
+**Functions:** `AI.CHUNK_DOCUMENT`
+
+```sql
+-- Direct GCS wildcard literal (13 columns, top-level uri)
+SELECT uri, chunk_id, start_page, end_page, content
+FROM AI.CHUNK_DOCUMENT('gs://bucket/docs/*.pdf', chunk_size => 500)
+WHERE status = '';
+
+-- Subquery returning an ObjectRef column named ref (6 columns; read ref.uri)
+SELECT ref.uri AS gcs_uri, chunk_id, content
+FROM AI.CHUNK_DOCUMENT(
+  (SELECT OBJ.MAKE_REF('gs://bucket/doc.pdf') AS ref),
+  chunk_size => 500
+)
+WHERE status = '';
+```
+
 ### Shape Summary
 
 | Shape | Functions | Object Table Required? | Input Method |
@@ -122,7 +143,8 @@ SELECT AI.SIMILARITY(
 | Tuple | AI.SCORE | No (object table is the convenient source) | `('scoring text', ref)` |
 | Bare argument | AI.CLASSIFY, AI.AGG | No (object table is the convenient source) | `AI.CLASSIFY(ref, categories)`, `AI.AGG(STRUCT(ref), prompt)` |
 | `content` parameter | AI.EMBED, AI.SIMILARITY, AI.GENERATE_EMBEDDING, ML.GENERATE_EMBEDDING | No | Pass the `ObjectRef` as the content argument |
+| Document chunking TVF | AI.CHUNK_DOCUMENT | No | `'gs://...'` literal, `TABLE object_table`, or `(SELECT ... ObjectRef)` subquery |
 | Object table (document processing) | ML.PROCESS_DOCUMENT | Yes | Object table rows as input to Document AI processor |
-| Not supported | VECTOR_SEARCH, AI.SEARCH, AI.FORECAST, AI.DETECT_ANOMALIES, AI.PREDICT, AI.EVALUATE | — | Text/numeric input only |
+| Not supported | AI.TRANSLATE, AI.COUNT_TOKENS, VECTOR_SEARCH, AI.SEARCH, AI.FORECAST, AI.DETECT_ANOMALIES, AI.PREDICT, AI.EVALUATE | — | Text/numeric input only |
 
 > **`ObjectRefRuntime` still works everywhere.** Nothing in this section is a breaking change — wrapping a reference in `OBJ.GET_ACCESS_URL` is accepted by every function above. It is simply no longer necessary, and `AI.AGG`'s Known Issues give a reason to prefer the unwrapped form.

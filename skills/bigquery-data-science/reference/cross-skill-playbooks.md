@@ -14,7 +14,7 @@ flowchart TD
     TASK["<b>Incoming Data Science / Engineering Task</b><br/>Routed by bigquery-data-science"]
     subgraph COMPOSE["Multi-Skill Composition Stages (Combine Any Subset)"]
         direction LR
-        Q_UNSTRUCT["<b>Stage A — bigquery-ai</b><br/>Unstructured or Zero-Shot Baseline?<br/>AI.EMBED · AI.GENERATE_TABLE<br/>ML.PROCESS_DOCUMENT · AI.FORECAST"]
+        Q_UNSTRUCT["<b>Stage A — bigquery-ai</b><br/>Unstructured or Zero-Shot Baseline?<br/>AI.EMBED · AI.GENERATE_TABLE<br/>AI.CHUNK_DOCUMENT · ML.PROCESS_DOCUMENT · AI.FORECAST"]
         Q_TRAIN["<b>Stage B — bigquery-ml</b><br/>Supervised, Unsupervised, or Causal?<br/>CREATE MODEL · TRANSFORM<br/>BOOSTED_TREE_* · ARIMA_PLUS · Causal"]
         Q_OPS["<b>Stage C — bigquery-mlops</b><br/>Temporal Joins, Registry, or Drift?<br/>ML.ENTITY_FEATURES_AT_TIME · Registry<br/>ML.VALIDATE_DATA_DRIFT · 8 Pipelines"]
         Q_UNSTRUCT --> Q_TRAIN --> Q_OPS
@@ -123,7 +123,7 @@ Use this master index to find every end-to-end workflow and orchestration pipeli
 | **4. Foundation AI, Search & Multimodal** | Hybrid RRF catalog search & exact-token SKU reach math | `bigquery-ai` | `AI.EMBED`, `VECTOR_SEARCH` (`lexical_search_columns`), `AI.SEARCH` | [`catalog_search.md`](../../bigquery-ai/narrative/catalog_search.md) | `bigquery-ai/workflows/catalog_search/` |
 | **4. Foundation AI, Search & Multimodal** | End-to-end Retrieval-Augmented Generation (RAG) over text | `bigquery-ai` | `AI.GENERATE_TABLE`, `AI.EMBED`, `VECTOR_SEARCH`, `AI.GENERATE` | [`rag_pipeline.md`](../../bigquery-ai/narrative/rag_pipeline.md) | `bigquery-ai/workflows/rag_pipeline/` |
 | **4. Foundation AI, Search & Multimodal** | Document classification, schema extraction, quality scoring & synthesis | `bigquery-ai` | `AI.CLASSIFY`, `AI.GENERATE`, `AI.SCORE`, `AI.AGG` | [`document_intelligence.md`](../../bigquery-ai/narrative/document_intelligence.md) | `bigquery-ai/workflows/document_intelligence/` |
-| **4. Foundation AI, Search & Multimodal** | Document RAG *(historical record; use `ML.PROCESS_DOCUMENT` for new work)* | `bigquery-ai` | `ML.PROCESS_DOCUMENT` *(replaces retired `AI.PARSE_DOCUMENT`)*, `AI.EMBED`, `VECTOR_SEARCH` | [`document_rag.md`](../../bigquery-ai/narrative/document_rag.md) | `bigquery-ai/workflows/document_rag/` |
+| **4. Foundation AI, Search & Multimodal** | End-to-end Document RAG over PDFs (layout-aware chunking → embeddings → grounded Q&A) | `bigquery-ai` | `AI.CHUNK_DOCUMENT`, `AI.EMBED`, `VECTOR_SEARCH`, `AI.GENERATE` | [`document_rag.md`](../../bigquery-ai/narrative/document_rag.md) | `bigquery-ai/workflows/document_rag/` |
 | **4. Foundation AI, Search & Multimodal** | Content analysis: generate, classify, score & summarize at scale | `bigquery-ai` | `AI.GENERATE_TABLE`, `AI.CLASSIFY`, `AI.SCORE`, `AI.GENERATE`, `AI.AGG` | [`content_analysis.md`](../../bigquery-ai/narrative/content_analysis.md) | `bigquery-ai/workflows/content_analysis/` |
 | **4. Foundation AI, Search & Multimodal** | User-generated content moderation pipeline | `bigquery-ai` | `AI.IF`, `AI.CLASSIFY`, `AI.SCORE`, `AI.GENERATE`, `AI.AGG` | [`content_moderation.md`](../../bigquery-ai/narrative/content_moderation.md) | `bigquery-ai/workflows/content_moderation/` |
 | **4. Foundation AI, Search & Multimodal** | Multimodal document image embedding, similarity & visual description | `bigquery-ai` | `AI.EMBED`, `AI.SIMILARITY`, `AI.GENERATE` (`ObjectRef`) | [`multimodal_analysis.md`](../../bigquery-ai/narrative/multimodal_analysis.md) | `bigquery-ai/workflows/multimodal_analysis/` |

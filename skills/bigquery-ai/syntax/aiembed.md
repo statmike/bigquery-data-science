@@ -2,10 +2,10 @@
 
 > **Source:** [`bigquery-ai/reference/embedding-generation-and-semantic-search.md#aiembed`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/embedding-generation-and-semantic-search.md#aiembed)
 
-- **Description:** (Preview) Scalar function that creates embeddings from text or image data. Sends a request to a stable Vertex AI embedding model and returns the model's response. No pre-created model object required.
+- **Description:** Scalar function that creates embeddings from text or multimodal data. Sends a request to a Vertex AI embedding model (or runs the built-in Preview `embeddinggemma-300m` model) and returns a `STRUCT` with the embedding vector and status. No pre-created model object required.
 - **Use cases:** Semantic search, recommendation, classification, clustering, outlier detection.
 - [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-embed)
-- **Type:** Scalar function (returns a STRUCT value per row) -- Preview
+- **Type:** Scalar function (returns a STRUCT value per row) -- GA
 
 **Syntax (text embedding with endpoint):**
 ```sql
@@ -80,6 +80,6 @@ Returns a STRUCT with:
 
 **Provisioned throughput:** Not specified in documentation.
 
-**BigFrames API:** No direct equivalent. Use `%%bigquery` magics or `session.read_gbq_query()` to execute AI.EMBED SQL from BigFrames. For table-valued embedding generation, use `bbq.ai.generate_embedding()` instead.
+**BigFrames API:** `bigframes.bigquery.ai.embed(content, *, endpoint=..., model=..., connection_id=..., task_type=..., title=..., model_params=...)` (available in `bigframes 2.51.0+`) — Scalar wrapper returning a Series of `STRUCT<result ARRAY<FLOAT64>, status STRING>`. Access vectors with `.struct.field("result")`. For table-valued remote models, `bbq.ai.generate_embedding()` is also available.
 
 ---

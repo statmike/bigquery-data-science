@@ -2,7 +2,7 @@
 
 # Evaluation Without a Model — `ML.METRICS`
 
-`ML.METRICS` computes evaluation metrics from a relation that already holds an **actual** column and a **predicted** column. There is no model argument. Nothing is trained, nothing is loaded, and the predictions can come from anywhere — BigQuery ML, Vertex AI batch prediction, a vendor scoring API, a CSV someone emailed you. **Preview** as of 2026-09-10.
+`ML.METRICS` computes evaluation metrics from a relation that already holds an **actual** column and a **predicted** column. There is no model argument. Nothing is trained, nothing is loaded, and the predictions can come from anywhere — BigQuery ML, materialized zero-shot `bigquery-ai/functions/ai_predict` (`AI.PREDICT`) or `AI.CLASSIFY` outputs, Vertex AI batch prediction, a vendor scoring API, a CSV someone emailed you. **Preview** as of 2026-09-10.
 
 > **The one-line difference from `ML.EVALUATE`.** `ML.EVALUATE` needs the model object. `ML.METRICS` needs only the numbers. Step 2 deletes the model and shows exactly what that buys you.
 
@@ -10,6 +10,7 @@
 |---|---|---|
 | A trained model and an eval set | `ML.EVALUATE` | with each model — see `models` (Models) |
 | Two columns: actual and predicted | `ML.METRICS` | this notebook |
+| Materialized zero-shot predictions (`AI.PREDICT` or `AI.CLASSIFY`) | `ML.METRICS` (scores saved output once, reproducibly) | `bigquery-ai/functions/ai_predict` (`ai_predict`) + this notebook |
 | Raw data, and no model at all yet | `AI.EVALUATE` (trains TabFM/TimesFM internally) | `bigquery-ai/functions/ai_evaluate` (`ai_evaluate`) |
 
 **Where this project already scores saved predictions by hand.** `workflows/hierarchical_forecasting` (`workflows/hierarchical_forecasting/`) joins TEST-period actuals to two reconciled forecasts, and `workflows/regression_based_forecasting` (`workflows/regression_based_forecasting/`) builds its own actual-vs-predicted table for three of its four techniques — `ML.METRICS` fits both shapes. Both keep the hand-written arithmetic anyway, because they report MAPE and RMSE and `ML.METRICS` returns neither.
@@ -193,6 +194,7 @@ What the comparison actually establishes: the model contributed **nothing** to t
 
 Nothing in the `ML.METRICS` call mentions a model, a connection, or a training run. Two same-typed columns are the entire contract, which is why it reaches cases `ML.EVALUATE` structurally cannot:
 
+- **Zero-shot foundation-model predictions you materialized once** — `bigquery-ai/functions/ai_predict` (`AI.PREDICT`) runs TabFM in-context and drifts slightly from call to call, while `AI.EVALUATE` runs a separate TabFM pass and bills a second time. Saving `AI.PREDICT` (or `AI.CLASSIFY`) output to a table and scoring that table with `ML.METRICS` evaluates the exact predictions you keep, at zero extra model cost.
 - **Predictions BigQuery never made** — Vertex AI batch prediction output, a vendor scoring API's results, a partner's monthly file.
 - **Models that no longer exist** — retention policies delete models; the prediction logs outlive them.
 - **Models you cannot call** — a deprecated endpoint, an expired contract, a model behind someone else's IAM.
@@ -387,7 +389,7 @@ The workaround is the `TABLE` form — which is exactly what Step 3 already did 
 
 Observed **failing** in query form: `ml_datasets.penguins`, `ml_datasets.iris`, a copy of `penguins` in the caller's own project, and `evaluation_penguins`. Observed **working**: `ml_datasets.census_adult_income`, `usa_names.usa_1910_2013`, `evaluation_predictions`, and `penguins` wrapped in a `GROUP BY`.
 
-No mechanism is claimed here — the tests narrow it, they do not explain it. The practical advice is the point: **if the query form errors, do not spend time reshaping the subquery. Materialize it and pass `TABLE`.** This is a Preview function; behavior may change.
+No mechanism is claimed here — the tests narrow it, they do not explain it. The practical advice is the point: **if the query form errors, do not spend time reshaping the subquery. Materialize it and pass `TABLE`.** This is a Preview function; behavior may change. *(Re-tested 2026-11-02: inline `(QUERY_STATEMENT)` calls over `bigquery-public-data.ml_datasets.penguins` and `ml_datasets.iris` with `retry=None, job_retry=None` succeeded without `80038528`, whereas the 2026-09-11 run captured above failed — Preview query-form handling is improving, so retain `TABLE` materialization plus `retry=None, job_retry=None` as defensive practice whenever an inline subquery hits `80038528`.)*
 
 ---
 ## Step 7 — Reproducibility
@@ -412,7 +414,7 @@ print(f'distinct result rows across 3 cache-off runs: {len(runs.drop_duplicates(
 runs
 ```
 
-One distinct row across three runs — bit-identical. That is worth stating next to `AI.EVALUATE`, which is **not** reproducible run to run even with its `model` pinned (measured in `bigquery-ai/functions/ai_evaluate` (`ai_evaluate`)). When a metric has to be defensible — a model card, a release gate, a regulator's file — computing it from saved predictions with `ML.METRICS` gives you a number you can regenerate on demand.
+One distinct row across three runs — bit-identical. That is worth stating next to `bigquery-ai/functions/ai_predict` (`AI.PREDICT`) and `bigquery-ai/functions/ai_evaluate` (`AI.EVALUATE`), where TabFM inference is **not** reproducible run to run. When a metric has to be defensible — a model card, a release gate, a regulator's file — materializing predictions once and computing metrics with `ML.METRICS` gives you a number you can regenerate on demand.
 
 ---
 ## Examples — `%%bigquery` Magics

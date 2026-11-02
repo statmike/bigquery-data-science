@@ -21,6 +21,7 @@ Focused, per-statement syntax and option cards sliced from [`bigquery-ai/referen
 
 ## Document Processing (`document-processing.md`)
 
+- [`AI.CHUNK_DOCUMENT`](aichunk_document.md)
 - [`ML.PROCESS_DOCUMENT`](mlprocess_document.md)
 - [`AI.PARSE_DOCUMENT`](aiparse_document.md)
 
@@ -51,6 +52,7 @@ Focused, per-statement syntax and option cards sliced from [`bigquery-ai/referen
 - [`AI.SCORE`](aiscore.md)
 - [`AI.CLASSIFY`](aiclassify.md)
 - [`AI.AGG`](aiagg.md)
+- [`AI.TRANSLATE`](aitranslate.md)
 
 ## Predictive AI (`predictive-ai.md`)
 

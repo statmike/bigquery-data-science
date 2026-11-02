@@ -49,8 +49,8 @@ These are not AI functions themselves, but the infrastructure that enables AI fu
 - `OBJ.FETCH_METADATA` enriches partial `ObjectRef` values with Cloud Storage metadata (content type, size, MD5 hash).
 - `OBJ.GET_ACCESS_URL` converts `ObjectRef` into `ObjectRefRuntime` with signed URLs — a tool for handing a URL to something outside the AI call, not a step on the way into one.
 - `OBJ.GET_READ_URL` returns a 45-minute read URL as `STRUCT<url, status>`, for displaying an object in query results.
-- **Typical pipeline:** URI → `OBJ.MAKE_REF` → any multimodal `AI.*` function. From an object table or from `OBJ.LIST`, the `ref` column replaces even the `OBJ.MAKE_REF` step.
-- **`AI.PARSE_DOCUMENT` is stricter about the column name:** its subquery must alias the reference as `ref` specifically. (That function has been offline since 2026-06-01 with its reference docs withdrawn.)
+- **Typical pipeline:** URI → `OBJ.MAKE_REF` → any multimodal `AI.*` function (including [`AI.CHUNK_DOCUMENT`](document-processing.md#aichunk_document)). From an object table or from `OBJ.LIST`, the `ref` column replaces even the `OBJ.MAKE_REF` step — and `AI.CHUNK_DOCUMENT` can also take a `'gs://...'` URI or wildcard literal directly.
+- **`AI.CHUNK_DOCUMENT` subquery contract:** when passed a `(SELECT ...)` subquery instead of a `'gs://...'` literal or `TABLE object_table`, the subquery must return an `OBJECTREF` column **named `ref`** (for example `OBJ.MAKE_REF(uri) AS ref` or `SELECT * FROM OBJ.LIST(...)`), and `AI.CHUNK_DOCUMENT` passes through only the columns projected by that subquery. (Retired Preview `AI.PARSE_DOCUMENT` has been offline since 2026-06-01 with its docs withdrawn; `AI.CHUNK_DOCUMENT` is its GA replacement.)
 
 **RESOLVED (2026-09-15) -- AI functions take an `ObjectRef` directly; `OBJ.GET_ACCESS_URL` is not required.** The 2026-06-12 release note said so, the reference pages disagreed, and this project kept the wrapper because it was the one form documented everywhere. Both halves of that disagreement have now closed:
 
@@ -63,10 +63,10 @@ These are not AI functions themselves, but the infrastructure that enables AI fu
 Every notebook in this project now passes the `ObjectRef`. **Nothing was deprecated** — `ObjectRefRuntime` is still accepted everywhere, so existing queries keep working. See [Multimodal Input Patterns](#multimodal-input-patterns-by-function) for where the reference goes in each function's call.
 
 **Three ways to get an `ObjectRef`** — object table, `OBJ.LIST`, inline `OBJ.MAKE_REF`:
-- **`OBJ.LIST`** (GA) is the middle option: one wildcard path in the `FROM` clause yields `uri`, `content_type`, `size`, `md5_hash`, `updated`, `generation`, `metadata` and a `ref` column, with no DDL, no persistent table and no reservation. Pass `ref` straight to any multimodal `AI.*` function. Reach for an object table instead when you need a persistent, self-updating listing that tracks arrivals over time, or `ML.PROCESS_DOCUMENT`, which reads object tables only.
+- **`OBJ.LIST`** (GA) is the middle option: one wildcard path in the `FROM` clause yields `uri`, `content_type`, `size`, `md5_hash`, `updated`, `generation`, `metadata` and a `ref` column, with no DDL, no persistent table and no reservation. Pass `ref` straight to any multimodal `AI.*` function (including `AI.CHUNK_DOCUMENT((SELECT uri, ref FROM OBJ.LIST('gs://bucket/docs/*.pdf')))`). Reach for an object table instead when you need a persistent, self-updating listing that tracks arrivals over time, or `ML.PROCESS_DOCUMENT`, which reads object tables only.
 - **Object tables** with remote models (e.g., `AI.GENERATE_EMBEDDING` reading from an object table) require a BigQuery reservation. Best for large-scale processing where you have reservations configured.
 - **Inline ObjectRef** (`OBJ.MAKE_REF(uri, connection)` in a subquery) does **not** require a reservation. Best for ad-hoc multimodal queries and prototyping. All embedding and similarity function notebooks in this project use inline ObjectRef.
-- **Inside a VPC Service Controls perimeter, inline is the only option that works.** An object table's `ref` column uses delegated access, which mints a signed HTTPS URL that Agent Platform blocks inside a perimeter. Single-argument `OBJ.MAKE_REF(uri)` uses direct access and sends the Cloud Storage URI itself. See the note under [`OBJ.MAKE_REF`](#objmake_ref).
+- **Inside a VPC Service Controls perimeter, inline direct access is the option that works.** An object table's `ref` column (or 2-argument `OBJ.MAKE_REF(uri, connection)`) uses delegated access, which mints a signed HTTPS URL that Agent Platform and `AI.CHUNK_DOCUMENT` block inside a perimeter (`INVALID_ARGUMENT: HTTP links are not supported for requests restricted by VPCSC.`). Single-argument `OBJ.MAKE_REF(uri)` (or a direct `'gs://...'` URI literal on `AI.CHUNK_DOCUMENT`) uses direct access and sends the Cloud Storage URI itself. See the note under [`OBJ.MAKE_REF`](#objmake_ref).
 
 ---
 
@@ -157,6 +157,7 @@ Signed URLs expire after 6 hours. Row-level access policies restrict which URLs 
 - Connection must be in the same region as the dataset.
 
 **AI function integration:** every one of these reads the `ref` column as-is — an `ObjectRef` — with no signing step in between.
+- `AI.CHUNK_DOCUMENT` — zero-DDL layout-aware document chunking (`TABLE object_table` or `(SELECT ... ref ...)` subquery).
 - `ML.PROCESS_DOCUMENT` — document extraction via Document AI processors.
 - `AI.GENERATE_TEXT` / `AI.GENERATE` — text generation from object data: `STRUCT(text AS prompt, [ref] AS object_refs)`.
 - `AI.GENERATE_EMBEDDING` — embeddings from image/video data: a `content` column of `ObjectRef`.
@@ -201,7 +202,7 @@ FROM OBJ.LIST(
 
 **Outputs:** one row per object: `uri` STRING, `content_type` STRING, `size` INT64, `md5_hash` STRING, `updated` TIMESTAMP, `metadata` ARRAY\<STRUCT\<name STRING, value STRING\>\>, `generation` INT64, and `ref` — an `ObjectRef` whose `authorizer` is populated only when you passed one.
 
-**Measured 2026-10-09** against `gs://cloud-samples-data/bigquery/tutorials/cymbal-pets/images/*.png` (205 objects): the no-authorizer form and the authorizer form both feed `AI.GENERATE`, the typed variants, `AI.IF`/`AI.SCORE`/`AI.CLASSIFY`, `AI.AGG`, `AI.EMBED` and `AI.SIMILARITY` directly via `ref`, with an empty `status` on every row. Direct access worked here because the bucket is public; on a private bucket it works only if the query runner holds `storage.objectViewer`, and inside a VPC Service Controls perimeter it is the form that works (see the note under [`OBJ.MAKE_REF`](#objmake_ref)).
+**Measured 2026-10-09** against `gs://cloud-samples-data/bigquery/tutorials/cymbal-pets/images/*.png` (205 objects): the no-authorizer form and the authorizer form both feed `AI.GENERATE`, the typed variants, `AI.IF`/`AI.SCORE`/`AI.CLASSIFY`, `AI.AGG`, `AI.EMBED`, `AI.SIMILARITY`, and `AI.CHUNK_DOCUMENT` (over supported document formats) directly via `ref`, with an empty `status` on every row. Direct access worked here because the bucket is public; on a private bucket it works only if the query runner holds `storage.objectViewer`, and inside a VPC Service Controls perimeter it is the form that works (see the note under [`OBJ.MAKE_REF`](#objmake_ref)).
 
 **Limitations:** Shares the object-table limitations because it generates the same metadata dynamically. The listing is computed per query — there is no persistence and no change tracking; use an object table for that. `ML.PROCESS_DOCUMENT` still reads object tables only.
 
@@ -255,7 +256,7 @@ The top-level `authorizer` overwrites whatever the input `objectref` carried.
 
 > **Dropping the authorizer changes who reads the object, not whether it works.** `OBJ.MAKE_REF('gs://bucket/file.pdf')` is legal and succeeds against private buckets — but only because the identity running the query holds `storage.objectViewer` on that bucket. That is **direct access**: the object is fetched as the query runner. Passing the connection gives **delegated access**, where the object is fetched as the connection's service account and the grant is auditable and independent of whoever runs the query. The examples throughout this project pass the connection for that reason.
 >
-> **Inside a VPC Service Controls perimeter the recommendation inverts.** Delegated access mints a signed HTTPS URL, and Agent Platform blocks HTTP/HTTPS fetches for projects inside a perimeter — so a delegated-access `ObjectRef`, **including an object table's `ref` column**, fails with `INVALID_ARGUMENT: HTTP links are not supported for requests restricted by VPCSC.` in the output's `status` field. In that environment use the single-argument `OBJ.MAKE_REF(uri)`: direct access sends the Cloud Storage URI to the model with no signed URL in between. This is also a reason to prefer inline `OBJ.MAKE_REF` over object tables inside a perimeter — an object table has no direct-access form.
+> **Inside a VPC Service Controls perimeter the recommendation inverts.** Delegated access mints a signed HTTPS URL, and Agent Platform and Document AI (`AI.CHUNK_DOCUMENT`) block HTTP/HTTPS fetches for projects inside a perimeter — so a delegated-access `ObjectRef` (`OBJ.MAKE_REF(uri, connection)`), **including an object table's `ref` column**, fails with `INVALID_ARGUMENT: HTTP links are not supported for requests restricted by VPCSC.` in the output's `status` field. In that environment use the single-argument `OBJ.MAKE_REF(uri)` (or a direct `'gs://...'` URI literal on `AI.CHUNK_DOCUMENT`): direct access sends the Cloud Storage URI with no signed URL in between. This is also a reason to prefer inline 1-argument `OBJ.MAKE_REF(uri)` over object tables inside a perimeter — an object table has no direct-access form.
 
 **Limitations:**
 - Maximum **20 connections** per project+region for queries referencing ObjectRef values.
@@ -465,13 +466,13 @@ URI string
 
 ## Multimodal Input Patterns by Function
 
-**Every multimodal AI function takes an `ObjectRef`.** What differs between them is only *where the reference goes in the call*: a field of a STRUCT prompt, the second slot of a tuple, a bare positional argument, or a named `content` parameter. There are four shapes, not four pipelines.
+**Every multimodal AI function takes an `ObjectRef`.** What differs between them is only *where the reference goes in the call*: a field of a STRUCT prompt, the second slot of a tuple, a bare positional argument, a named `content` parameter, or a document-chunking TVF input relation. There are five shapes, not five pipelines.
 
 Where the `ObjectRef` comes from is an independent choice:
 
 ```sql
 OBJ.MAKE_REF('gs://bucket/doc.pdf', 'PROJECT.REGION.CONNECTION')  -- inline, no table
-ref                                                                -- object table column
+ref                                                                -- object table or OBJ.LIST column
 ```
 
 ### Shape 1: STRUCT Prompt (most generation functions + AI.IF)
@@ -556,7 +557,7 @@ FROM `project.dataset.docs`;
 
 ### Shape 4: `content` Parameter (Embedding and similarity functions)
 
-Embedding and similarity functions take the reference as the content argument rather than in a prompt. Requires a multimodal embedding endpoint (e.g., `multimodalembedding@001`).
+Embedding and similarity functions take the reference as the content argument rather than in a prompt. Requires a multimodal embedding endpoint (e.g., `multimodalembedding@001` or `gemini-embedding-2`).
 
 **Functions:** `AI.EMBED`, `AI.GENERATE_EMBEDDING`, `ML.GENERATE_EMBEDDING`, `AI.SIMILARITY`
 
@@ -577,6 +578,27 @@ SELECT AI.SIMILARITY(
 ) AS similarity;
 ```
 
+### Shape 5: Document Chunking TVF (`AI.CHUNK_DOCUMENT`)
+
+[`AI.CHUNK_DOCUMENT`](document-processing.md#aichunk_document) accepts **three** document input forms: a `'gs://...'` URI or wildcard literal (`13` output columns), `TABLE object_table` (`13` output columns), or a `(SELECT ...)` subquery returning an `OBJECTREF` column **named `ref`** (`5 + passthrough` output columns). When a subquery projects only `OBJ.MAKE_REF(uri) AS ref`, the result has **6 columns** (`chunk_id`, `content`, `start_page`, `end_page`, `status`, `ref`) with **no top-level `uri`** — read `ref.uri` and filter `WHERE status = ''`:
+
+**Functions:** `AI.CHUNK_DOCUMENT`
+
+```sql
+-- Direct GCS wildcard literal (13 columns, top-level uri)
+SELECT uri, chunk_id, start_page, end_page, content
+FROM AI.CHUNK_DOCUMENT('gs://bucket/docs/*.pdf', chunk_size => 500)
+WHERE status = '';
+
+-- Subquery returning an ObjectRef column named ref (6 columns; read ref.uri)
+SELECT ref.uri AS gcs_uri, chunk_id, content
+FROM AI.CHUNK_DOCUMENT(
+  (SELECT OBJ.MAKE_REF('gs://bucket/doc.pdf') AS ref),
+  chunk_size => 500
+)
+WHERE status = '';
+```
+
 ### Shape Summary
 
 | Shape | Functions | Object Table Required? | Input Method |
@@ -585,7 +607,8 @@ SELECT AI.SIMILARITY(
 | Tuple | AI.SCORE | No (object table is the convenient source) | `('scoring text', ref)` |
 | Bare argument | AI.CLASSIFY, AI.AGG | No (object table is the convenient source) | `AI.CLASSIFY(ref, categories)`, `AI.AGG(STRUCT(ref), prompt)` |
 | `content` parameter | AI.EMBED, AI.SIMILARITY, AI.GENERATE_EMBEDDING, ML.GENERATE_EMBEDDING | No | Pass the `ObjectRef` as the content argument |
+| Document chunking TVF | AI.CHUNK_DOCUMENT | No | `'gs://...'` literal, `TABLE object_table`, or `(SELECT ... ObjectRef)` subquery |
 | Object table (document processing) | ML.PROCESS_DOCUMENT | Yes | Object table rows as input to Document AI processor |
-| Not supported | VECTOR_SEARCH, AI.SEARCH, AI.FORECAST, AI.DETECT_ANOMALIES, AI.PREDICT, AI.EVALUATE | — | Text/numeric input only |
+| Not supported | AI.TRANSLATE, AI.COUNT_TOKENS, VECTOR_SEARCH, AI.SEARCH, AI.FORECAST, AI.DETECT_ANOMALIES, AI.PREDICT, AI.EVALUATE | — | Text/numeric input only |
 
 > **`ObjectRefRuntime` still works everywhere.** Nothing in this section is a breaking change — wrapping a reference in `OBJ.GET_ACCESS_URL` is accepted by every function above. It is simply no longer necessary, and `AI.AGG`'s Known Issues give a reason to prefer the unwrapped form.

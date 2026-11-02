@@ -48,23 +48,15 @@ def build_manifest(
     narrative_dir = skill_dir / "narrative"
 
     reference_files = (
-        sorted(path.name for path in reference_dir.glob("*.md"))
-        if reference_dir.exists()
-        else []
+        sorted(path.name for path in reference_dir.glob("*.md")) if reference_dir.exists() else []
     )
     syntax_files = (
-        sorted(
-            path.name
-            for path in syntax_dir.glob("*.md")
-            if path.name != "INDEX.md"
-        )
+        sorted(path.name for path in syntax_dir.glob("*.md") if path.name != "INDEX.md")
         if syntax_dir.exists()
         else []
     )
     narrative_files = (
-        sorted(path.name for path in narrative_dir.glob("*.md"))
-        if narrative_dir.exists()
-        else []
+        sorted(path.name for path in narrative_dir.glob("*.md")) if narrative_dir.exists() else []
     )
 
     existing: dict[str, object] = {}
@@ -75,14 +67,10 @@ def build_manifest(
             existing = loaded
 
     resolved_version = (
-        version
-        if version is not None
-        else str(existing.get("version", _default_version()))
+        version if version is not None else str(existing.get("version", _default_version()))
     )
     resolved_source_project = (
-        source_project
-        if source_project is not None
-        else existing.get("source_project")
+        source_project if source_project is not None else existing.get("source_project")
     )
     narrative_sources = existing.get("narrative_sources", {})
     if not isinstance(narrative_sources, dict):
@@ -94,8 +82,7 @@ def build_manifest(
         "source_project": resolved_source_project,
         "narrative_sources": narrative_sources,
         "generated_date": date.today().isoformat(),
-        "source_commit": _git_short_hash(skill_dir)
-        or existing.get("source_commit"),
+        "source_commit": _git_short_hash(skill_dir) or existing.get("source_commit"),
         "reference_files": reference_files,
         "syntax_files": syntax_files,
         "narrative_files": narrative_files,

@@ -15,7 +15,7 @@
 
 **Note:** `AI.COUNT_TOKENS` counts **input** tokens only — not thinking or output tokens.
 
-**Text only (Preview):** the input must be a `STRING` — multimodal/ObjectRef prompts are not accepted (verified 2026-07-17), so `full_response` always reports `modality: "TEXT"`. This is a Preview function; multimodal support should be re-evaluated at GA.
+**Text only (GA):** `AI.COUNT_TOKENS` is generally available (announced 2026-10-27) and remains strictly text-only — the input must be a `STRING`. Multimodal `STRUCT` and `ObjectRef` inputs are rejected (`Unable to coerce type STRUCT<...> to expected type STRING`, first verified 2026-07-17 and re-verified at GA on 2026-11-02), so `full_response` always reports `modality: "TEXT"`. Alongside documented `endpoint`, the live GoogleSQL signature also accepts optional named `title => STRING` and `model => STRING` arguments (verified 2026-11-02).
 
 **References:** `RESOURCES.md` (Full syntax reference) | [Official documentation](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-count-tokens) | `setup` (Setup guide)
 
