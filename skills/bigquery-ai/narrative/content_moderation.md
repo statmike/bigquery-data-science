@@ -71,7 +71,7 @@ print(f'Dataset {PROJECT_ID}.{DATASET_ID} ready')
 ```
 
 ```python
-import subprocess as _sp, json as _json
+import subprocess as _sp, json as _json, re as _re
 
 # Create connection (idempotent)
 _sp.run(['bq', 'mk', '--connection', '--location', LOCATION,
@@ -84,10 +84,11 @@ r = _sp.run(['bq', 'show', '--connection', '--format=json',
              '--project_id', PROJECT_ID, '--location', LOCATION, CONNECTION_ID],
             capture_output=True, text=True, check=True)
 sa = _json.loads(r.stdout)['cloudResource']['serviceAccountId']
+sa_display = _re.sub(r'bqcx-\d+-', 'bqcx-000000000000-', sa)
 _sp.run(['gcloud', 'projects', 'add-iam-policy-binding', PROJECT_ID,
          f'--member=serviceAccount:{sa}', '--role=roles/aiplatform.user', '--quiet'],
         capture_output=True, text=True)
-print(f'Connection {CONNECTION_ID} ready (SA: {sa})')
+print(f'Connection {CONNECTION_ID} ready (SA: {sa_display})')
 ```
 
 ```python
@@ -95,7 +96,7 @@ print(f'Connection {CONNECTION_ID} ready (SA: {sa})')
 client.query(f'''
 CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.gemini_flash`
   REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
-  OPTIONS (endpoint = \'gemini-2.5-flash\')
+  OPTIONS (endpoint = 'gemini-3.8-flash')
 ''').result()
 print('Model gemini_flash ready')
 ```
@@ -377,4 +378,37 @@ for _, row in df_agg.iterrows():
     print(f'=== {row["violation_type"]} ===')
     print(row['violation_summary'])
     print()
+```
+
+### Structured moderation queue digests with `AI.AGG(..., output_schema => ...)`
+
+Trust & Safety operations dashboards need machine-readable queue fields — SLA priority tiers, auto-quarantine flags, and policy remediation steps — rather than a single prose block. By adding `output_schema` to `AI.AGG`, BigQuery returns a typed `STRUCT` per `violation_type` containing **only** your declared schema fields (no `status` or `full_response` wrapper), which we unpack directly with `digest.*` alongside `COUNT(*)` and `AVG(severity_score)` (recommended up to **10,000 rows per group**).
+
+```python
+# Typed per-violation queue digest using AI.AGG(..., output_schema => ...)
+query = f"""
+WITH queue_digests AS (
+  SELECT
+    violation_type,
+    COUNT(*) AS flagged_posts,
+    ROUND(AVG(severity_score), 2) AS avg_severity,
+    ROUND(MAX(severity_score), 2) AS max_severity,
+    AI.AGG(
+      post_text,
+      'Summarize the dominant violation pattern, whether auto-quarantine is recommended, and the SLA tier (P0_IMMEDIATE, P1_URGENT, or P2_STANDARD) for this queue. Keep it concise.',
+      output_schema => 'dominant_pattern STRING, auto_quarantine_recommended BOOL, sla_tier STRING'
+    ) AS digest
+  FROM `{PROJECT_ID}.{DATASET_ID}.workflow_mod_scored`
+  GROUP BY violation_type
+)
+SELECT
+  violation_type,
+  flagged_posts,
+  avg_severity,
+  max_severity,
+  digest.*
+FROM queue_digests
+ORDER BY max_severity DESC, avg_severity DESC
+"""
+client.query(query).to_dataframe()
 ```

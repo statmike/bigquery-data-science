@@ -17,10 +17,13 @@
 
 -- =============================================================================
 -- Setup: Create sample data with embeddings
+-- (Uses gemini-embedding-2 with outputDimensionality: 768 so vectors stay under
+--  BigQuery's <= 2,000-dimension limit for CREATE VECTOR INDEX; task_type is
+--  omitted because gemini-embedding-2 is unified task-agnostic)
 -- =============================================================================
 CREATE OR REPLACE TABLE `PROJECT_ID.DATASET.vector_search_products` AS
 SELECT id, product, category, description,
-  (AI.EMBED(content => description, endpoint => 'text-embedding-005', task_type => 'RETRIEVAL_DOCUMENT')).result AS embedding
+  (AI.EMBED(content => description, endpoint => 'gemini-embedding-2', model_params => JSON '{"outputDimensionality": 768}')).result AS embedding
 FROM UNNEST([
   STRUCT(1 AS id, 'Laptop' AS product, 'Computing' AS category, 'High-performance laptop with 16GB RAM and SSD.' AS description),
   STRUCT(2, 'Headphones', 'Audio', 'Wireless noise-cancelling headphones with 30-hour battery.'),
@@ -40,8 +43,8 @@ FROM VECTOR_SEARCH(
   TABLE `PROJECT_ID.DATASET.vector_search_products`,
   'embedding',
   query_value => (AI.EMBED(content => 'comfortable work setup',
-                           endpoint => 'text-embedding-005',
-                           task_type => 'RETRIEVAL_QUERY')).result,
+                           endpoint => 'gemini-embedding-2',
+                           model_params => JSON '{"outputDimensionality": 768}')).result,
   top_k => 3,
   distance_type => 'COSINE'
 );
@@ -58,8 +61,8 @@ FROM VECTOR_SEARCH(
   TABLE `PROJECT_ID.DATASET.vector_search_products`,
   'embedding',
   (SELECT search_term,
-    (AI.EMBED(content => search_term, endpoint => 'text-embedding-005',
-              task_type => 'RETRIEVAL_QUERY')).result AS embedding
+    (AI.EMBED(content => search_term, endpoint => 'gemini-embedding-2',
+              model_params => JSON '{"outputDimensionality": 768}')).result AS embedding
    FROM UNNEST(['audio equipment', 'computer display']) AS search_term),
   top_k => 2,
   distance_type => 'COSINE'
@@ -74,8 +77,8 @@ SELECT base.product, base.description, distance
 FROM VECTOR_SEARCH(
   TABLE `PROJECT_ID.DATASET.vector_search_products`,
   'embedding',
-  query_value => (AI.EMBED(content => 'typing device', endpoint => 'text-embedding-005',
-                           task_type => 'RETRIEVAL_QUERY')).result,
+  query_value => (AI.EMBED(content => 'typing device', endpoint => 'gemini-embedding-2',
+                           model_params => JSON '{"outputDimensionality": 768}')).result,
   top_k => 3,
   distance_type => 'EUCLIDEAN'
 );
@@ -91,8 +94,8 @@ FROM VECTOR_SEARCH(
   (SELECT * FROM `PROJECT_ID.DATASET.vector_search_products` WHERE category = 'Computing'),
   'embedding',
   query_value => (AI.EMBED(content => 'display for programming',
-                           endpoint => 'text-embedding-005',
-                           task_type => 'RETRIEVAL_QUERY')).result,
+                           endpoint => 'gemini-embedding-2',
+                           model_params => JSON '{"outputDimensionality": 768}')).result,
   top_k => 3,
   distance_type => 'COSINE'
 );
@@ -107,8 +110,8 @@ WITH context AS (
     TABLE `PROJECT_ID.DATASET.vector_search_products`,
     'embedding',
     query_value => (AI.EMBED(content => 'ergonomic office',
-                             endpoint => 'text-embedding-005',
-                             task_type => 'RETRIEVAL_QUERY')).result,
+                             endpoint => 'gemini-embedding-2',
+                             model_params => JSON '{"outputDimensionality": 768}')).result,
     top_k => 3, distance_type => 'COSINE'
   )
 )
@@ -132,8 +135,8 @@ FROM VECTOR_SEARCH(
   TABLE `PROJECT_ID.DATASET.vector_search_products`,
   'embedding',
   query_value => (AI.EMBED(content => 'connect two external displays to a laptop',
-                           endpoint => 'text-embedding-005',
-                           task_type => 'RETRIEVAL_QUERY')).result,
+                           endpoint => 'gemini-embedding-2',
+                           model_params => JSON '{"outputDimensionality": 768}')).result,
   lexical_search_columns => ['product', 'description'],
   lexical_search_query_value => 'Thunderbolt 4 docking station',
   top_k => 3,
@@ -155,7 +158,7 @@ FROM VECTOR_SEARCH(
 -- only prose.
 CREATE OR REPLACE TABLE `PROJECT_ID.DATASET.vector_search_catalog` AS
 SELECT id, sku, product, description,
-  (AI.EMBED(content => description, endpoint => 'text-embedding-005', task_type => 'RETRIEVAL_DOCUMENT')).result AS embedding
+  (AI.EMBED(content => description, endpoint => 'gemini-embedding-2', model_params => JSON '{"outputDimensionality": 768}')).result AS embedding
 FROM UNNEST([
   STRUCT(1 AS id, 'TBT-8841' AS sku, 'Thunderbolt Dock' AS product, 'Thunderbolt 4 docking station with dual 4K display support and 90W laptop charging.' AS description),
   STRUCT(2, 'DCK-2210', 'USB-C Hub', 'Seven-port USB-C hub with HDMI output, card reader, and gigabit ethernet.'),
@@ -202,8 +205,8 @@ WITH semantic AS (
     TABLE `PROJECT_ID.DATASET.vector_search_catalog`,
     'embedding',
     query_value => (AI.EMBED(content => 'run two external monitors from one laptop port',
-                             endpoint => 'text-embedding-005',
-                             task_type => 'RETRIEVAL_QUERY')).result,
+                             endpoint => 'gemini-embedding-2',
+                             model_params => JSON '{"outputDimensionality": 768}')).result,
     top_k => 5,
     distance_type => 'COSINE'
   )
@@ -214,8 +217,8 @@ hybrid AS (
     TABLE `PROJECT_ID.DATASET.vector_search_catalog`,
     'embedding',
     query_value => (AI.EMBED(content => 'run two external monitors from one laptop port',
-                             endpoint => 'text-embedding-005',
-                             task_type => 'RETRIEVAL_QUERY')).result,
+                             endpoint => 'gemini-embedding-2',
+                             model_params => JSON '{"outputDimensionality": 768}')).result,
     lexical_search_columns => ['sku'],
     lexical_search_query_value => 'DCK-2210',
     top_k => 5,
@@ -229,8 +232,8 @@ whole_catalog AS (
     TABLE `PROJECT_ID.DATASET.vector_search_catalog`,
     'embedding',
     query_value => (AI.EMBED(content => 'run two external monitors from one laptop port',
-                             endpoint => 'text-embedding-005',
-                             task_type => 'RETRIEVAL_QUERY')).result,
+                             endpoint => 'gemini-embedding-2',
+                             model_params => JSON '{"outputDimensionality": 768}')).result,
     top_k => 24,
     distance_type => 'COSINE'
   )
@@ -335,7 +338,7 @@ ORDER BY h.hybrid_rank NULLS LAST;
 -- not 10; at rank 200, 40, not 20; at rank 500, 51, not 50. So size top_k to at least
 -- R/10 and above that to whatever the reach table above requires; the two gates cross at
 -- top_k = 51. With a small top_k (<= ~30) an exact token only nudges rows already near
--- the top; do not expect recall from it. A 7,275-row catalog makes the cost concrete:
+-- the top; do not expect recall from it. A 7,275-row product catalog makes the cost concrete:
 -- with the wanted row at semantic rank 2,072, top_k => 64 returns nothing because the
 -- pool reached only 640 rows deep — that row needs top_k >= 208. When the identifier is
 -- the entire query and you want certainty, use WHERE sku = @sku — a predicate cannot be
@@ -357,8 +360,8 @@ WITH vector_leg AS (
     TABLE `PROJECT_ID.DATASET.vector_search_catalog`,
     'embedding',
     query_value => (AI.EMBED(content => 'run two external monitors from one laptop port',
-                             endpoint => 'text-embedding-005',
-                             task_type => 'RETRIEVAL_QUERY')).result,
+                             endpoint => 'gemini-embedding-2',
+                             model_params => JSON '{"outputDimensionality": 768}')).result,
     top_k => 24,
     distance_type => 'COSINE'
   )
@@ -369,8 +372,8 @@ hybrid_exact AS (
     TABLE `PROJECT_ID.DATASET.vector_search_catalog`,
     'embedding',
     query_value => (AI.EMBED(content => 'run two external monitors from one laptop port',
-                             endpoint => 'text-embedding-005',
-                             task_type => 'RETRIEVAL_QUERY')).result,
+                             endpoint => 'gemini-embedding-2',
+                             model_params => JSON '{"outputDimensionality": 768}')).result,
     lexical_search_columns => ['sku'],
     lexical_search_query_value => 'DCK-2210',
     top_k => 24,
@@ -383,8 +386,8 @@ hybrid_nomatch AS (
     TABLE `PROJECT_ID.DATASET.vector_search_catalog`,
     'embedding',
     query_value => (AI.EMBED(content => 'run two external monitors from one laptop port',
-                             endpoint => 'text-embedding-005',
-                             task_type => 'RETRIEVAL_QUERY')).result,
+                             endpoint => 'gemini-embedding-2',
+                             model_params => JSON '{"outputDimensionality": 768}')).result,
     lexical_search_columns => ['sku'],
     lexical_search_query_value => 'NOSUCHTOKEN',
     top_k => 24,
@@ -410,7 +413,9 @@ ORDER BY rank_vector;
 -- Example 9: CREATE VECTOR INDEX for hybrid — accelerating the lexical leg
 -- =============================================================================
 -- Hybrid search needs no index. An index only speeds up the lexical leg, and lets
--- AI.SEARCH choose hybrid on its own in AUTO mode. Two rules the DDL enforces:
+-- AI.SEARCH choose hybrid on its own in AUTO mode. Three rules the DDL enforces:
+--   0. The indexed embedding column must have <= 2,000 dimensions (which is why
+--      gemini-embedding-2 embeddings above use {"outputDimensionality": 768}).
 --   1. Every lexical_search_columns entry must also appear in STORING(...), or the
 --      statement fails: "Lexical search column product must be in the list of
 --      stored columns."

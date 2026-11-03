@@ -72,8 +72,8 @@ Its sibling project **[`../bigquery-ai/`](../bigquery-ai/RESOURCES.md)** covers 
 |---|---|
 | Contribution analysis (`CONTRIBUTION_ANALYSIS` model) | [`AI.KEY_DRIVERS`](../bigquery-ai/RESOURCES.md) — the model-free equivalent |
 | TimesFM forecasting (built-in foundation forecaster) | [`AI.FORECAST`, `AI.EVALUATE`, `AI.DETECT_ANOMALIES`](../bigquery-ai/RESOURCES.md) |
-| Document processing | [`ML.PROCESS_DOCUMENT`, `AI.PARSE_DOCUMENT`](../bigquery-ai/reference/document-processing.md) |
-| `CREATE MODEL ... REMOTE` over a **pre-trained Cloud AI service** (`REMOTE_SERVICE_TYPE`, not `endpoint`) | [`ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`, `ML.PROCESS_DOCUMENT`](../bigquery-ai/reference/cloud-ai-service-models.md) — the model object is a handle, nothing trains, and the reader never manages an artifact. [`models/remote/`](models/remote/) covers the other branch: your own Vertex AI Endpoint, consumed with `ML.PREDICT` |
+| Document processing | [`AI.CHUNK_DOCUMENT`, `ML.PROCESS_DOCUMENT`, `AI.PARSE_DOCUMENT`](../bigquery-ai/reference/document-processing.md) |
+| `CREATE MODEL ... REMOTE` over a **pre-trained Cloud AI service** (`REMOTE_SERVICE_TYPE`, not `endpoint`) | [`ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`, `ML.PROCESS_DOCUMENT`](../bigquery-ai/reference/cloud-ai-service-models.md) — the model object is a handle, nothing trains, and the reader never manages an artifact (for zero-DDL per-row translation and layout-aware chunking without `CREATE MODEL`, see [`AI.TRANSLATE`](../bigquery-ai/reference/managed-functions.md#aitranslate) and [`AI.CHUNK_DOCUMENT`](../bigquery-ai/reference/document-processing.md#aichunk_document)). [`models/remote/`](models/remote/) covers the other branch: your own Vertex AI Endpoint, consumed with `ML.PREDICT` |
 | LLM text generation | [`ML.GENERATE_TEXT`, `AI.GENERATE_*`](../bigquery-ai/RESOURCES.md) |
 | Foundation-model embeddings | [foundation `ML.GENERATE_EMBEDDING` / `AI.GENERATE_EMBEDDING`](../bigquery-ai/RESOURCES.md) |
 | Remote-model LLM endpoints | [the remote-model LLM pattern](../bigquery-ai/RESOURCES.md) |

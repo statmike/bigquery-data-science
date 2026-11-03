@@ -114,7 +114,7 @@ SELECT
   statement,
   (AI.GENERATE_BOOL(
     CONCAT(statement, ' is factually accurate'),
-    endpoint => 'gemini-2.5-flash',
+    endpoint => 'gemini-3.8-flash',
     model_params => JSON '{"generation_config": {"temperature": 0}}'
   )).result AS is_accurate
 FROM UNNEST([

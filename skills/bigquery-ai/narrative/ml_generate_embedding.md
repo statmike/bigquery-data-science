@@ -90,7 +90,7 @@ print(f'Connection {CONNECTION_ID} ready (SA: {sa})')
 client.query(f'''
 CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_text`
   REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
-  OPTIONS (endpoint = \'text-embedding-005\')
+  OPTIONS (endpoint = \'gemini-embedding-2\')
 ''').result()
 print('Model embedding_text ready')
 ```
@@ -102,13 +102,15 @@ Progressive examples from simplest to most advanced. Each cell adds one new conc
 
 ### 1. Basic text embedding
 
-Column names are prefixed with `ml_generate_embedding_`. The `flatten_json_output` defaults to TRUE.
+Column names are prefixed with `ml_generate_embedding_`. The `flatten_json_output` parameter defaults to `TRUE`.
+
+> **Note:** `gemini-embedding-2` returns `ml_generate_embedding_result` (3,072 dimensions by default) and `ml_generate_embedding_status`, and omits `ml_generate_embedding_statistics` (which is only returned by legacy text models such as `text-embedding-005` and `gemini-embedding-001`).
 
 ```python
 query = f'''
 SELECT content,
   ARRAY_LENGTH(ml_generate_embedding_result) AS dims,
-  ml_generate_embedding_statistics
+  ml_generate_embedding_status
 FROM ML.GENERATE_EMBEDDING(
   MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_text`,
   (SELECT text AS content
@@ -144,35 +146,22 @@ df_ai = client.query(query_ai).to_dataframe()
 print('AI.GENERATE_EMBEDDING columns:', list(df_ai.columns))
 ```
 
-### 3. Using task_type for retrieval
+### 3. Reducing dimensions with `output_dimensionality`
 
-`task_type` tells the embedding model the intended use of the text, which changes how the embedding is generated. This is a critical configuration choice.
+`gemini-embedding-2` produces unified, task-agnostic 3,072-dimension embeddings and **rejects `task_type` and `title`** (failing with `400 INVALID_ARGUMENT` if `task_type` is supplied; `task_type` such as `RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY` is only used on legacy models like `gemini-embedding-001` and `text-embedding-005`).
 
-**Asymmetric task types** — documents and queries use *different* task types. Use this pattern for retrieval, where what you index differs in intent from what you search with:
-
-| Use Case | Document Task Type | Query Task Type |
-|----------|-------------------|-----------------|
-| Search | `RETRIEVAL_DOCUMENT` | `RETRIEVAL_QUERY` |
-| Question Answering | `RETRIEVAL_DOCUMENT` | `QUESTION_ANSWERING` |
-| Fact Checking | `RETRIEVAL_DOCUMENT` | `FACT_VERIFICATION` |
-| Code Retrieval | `RETRIEVAL_DOCUMENT` | `CODE_RETRIEVAL_QUERY` |
-
-**Symmetric task types** — both sides use the *same* task type:
-- `SEMANTIC_SIMILARITY` — comparing how similar two texts are
-- `CLASSIFICATION` — grouping texts by category
-- `CLUSTERING` — organizing texts into clusters
-
-> **Key point:** If your use case doesn't align with a specific task type, use `RETRIEVAL_DOCUMENT` when indexing and `RETRIEVAL_QUERY` when searching.
+Instead, `gemini-embedding-2` supports Matryoshka dimension reduction via `output_dimensionality` in the options `STRUCT`. Reducing from 3,072 to `768` dimensions keeps vectors within BigQuery's `<= 2,000`-dimension limit for `CREATE VECTOR INDEX`:
 
 ```python
 query = f'''
 SELECT content,
-  ARRAY_LENGTH(ml_generate_embedding_result) AS dims
+  ARRAY_LENGTH(ml_generate_embedding_result) AS dims,
+  ml_generate_embedding_status
 FROM ML.GENERATE_EMBEDDING(
   MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_text`,
   (SELECT text AS content
    FROM UNNEST(['BigQuery', 'Cloud Functions', 'Cloud Storage']) AS text),
-  STRUCT('RETRIEVAL_DOCUMENT' AS task_type)
+  STRUCT(768 AS output_dimensionality, TRUE AS flatten_json_output)
 )
 '''
 client.query(query).to_dataframe()
@@ -206,8 +195,9 @@ FROM ML.GENERATE_EMBEDDING(
 ---
 ## Examples — BigFrames
 
-BigFrames has no direct `ML.GENERATE_EMBEDDING` wrapper. It routes through `AI.GENERATE_EMBEDDING` instead.
-Use `bbq.ai.generate_embedding()` or the `TextEmbeddingGenerator` class.
+BigFrames has two ways to generate embeddings:
+- **`bigframes.bigquery.ai.generate_embedding` (`bbq.ai.generate_embedding`) / `bbq.ai.embed` (Recommended):** Wraps `AI.GENERATE_EMBEDDING` / `AI.EMBED` directly and supports `gemini-embedding-2` with zero client-side warnings.
+- **`bigframes.ml.llm.TextEmbeddingGenerator` (Legacy wrapper):** In `bigframes 2.51.0`, `TextEmbeddingGenerator` validates `model_name` against a hardcoded client-side tuple `_TEXT_EMBEDDING_ENDPOINTS = ('text-embedding-005', 'text-embedding-004', 'text-multilingual-embedding-002')` and its `.predict()` method queries `ml_generate_embedding_statistics` (which `gemini-embedding-2` omits). Use `'text-embedding-005'` if maintaining existing `TextEmbeddingGenerator` code, and prefer `bbq.ai.embed` or `bbq.ai.generate_embedding` for new code.
 
 ```python
 import bigframes.pandas as bpd
@@ -217,12 +207,24 @@ bpd.options.bigquery.project = PROJECT_ID
 bpd.options.bigquery.location = LOCATION
 ```
 
-### Using bbq.ai.generate_embedding (wraps AI.GENERATE_EMBEDDING)
+### Using `bbq.ai.generate_embedding` (recommended) and legacy `TextEmbeddingGenerator`
 
 ```python
+from bigframes.ml.llm import TextEmbeddingGenerator
+
 df = bpd.DataFrame({'content': ['BigQuery', 'Cloud Storage', 'Cloud Functions']})
 
+# Recommended: bbq.ai.generate_embedding with gemini-embedding-2
 model_name = f'{PROJECT_ID}.{DATASET_ID}.embedding_text'
 result = bbq.ai.generate_embedding(model_name, df)
-result[['content']].to_pandas()
+print('bbq.ai.generate_embedding (gemini-embedding-2):')
+print(result[['content', 'status']].to_pandas())
+
+# Legacy: bigframes.ml.llm.TextEmbeddingGenerator (uses _TEXT_EMBEDDING_ENDPOINTS allowlist)
+legacy_embedder = TextEmbeddingGenerator(
+    model_name='text-embedding-005',
+    connection_name=f'{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}',
+)
+legacy_df = legacy_embedder.predict(df)
+legacy_df[['content', 'ml_generate_embedding_status']].to_pandas()
 ```

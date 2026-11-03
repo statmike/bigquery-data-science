@@ -67,8 +67,9 @@ def test_get_skills_dir_and_list_bundled_skills() -> None:
     assert by_name["bigquery-data-science"]["reference_count"] == 2
     assert by_name["bigquery-ml"]["syntax_count"] == 93
     assert by_name["bigquery-ml"]["narrative_count"] == 61
-    assert by_name["bigquery-ai"]["syntax_count"] == 44
-    assert by_name["bigquery-ai"]["narrative_count"] == 43
+    assert by_name["bigquery-ai"]["syntax_count"] == 46
+    assert by_name["bigquery-ai"]["narrative_count"] == 45
+    assert not (get_skills_dir() / "bigquery-ai" / "narrative" / "overview.md").exists()
     assert by_name["bigquery-mlops"]["reference_count"] == 4
     assert by_name["bigquery-mlops"]["syntax_count"] == 0
     assert by_name["bigquery-mlops"]["narrative_count"] == 0
@@ -90,9 +91,7 @@ def test_list_bundled_skills_edge_cases(tmp_path: Path) -> None:
         "---\nname: custom-extra-skill\ndescription: Custom skill.\n---\n# Title\n",
         encoding="utf-8",
     )
-    (extra_dir / "skill.manifest.json").write_text(
-        "{invalid json", encoding="utf-8"
-    )
+    (extra_dir / "skill.manifest.json").write_text("{invalid json", encoding="utf-8")
     listed = list_bundled_skills(custom_root)
     assert len(listed) == 1
     assert listed[0]["name"] == "custom-extra-skill"
@@ -228,9 +227,7 @@ def test_lookup_symbol_arima_plus_and_case_insensitivity() -> None:
     assert "TIME_SERIES_TIMESTAMP_COL" in upper_res.format_text()
     assert lower_res.syntax_card_path == upper_res.syntax_card_path
     assert tick_res.syntax_card_path == upper_res.syntax_card_path
-    assert any(
-        "arima_plus.md" in nar for nar in upper_res.related_narratives
-    )
+    assert any("arima_plus.md" in nar for nar in upper_res.related_narratives)
 
 
 def test_lookup_symbol_across_ai_and_ml_functions() -> None:
@@ -272,9 +269,7 @@ def test_lookup_symbol_canonical_aliases_and_body_fallback(
     ):
         res = lookup_symbol(alias)
         assert res.found is True, f"Expected alias {alias} to resolve"
-        assert res.syntax_card_path, (
-            f"Expected non-empty syntax_card_path for {alias}"
-        )
+        assert res.syntax_card_path, f"Expected non-empty syntax_card_path for {alias}"
 
     # Test secondary body-token fallback when H1/stem do not match
     custom_skills = tmp_path / "skills"
@@ -375,9 +370,7 @@ def test_triage_task_across_all_nine_domains_and_word_boundaries() -> None:
     categorical = triage_task("encode categorical columns for linear regression")
     assert "Feature Retrieval" in categorical.category
 
-    average_spend = triage_task(
-        "predict average customer spend from tabular features"
-    )
+    average_spend = triage_task("predict average customer spend from tabular features")
     assert "Tabular Prediction" in average_spend.category
 
     provision = triage_task("provisioned throughput quota for gemini")
@@ -400,23 +393,17 @@ def test_triage_task_across_all_nine_domains_and_word_boundaries() -> None:
     assert "**Collaborating Skills:**" in mlops_orch.format_text()
     assert mlops_orch.to_dict()["recommended_skills"] == mlops_orch.recommended_skills
 
-    mlops_ai_pipe = triage_task(
-        "orchestrate AI.GENERATE and VECTOR_SEARCH with Cloud Workflows"
-    )
+    mlops_ai_pipe = triage_task("orchestrate AI.GENERATE and VECTOR_SEARCH with Cloud Workflows")
     assert set(mlops_ai_pipe.recommended_skills) >= {
         "bigquery-ai",
         "bigquery-mlops",
     }
 
-    mlops_wf = triage_task(
-        "orchestrate BigQuery pipelines with Cloud Workflows and Dataform"
-    )
+    mlops_wf = triage_task("orchestrate BigQuery pipelines with Cloud Workflows and Dataform")
     assert mlops_wf.recommended_skill == "bigquery-mlops"
     assert "bigquery-ai" in mlops_wf.recommended_skills
 
-    mlops_drift = triage_task(
-        "monitor feature drift with ML.VALIDATE_DATA_DRIFT and export ONNX"
-    )
+    mlops_drift = triage_task("monitor feature drift with ML.VALIDATE_DATA_DRIFT and export ONNX")
     assert mlops_drift.recommended_skill == "bigquery-mlops"
     assert "ML.VALIDATE_DATA_DRIFT" in mlops_drift.format_text()
 
@@ -458,28 +445,19 @@ def test_get_walkthrough_resolves_narratives_and_variants() -> None:
 
 
 def test_mcp_server_jsonrpc_protocol_and_tools() -> None:
-    init_resp = handle_message(
-        {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}}
-    )
+    init_resp = handle_message({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
     assert init_resp is not None
     result = init_resp["result"]
     assert isinstance(result, dict)
     assert result["serverInfo"]["version"] == bigquery_data_science.__version__
 
     # Notification returns None
-    assert (
-        handle_message(
-            {"jsonrpc": "2.0", "method": "notifications/initialized"}
-        )
-        is None
-    )
+    assert handle_message({"jsonrpc": "2.0", "method": "notifications/initialized"}) is None
 
     ping_resp = handle_message({"jsonrpc": "2.0", "id": 10, "method": "ping"})
     assert ping_resp == {"jsonrpc": "2.0", "id": 10, "result": {}}
 
-    list_resp = handle_message(
-        {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}}
-    )
+    list_resp = handle_message({"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}})
     assert list_resp is not None
     tools = list_resp["result"]["tools"]  # type: ignore[index]
     tool_names = {t["name"] for t in tools}
@@ -514,7 +492,7 @@ def test_mcp_server_jsonrpc_protocol_and_tools() -> None:
         (
             61,
             "review_bigquery_sql",
-            {"sql": "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.5-flash')"},
+            {"sql": "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.8-flash')"},
         ),
     ):
         call_resp = handle_message(
@@ -550,9 +528,7 @@ def test_mcp_server_jsonrpc_protocol_and_tools() -> None:
         assert bad_resp is not None
         assert bad_resp["result"]["isError"] is True  # type: ignore[index]
 
-    err_method = handle_message(
-        {"jsonrpc": "2.0", "id": 7, "method": "unknown/method"}
-    )
+    err_method = handle_message({"jsonrpc": "2.0", "id": 7, "method": "unknown/method"})
     assert err_method is not None
     assert err_method["error"]["code"] == -32601  # type: ignore[index]
 
@@ -578,25 +554,15 @@ def test_mcp_serve_stdio_content_length_and_error_recovery() -> None:
     ).encode() + ping_bytes
 
     notif_line = (
-        json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
-        + "\n"
+        json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}) + "\n"
     ).encode()
     bad_header = b"Content-Length: invalid\r\n"
     bad_json = b"{malformed json\n"
     non_dict = b"[1, 2, 3]\n"
-    line_req = (
-        json.dumps({"jsonrpc": "2.0", "id": 2, "method": "ping"}) + "\n"
-    ).encode()
+    line_req = (json.dumps({"jsonrpc": "2.0", "id": 2, "method": "ping"}) + "\n").encode()
 
     in_stream = io.BytesIO(
-        b"\n"
-        + framed
-        + b"\n"
-        + notif_line
-        + bad_header
-        + bad_json
-        + non_dict
-        + line_req
+        b"\n" + framed + b"\n" + notif_line + bad_header + bad_json + non_dict + line_req
     )
     out_stream = io.BytesIO()
     assert serve_stdio(stdin=in_stream, stdout=out_stream) == 0
@@ -634,10 +600,24 @@ def test_cli_user_and_maintainer_subcommands_end_to_end(tmp_path: Path) -> None:
     assert main(["search", "xyznonexistenttoken999888"]) == 0
     assert main(["triage", "forecast daily demand"]) == 0
     assert main(["validate", "skills", "--all"]) == 0
-    assert main(["check-syntax-sync", "skills", "--repo-root", "."]) == 0
-    assert main(["sync-syntax", "skills", "--repo-root", ".", "--check"]) == 0
-    assert main(["check-narratives", "skills", "--repo-root", "."]) == 0
-    assert main(["manifest", "skills", "--check"]) == 0
+    if (
+        main(["check-narratives", "skills", "--repo-root", "."]) == 0
+        and main(["manifest", "skills", "--check"]) == 0
+    ):
+        skills_target = "skills"
+    else:
+        import shutil
+
+        staged_skills = tmp_path / "staged_skills"
+        shutil.copytree("skills", staged_skills)
+        skills_target = str(staged_skills)
+        assert main(["sync-syntax", skills_target, "--repo-root", "."]) == 0
+        assert main(["sync-narratives", skills_target, "--repo-root", "."]) == 0
+        assert main(["manifest", skills_target]) == 0
+    assert main(["check-syntax-sync", skills_target, "--repo-root", "."]) == 0
+    assert main(["sync-syntax", skills_target, "--repo-root", ".", "--check"]) == 0
+    assert main(["check-narratives", skills_target, "--repo-root", "."]) == 0
+    assert main(["manifest", skills_target, "--check"]) == 0
     assert main(["check-reference", "bigquery-ml"]) == 0
     assert (
         main(
@@ -652,9 +632,7 @@ def test_cli_user_and_maintainer_subcommands_end_to_end(tmp_path: Path) -> None:
         )
         == 0
     )
-    assert (
-        main(["check-pinned-models", "bigquery-ml", "--repo-root", "."]) == 0
-    )
+    assert main(["check-pinned-models", "bigquery-ml", "--repo-root", "."]) == 0
 
 
 def test_mcp_resources_and_prompts_protocol() -> None:
@@ -782,8 +760,7 @@ def test_mcp_resources_and_prompts_protocol() -> None:
 
 def test_review_sql_detects_all_empirical_guardrails(tmp_path: Path) -> None:
     clean_sql = (
-        "SELECT AI.GENERATE('Summarize', endpoint => 'gemini-3.5-flash') "
-        "FROM my_dataset.my_table"
+        "SELECT AI.GENERATE('Summarize', endpoint => 'gemini-3.8-flash') FROM my_dataset.my_table"
     )
     clean_res = review_sql(clean_sql)
     assert clean_res.ok is True
@@ -885,6 +862,389 @@ def test_adk_toolset_wrappers() -> None:
     assert len(hits) == 2
     wt = adk_get_walkthrough("ai_agg")
     assert wt["found"] is True
-    rev = adk_review("SELECT AI.GENERATE('hi', endpoint => 'gemini-3.5-flash')")
+    rev = adk_review("SELECT AI.GENERATE('hi', endpoint => 'gemini-3.8-flash')")
     assert rev["ok"] is True
 
+
+def test_catalog_triage_lookup_and_walkthrough_v0110_functions(
+    tmp_path: Path,
+) -> None:
+    chunk_triage = triage_task("chunk PDF documents with AI.CHUNK_DOCUMENT")
+    assert chunk_triage.recommended_skill == "bigquery-ai"
+    chunk_text = chunk_triage.format_text()
+    assert "AI.CHUNK_DOCUMENT" in chunk_text
+    assert "AI.PARSE_DOCUMENT" in chunk_text
+    assert "bq-created-layout-parser" in chunk_text
+
+    trans_triage = triage_task("translate multilingual text with translation-llm")
+    assert trans_triage.recommended_skill == "bigquery-ai"
+    trans_text = trans_triage.format_text()
+    assert "AI.TRANSLATE" in trans_text
+    assert "ML.TRANSLATE" in trans_text
+    assert "status = 'OK'" in trans_text
+
+    gen_triage = triage_task("classify support tickets with AI.CLASSIFY and AI.IF")
+    gen_text = gen_triage.format_text()
+    assert "AI.COUNT_TOKENS" in gen_text
+    assert "optimization_mode" in gen_text
+    assert "output_schema" in gen_text
+
+    emb_triage = triage_task("embed documents for RAG with AI.EMBED")
+    emb_text = emb_triage.format_text()
+    assert "gemini-embedding-2" in emb_text
+    assert "embeddinggemma-300m" in emb_text
+    assert "AI.CHUNK_DOCUMENT" in emb_text
+
+    tab_triage = triage_task("predict customer churn probability from tabular features")
+    assert "2026-11-17" in tab_triage.format_text()
+    assert "ML.METRICS" in tab_triage.format_text()
+
+    alias_triage = triage_task("reusable column aliases for AI.GENERATE struct unpacking")
+    assert alias_triage.recommended_skill == "bigquery-ai"
+    assert "reusable_column_aliases_mode" in alias_triage.format_text()
+
+    for query_symbol, expected_canonical in (
+        ("AI.CHUNK_DOCUMENT", "AI.CHUNK_DOCUMENT"),
+        ("chunk_document", "AI.CHUNK_DOCUMENT"),
+        ("document_chunking", "AI.CHUNK_DOCUMENT"),
+        ("aichunk_document", "AI.CHUNK_DOCUMENT"),
+        ("AI.TRANSLATE", "AI.TRANSLATE"),
+        ("translate", "AI.TRANSLATE"),
+        ("aitranslate", "AI.TRANSLATE"),
+        ("translation-llm", "AI.TRANSLATE"),
+    ):
+        lookup_res = lookup_symbol(query_symbol)
+        assert lookup_res.found is True
+        assert lookup_res.skill == "bigquery-ai"
+        assert lookup_res.prerequisites
+        assert lookup_res.gotchas
+        assert expected_canonical in lookup_res.format_text()
+
+    gotcha_hits = search_catalog("AI.TRANSLATE", lens_filter="gotchas", limit=5)
+    assert gotcha_hits
+    assert any("status = 'OK'" in hit.snippet for hit in gotcha_hits)
+
+    custom_skills = tmp_path / "skills"
+    syn_dir = custom_skills / "bigquery-ai" / "syntax"
+    nar_dir = custom_skills / "bigquery-ai" / "narrative"
+    syn_dir.mkdir(parents=True)
+    nar_dir.mkdir(parents=True)
+    (syn_dir / "aichunk_document.md").write_text(
+        "# `AI.CHUNK_DOCUMENT`\n\nChunks documents with `chunk_size => 500`.\n",
+        encoding="utf-8",
+    )
+    (syn_dir / "aitranslate.md").write_text(
+        "# `AI.TRANSLATE`\n\nTranslates text with `model => 'nmt'`.\n",
+        encoding="utf-8",
+    )
+    (nar_dir / "ai_chunk_document.md").write_text(
+        "# AI.CHUNK_DOCUMENT Walkthrough\n",
+        encoding="utf-8",
+    )
+    (nar_dir / "ai_translate.md").write_text(
+        "# AI.TRANSLATE Walkthrough\n",
+        encoding="utf-8",
+    )
+    on_disk_chunk = lookup_symbol("layout_parser", skills_dir=custom_skills)
+    assert on_disk_chunk.found is True
+    assert on_disk_chunk.syntax_card_path == "bigquery-ai/syntax/aichunk_document.md"
+    wt_chunk = get_walkthrough("chunk_document", skills_dir=custom_skills)
+    assert wt_chunk["found"] is True
+    assert wt_chunk["path"] == "bigquery-ai/narrative/ai_chunk_document.md"
+    wt_trans = get_walkthrough("tllm", skills_dir=custom_skills)
+    assert wt_trans["found"] is True
+    assert wt_trans["path"] == "bigquery-ai/narrative/ai_translate.md"
+
+    for invalid_topic in ("", "   ", "../../README", "```", "pipeline_"):
+        invalid_wt = get_walkthrough(invalid_topic)
+        assert invalid_wt["found"] is False
+        assert invalid_wt["path"] == ""
+
+
+def test_review_sql_v0110_translate_chunk_document_and_tabfm_rules() -> None:
+    clean_chunk = (
+        "SELECT chunk_id, content FROM AI.CHUNK_DOCUMENT("
+        "'gs://my-bucket/*.pdf', chunk_size => 500) WHERE status = ''"
+    )
+    res_chunk = review_sql(clean_chunk)
+    assert res_chunk.ok is True
+    assert res_chunk.findings == []
+
+    clean_trans = (
+        "SELECT tr.result FROM ("
+        "SELECT AI.TRANSLATE(body, 'ja', model => 'translation-llm', "
+        "return_details => TRUE) AS tr FROM docs) WHERE tr.status = 'OK'"
+    )
+    res_trans = review_sql(clean_trans)
+    assert res_trans.ok is True
+    assert res_trans.findings == []
+
+    # Mixed queries: zero false positives on status = '' or connection_id =>
+    mixed_chunk_trans = (
+        "SELECT chunk_id, AI.TRANSLATE(content, 'es', model => 'nmt') AS es_text "
+        "FROM AI.CHUNK_DOCUMENT('gs://my-bucket/doc.pdf') WHERE status = ''"
+    )
+    assert review_sql(mixed_chunk_trans).findings == []
+
+    mixed_gen_trans = (
+        "SELECT AI.TRANSLATE(body, 'es'), "
+        "AI.GENERATE(body, connection_id => 'us.conn', endpoint => 'gemini-3.8-flash') "
+        "FROM docs"
+    )
+    assert review_sql(mixed_gen_trans).findings == []
+
+    # Adversarial edge cases: error-audit status filter, aliased CTEs, scalar status = '',
+    # string literals containing '--', '/*', 'AI.PARSE_DOCUMENT', and options => on CHUNK_DOCUMENT
+    assert (
+        review_sql(
+            "SELECT * FROM AI.CHUNK_DOCUMENT('gs://b/d.pdf') WHERE status IS NULL OR status != ''"
+        ).findings
+        == []
+    )
+    assert (
+        review_sql("SELECT AI.TRANSLATE(body, 'es') FROM tickets WHERE status = ''").findings == []
+    )
+    assert (
+        review_sql(
+            "WITH c AS ("
+            "SELECT content FROM AI.CHUNK_DOCUMENT('gs://b/d.pdf') AS ch WHERE ch.status = '') "
+            "SELECT AI.TRANSLATE(content, 'es', return_details => TRUE) FROM c"
+        ).findings
+        == []
+    )
+    assert (
+        review_sql(
+            "SELECT gen.result, tr.result FROM ("
+            "SELECT AI.GENERATE(p, endpoint => 'gemini-3.8-flash') AS gen, "
+            "AI.TRANSLATE(p, 'es', return_details => TRUE) AS tr FROM t) "
+            "WHERE gen.status = '' AND tr.status = 'OK'"
+        ).findings
+        == []
+    )
+    assert (
+        review_sql(
+            "SELECT AI.TRANSLATE("
+            "'AI.PARSE_DOCUMENT was replaced by AI.CHUNK_DOCUMENT', 'es', model => 'nmt')"
+        ).findings
+        == []
+    )
+
+    comment_in_str = review_sql(
+        "SELECT AI.TRANSLATE('Hello -- world ) test', 'es', connection_id => 'us.conn')"
+    )
+    assert comment_in_str.ok is False
+    assert any(f.rule == "AI_TRANSLATE_CONNECTION_ID" for f in comment_in_str.findings)
+
+    wildcard_and_comment = review_sql(
+        "SELECT * FROM AI.CHUNK_DOCUMENT('gs://my-bucket/*.pdf') WHERE status = '';\n"
+        "SELECT * FROM AI.CHUNK_DOCUMENT('gs://my-bucket/doc.pdf', chunk_size => 5000);\n"
+        "/* trailing comment */"
+    )
+    assert wildcard_and_comment.ok is False
+    assert any(f.rule == "AI_CHUNK_DOCUMENT_CHUNK_SIZE" for f in wildcard_and_comment.findings)
+
+    err_options = review_sql(
+        "SELECT * FROM AI.CHUNK_DOCUMENT('gs://b/f.pdf', options => JSON '{\"chunk_size\": 500}')"
+    )
+    assert err_options.ok is False
+    assert any(f.rule == "AI_CHUNK_DOCUMENT_OPTIONS_ARG" for f in err_options.findings)
+
+    err_float_size = review_sql(
+        "SELECT * FROM AI.CHUNK_DOCUMENT('gs://b/f.pdf', chunk_size => 500.5)"
+    )
+    assert err_float_size.ok is False
+    assert any(f.rule == "AI_CHUNK_DOCUMENT_CHUNK_SIZE" for f in err_float_size.findings)
+
+    warn_trans_null = review_sql(
+        "SELECT tr.result FROM ("
+        "SELECT AI.TRANSLATE(body, 'es', return_details => TRUE) AS tr FROM t) "
+        "WHERE tr.status IS NULL"
+    )
+    assert any(f.rule == "AI_TRANSLATE_STATUS_OK" for f in warn_trans_null.findings)
+
+    # Negative fixtures
+    err_conn = review_sql("SELECT AI.TRANSLATE(body, 'es', connection_id => 'us.conn') FROM docs")
+    assert err_conn.ok is False
+    assert any(f.rule == "AI_TRANSLATE_CONNECTION_ID" for f in err_conn.findings)
+
+    warn_status = review_sql(
+        "SELECT * FROM (SELECT AI.TRANSLATE(body, 'es', return_details => TRUE) "
+        "AS tr FROM docs) WHERE tr.status = ''"
+    )
+    assert any(f.rule == "AI_TRANSLATE_STATUS_OK" for f in warn_status.findings)
+
+    err_size = review_sql(
+        "SELECT * FROM AI.CHUNK_DOCUMENT('gs://my-bucket/doc.pdf', chunk_size => 2500)"
+    )
+    assert err_size.ok is False
+    assert any(f.rule == "AI_CHUNK_DOCUMENT_CHUNK_SIZE" for f in err_size.findings)
+
+    warn_chunk_null = review_sql(
+        "SELECT * FROM AI.CHUNK_DOCUMENT('gs://my-bucket/doc.pdf') WHERE status IS NULL"
+    )
+    assert any(f.rule == "AI_CHUNK_DOCUMENT_STATUS_FILTER" for f in warn_chunk_null.findings)
+
+    retired_res = review_sql("SELECT * FROM AI.PARSE_DOCUMENT(TABLE docs)")
+    assert retired_res.ok is False
+    retired_finding = next(f for f in retired_res.findings if f.rule == "RETIRED_FUNCTION")
+    assert retired_finding.remediation.index(
+        "AI.CHUNK_DOCUMENT"
+    ) < retired_finding.remediation.index("ML.PROCESS_DOCUMENT")
+
+    deprecated_ep = review_sql(
+        "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.1-flash-lite-preview')"
+    )
+    assert deprecated_ep.ok is False
+    ep_finding = next(f for f in deprecated_ep.findings if f.rule == "DEPRECATED_MODEL_ENDPOINT")
+    assert "gemini-3.1-flash-lite" in ep_finding.remediation
+    assert "gemini-3.8-flash" in ep_finding.remediation
+
+    unlisted_ep = review_sql("SELECT AI.GENERATE('hi', endpoint => 'gemini-1.5-pro-002')")
+    assert unlisted_ep.ok is False
+    unlisted_finding = next(
+        f for f in unlisted_ep.findings if f.rule == "DEPRECATED_MODEL_ENDPOINT"
+    )
+    assert "gemini-3.8-flash" in unlisted_finding.remediation
+    assert "gemini-4-argon" in unlisted_finding.remediation
+    assert "gemini-embedding-2" in unlisted_finding.remediation
+
+    unpinned_gen = review_sql("SELECT AI.GENERATE('hi')")
+    unpinned_finding = next(f for f in unpinned_gen.findings if f.rule == "UNPINNED_AI_ENDPOINT")
+    assert "gemini-3.8-flash" in unpinned_finding.remediation
+    assert "gemini-4-argon" in unpinned_finding.remediation
+
+    # gemini-embedding-2 rejects task_type and title (inline and via CREATE MODEL handle)
+    emb2_task_type = review_sql(
+        "SELECT AI.EMBED(body, connection_id => 'us.conn', "
+        "endpoint => 'gemini-embedding-2', task_type => 'RETRIEVAL_DOCUMENT') FROM docs"
+    )
+    assert emb2_task_type.ok is True
+    assert emb2_task_type.error_count == 0
+    assert emb2_task_type.warning_count == 1
+    assert emb2_task_type.findings[0].code == "GEMINI_EMBEDDING_2_UNSUPPORTED_ARGS"
+
+    emb2_title = review_sql(
+        "SELECT AI.EMBED(body, connection_id => 'us.conn', "
+        "endpoint => 'gemini-embedding-2', title => 'Doc 1') FROM docs"
+    )
+    assert any(f.rule == "GEMINI_EMBEDDING_2_UNSUPPORTED_ARGS" for f in emb2_title.findings)
+
+    emb2_handle_struct = review_sql(
+        "CREATE OR REPLACE MODEL `p.d.emb_m` REMOTE WITH CONNECTION `p.us.c` "
+        "OPTIONS (endpoint = 'gemini-embedding-2');\n"
+        "SELECT * FROM AI.GENERATE_EMBEDDING(MODEL `p.d.emb_m`, TABLE docs, "
+        "STRUCT('RETRIEVAL_DOCUMENT' AS task_type));"
+    )
+    assert any(f.rule == "GEMINI_EMBEDDING_2_UNSUPPORTED_ARGS" for f in emb2_handle_struct.findings)
+
+    # Multi-statement script where stmt 1 uses gemini-embedding-2 cleanly and stmt 2 uses
+    # task_type with gemini-embedding-001 (plus selecting column 'title') is clean
+    emb2_multi_clean = review_sql(
+        "SELECT title, AI.EMBED(body, connection_id => 'us.conn', "
+        "endpoint => 'gemini-embedding-2', "
+        "model_params => JSON '{\"outputDimensionality\": 768}') FROM docs;\n"
+        "SELECT AI.EMBED(body, connection_id => 'us.conn', "
+        "endpoint => 'gemini-embedding-001', task_type => 'RETRIEVAL_DOCUMENT', "
+        "title => 'Doc Title') FROM docs;"
+    )
+    assert emb2_multi_clean.findings == []
+
+    for fn_expr in (
+        "SELECT * FROM AI.CHUNK_DOCUMENT(OBJ.GET_ACCESS_URL(ref, 'r'))",
+        "SELECT AI.SIMILARITY(OBJ.GET_ACCESS_URL(ref, 'r'), 'shoe') FROM docs",
+        "SELECT AI.AGG(OBJ.GET_ACCESS_URL(ref, 'r'), 'Summarize') FROM docs",
+    ):
+        url_res = review_sql(fn_expr)
+        assert any(f.rule == "UNNECESSARY_GET_ACCESS_URL" for f in url_res.findings)
+
+    predict_res = review_sql(
+        "SELECT * FROM AI.PREDICT(TABLE train_t, TABLE pred_t, label_col => 'y')"
+    )
+    assert predict_res.ok is True
+    predict_info = next(
+        f for f in predict_res.findings if f.rule == "AI_PREDICT_RESERVATION_REMINDER"
+    )
+    assert "2026-11-17" in predict_info.message
+
+
+def test_live_skills_v0110_chunk_translate_and_newly_ga_functions() -> None:
+    for sym, card_rel, nar_slug in (
+        ("AI.CHUNK_DOCUMENT", "bigquery-ai/syntax/aichunk_document.md", "ai_chunk_document"),
+        ("AI.TRANSLATE", "bigquery-ai/syntax/aitranslate.md", "ai_translate"),
+    ):
+        res = lookup_symbol(sym)
+        assert res.found is True
+        assert res.skill == "bigquery-ai"
+        assert res.syntax_card_path == card_rel
+        assert f"bigquery-ai/narrative/{nar_slug}.md" in res.related_narratives
+        assert res.prerequisites, f"Missing prerequisites row for {sym}"
+        assert str(res.prerequisites[0].get("Status", "")).startswith("GA")
+
+        wt = get_walkthrough(nar_slug)
+        assert wt["found"] is True
+        assert wt["skill"] == "bigquery-ai"
+        assert sym in wt["content"]
+
+    rag_wt = get_walkthrough("document_rag")
+    assert rag_wt["found"] is True
+    assert "AI.CHUNK_DOCUMENT" in rag_wt["content"]
+
+    newly_ga = (
+        "AI.COUNT_TOKENS",
+        "AI.IF",
+        "AI.SCORE",
+        "AI.CLASSIFY",
+        "AI.EMBED",
+        "AI.SIMILARITY",
+    )
+    for sym in newly_ga:
+        info = lookup_symbol(sym)
+        assert info.found is True
+        assert info.skill == "bigquery-ai"
+        assert info.syntax_card_path is not None
+        assert info.prerequisites, f"Missing namespace-matrix row for {sym}"
+        status_val = str(info.prerequisites[0].get("Status", ""))
+        assert status_val.startswith("GA"), f"Expected GA status for {sym}, got {status_val!r}"
+        assert status_val != "Preview"
+
+    for sym, subfeature in (
+        ("AI.IF", "optimization_mode"),
+        ("AI.CLASSIFY", "optimization_mode"),
+        ("AI.EMBED", "embeddinggemma-300m"),
+        ("AI.SIMILARITY", "embeddinggemma-300m"),
+    ):
+        info = lookup_symbol(sym)
+        combined = (info.syntax_content or "") + "\n" + "\n".join(info.gotchas)
+        assert subfeature in combined
+
+    ga_sql = """
+    SELECT
+      AI.COUNT_TOKENS('hello world', endpoint => 'gemini-3.8-flash') AS tok,
+      AI.IF(('Is positive?', review), connection_id => 'us.conn') AS is_pos,
+      AI.SCORE(('Rate clarity 1-5', review), connection_id => 'us.conn') AS clarity,
+      AI.CLASSIFY(review, categories => ['billing', 'tech'], connection_id => 'us.conn') AS cat,
+      AI.EMBED(
+        content => review, connection_id => 'us.conn', endpoint => 'gemini-embedding-2'
+      ) AS emb,
+      AI.SIMILARITY(
+        content1 => 'a', content2 => 'b',
+        connection_id => 'us.conn', endpoint => 'gemini-embedding-2'
+      ) AS sim
+    FROM my_dataset.reviews;
+    """
+    rev = review_sql(ga_sql)
+    assert rev.ok is True
+    assert set(rev.detected_symbols) >= set(newly_ga)
+
+    agg_sql = """
+    SELECT AI.AGG(
+      review,
+      'Summarize the main themes and overall sentiment.',
+      connection_id => 'us.conn',
+      output_schema => 'themes ARRAY<STRING>, sentiment STRING'
+    ) AS summary
+    FROM my_dataset.reviews;
+    """
+    agg_rev = review_sql(agg_sql)
+    assert agg_rev.ok is True
+    assert "AI.AGG" in agg_rev.detected_symbols

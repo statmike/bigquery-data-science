@@ -55,8 +55,7 @@ def get_skill_path(
     candidate = root / skill_name
     if not candidate.is_dir():
         raise FileNotFoundError(
-            f"Unknown skill '{skill_name}'. Available skills: "
-            f"{', '.join(SKILL_NAMES)}"
+            f"Unknown skill '{skill_name}'. Available skills: {', '.join(SKILL_NAMES)}"
         )
     return candidate
 
@@ -81,15 +80,11 @@ def list_bundled_skills(
         return []
 
     skills: list[dict[str, object]] = []
-    ordered_dirs = [
-        root / name for name in SKILL_NAMES if (root / name).is_dir()
-    ]
+    ordered_dirs = [root / name for name in SKILL_NAMES if (root / name).is_dir()]
     extra_dirs = [
         path
         for path in sorted(root.iterdir())
-        if path.is_dir()
-        and (path / "SKILL.md").is_file()
-        and path.name not in SKILL_NAMES
+        if path.is_dir() and (path / "SKILL.md").is_file() and path.name not in SKILL_NAMES
     ]
 
     import bigquery_data_science
@@ -120,9 +115,7 @@ def list_bundled_skills(
             {
                 "name": skill_dir.name,
                 "version": version,
-                "description": _extract_skill_description(
-                    skill_dir / "SKILL.md"
-                ),
+                "description": _extract_skill_description(skill_dir / "SKILL.md"),
                 "path": str(skill_dir),
                 "reference_count": ref_count,
                 "syntax_count": syn_count,
@@ -134,9 +127,7 @@ def list_bundled_skills(
 
 def discover_federated_skill_dirs() -> list[Path]:
     """Discover skill directories registered under `statmike.agent_skills`."""
-    discovered: dict[str, Path] = {
-        "bigquery_data_science": get_skills_dir().resolve()
-    }
+    discovered: dict[str, Path] = {"bigquery_data_science": get_skills_dir().resolve()}
     entry_points = importlib.metadata.entry_points(group=ENTRYPOINT_GROUP)
     for entry_point in entry_points:
         try:
@@ -155,9 +146,7 @@ def _resolve_target_dirs(
 ) -> list[Path]:
     """Resolve destination skill parent directories for `install_skills`."""
     base_dir = (
-        Path.home()
-        if global_install
-        else (dest.expanduser() if dest is not None else Path.cwd())
+        Path.home() if global_install else (dest.expanduser() if dest is not None else Path.cwd())
     )
     if target == "agents":
         return [base_dir / ".agents" / "skills"]
@@ -179,9 +168,7 @@ def install_skills(
     skills_dir: Path | None = None,
 ) -> list[Path]:
     """Install bundled skills into `.agents/skills`, `.claude/skills`, or a path."""
-    source_root = (
-        skills_dir if skills_dir is not None else get_skills_dir()
-    ).resolve()
+    source_root = (skills_dir if skills_dir is not None else get_skills_dir()).resolve()
     target_dirs = _resolve_target_dirs(
         target=target,
         dest=dest,
@@ -230,7 +217,7 @@ def install_kernel(
         print(
             "ipykernel is not installed in this Python environment.\n"
             "Install the notebook extra first:\n"
-            '  uv sync --extra notebooks\n'
+            "  uv sync --extra notebooks\n"
             '  # or: pip install "bigquery-data-science[notebooks]"',
             file=sys.stderr,
         )
@@ -337,9 +324,7 @@ def install_mcp_config(
                 payload = {}
 
         raw_servers = payload.get("mcpServers")
-        servers: dict[str, object] = (
-            dict(raw_servers) if isinstance(raw_servers, dict) else {}
-        )
+        servers: dict[str, object] = dict(raw_servers) if isinstance(raw_servers, dict) else {}
         servers["bigquery-data-science"] = {
             "command": command,
             "args": ["mcp"],
@@ -351,4 +336,3 @@ def install_mcp_config(
         )
         updated.append(cfg_path)
     return updated
-

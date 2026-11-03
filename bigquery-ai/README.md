@@ -70,18 +70,18 @@ Workflows compose multiple AI functions together for end-to-end scenarios. See [
 | Workflow | Functions Used | Description |
 |----------|---------------|-------------|
 | [Data Enrichment](workflows/data_enrichment/) | AI.GENERATE (Google Search grounding + output_schema), AI.PREDICT | Fix misspellings and correct errors using grounded web lookups, then fill a missing structured attribute with TabFM |
-| [Content Analysis Pipeline](workflows/content_analysis/) | AI.GENERATE_TABLE, AI.CLASSIFY, AI.SCORE, AI.GENERATE, AI.AGG | Generate sample data, classify it, score it, and summarize findings |
+| [Content Analysis Pipeline](workflows/content_analysis/) | AI.GENERATE_TABLE, AI.CLASSIFY, AI.SCORE, AI.GENERATE, AI.AGG | Generate sample data, classify it, score it, and synthesize structured briefs with typed `AI.AGG` (`output_schema`) |
 | [Semantic Search System](workflows/semantic_search/) | AI.EMBED, VECTOR_SEARCH, AI.SEARCH | Build and query a semantic search index, three ways: manual, simplified, and hybrid |
 | [Catalog Search](workflows/catalog_search/) | AI.EMBED, VECTOR_SEARCH, AI.SEARCH | Hybrid retrieval over a real product catalog: what rank fusion does and does not buy you for exact-token lookups, with a corpus large enough to actually populate a vector index |
 | [RAG Pipeline](workflows/rag_pipeline/) | AI.GENERATE_TABLE, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | Generate a knowledge base, embed, search, answer questions |
-| [Document RAG](workflows/document_rag/) ⚠️ | AI.PARSE_DOCUMENT, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | Parse real documents, embed chunks, search, answer questions with grounded context. **⚠️ Blocked — depends on AI.PARSE_DOCUMENT, offline since 2026-06-01 and now with its reference docs withdrawn. Committed outputs are a pre-withdrawal record; do not re-run.** |
+| [Document RAG](workflows/document_rag/) | AI.CHUNK_DOCUMENT, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | Chunk real PDF documents in Cloud Storage with zero DDL (`AI.CHUNK_DOCUMENT`), embed chunks (`AI.EMBED`), retrieve with page provenance (`VECTOR_SEARCH`), and answer questions with grounded context (`AI.GENERATE`) |
 | [Time Series Intelligence](workflows/time_series_intelligence/) | AI.FORECAST, AI.DETECT_ANOMALIES, AI.EVALUATE, AI.KEY_DRIVERS | Forecast, detect anomalies, evaluate accuracy, explain changes by segment |
 | [Zero-Shot Tabular Prediction](workflows/tabular_prediction/) | AI.PREDICT, AI.EVALUATE, AI.KEY_DRIVERS, AI.GENERATE | Zero-shot regression and classification with TabFM, scored and explained — no model training |
 | [Metric Diagnostics](workflows/metric_diagnostics/) | AI.KEY_DRIVERS, AI.PREDICT, AI.CAUSAL_EFFECT, AI.GENERATE | Explain why a metric moved between two periods, project it forward, then narrate the drivers in plain language — and stop short of calling any of it causal. A placebo test with `AI.CAUSAL_EFFECT` at six dates where nothing happened returns a significant result at one of them, which is why the diagnostic steps stay descriptive |
-| [Document Intelligence](workflows/document_intelligence/) | AI.CLASSIFY, AI.GENERATE, AI.SCORE, AI.AGG | Classify mixed documents, extract key fields, score quality, summarize findings |
-| [Content Moderation](workflows/content_moderation/) | AI.GENERATE_TABLE, AI.IF, AI.CLASSIFY, AI.SCORE, AI.GENERATE, AI.AGG | Flag, categorize, and score user-generated content for moderation |
+| [Document Intelligence](workflows/document_intelligence/) | AI.CLASSIFY, AI.GENERATE, AI.SCORE, AI.AGG | Classify mixed documents, extract key fields, score quality, and aggregate typed summaries with `AI.AGG` (`output_schema`) |
+| [Content Moderation](workflows/content_moderation/) | AI.GENERATE_TABLE, AI.IF, AI.CLASSIFY, AI.SCORE, AI.GENERATE, AI.AGG | Flag, categorize, score, and summarize user-generated content with typed `AI.AGG` (`output_schema`) |
 | [Multimodal Analysis](workflows/multimodal_analysis/) | AI.EMBED, AI.SIMILARITY, AI.GENERATE | Embed document images, find similar documents, generate visual descriptions |
-| [Log Analysis](workflows/log_analysis/) | AI.GENERATE_TABLE, AI.CLASSIFY, AI.SCORE, AI.AGG, AI.EMBED, VECTOR_SEARCH | Classify tickets, score priority, summarize patterns with AI.AGG, then retrieve by error code with hybrid search — and measure how far up the ranking a lexical hit can actually lift a row |
+| [Log Analysis](workflows/log_analysis/) | AI.GENERATE_TABLE, AI.CLASSIFY, AI.SCORE, AI.AGG, AI.EMBED, VECTOR_SEARCH | Classify tickets, score priority, synthesize patterns and typed escalation digests with `AI.AGG` (`output_schema`), then retrieve by error code with hybrid search — and measure how far up the ranking a lexical hit can actually lift a row |
 | [Image Deduplication](workflows/image_deduplication/) | AI.EMBED, VECTOR_SEARCH | Group near-duplicate images using embedding similarity for train/test split integrity |
 
 ---
@@ -125,25 +125,26 @@ See the [Unstructured Data Infrastructure](reference/unstructured-data-infrastru
 | `AI.GENERATE_DOUBLE` | [notebook](functions/ai_generate_double/ai_generate_double.ipynb) · [sql](functions/ai_generate_double/ai_generate_double.sql) | Scalar | Preview | No | STRUCT prompt | Return a FLOAT64 per row from a Gemini prompt. |
 | `AI.GENERATE_INT` | [notebook](functions/ai_generate_int/ai_generate_int.ipynb) · [sql](functions/ai_generate_int/ai_generate_int.sql) | Scalar | Preview | No | STRUCT prompt | Return an INT64 per row from a Gemini prompt. |
 | `ML.GENERATE_TEXT` | [notebook](functions/ml_generate_text/ml_generate_text.ipynb) · [sql](functions/ml_generate_text/ml_generate_text.sql) | TVF | GA | Yes | STRUCT prompt | Legacy predecessor to AI.GENERATE_TEXT. Use AI.GENERATE_TEXT for new work. |
-| `AI.COUNT_TOKENS` | [notebook](functions/ai_count_tokens/ai_count_tokens.ipynb) · [sql](functions/ai_count_tokens/ai_count_tokens.sql) | Scalar | Preview | No | — | Utility: estimate a prompt's input token count for free (no Vertex AI charge) to size/cost prompts before generating. |
+| `AI.COUNT_TOKENS` | [notebook](functions/ai_count_tokens/ai_count_tokens.ipynb) · [sql](functions/ai_count_tokens/ai_count_tokens.sql) | Scalar | GA | No | — | Utility: estimate a prompt's input token count for free (no Vertex AI charge) to size/cost prompts before generating. |
 
 ### Managed — Simplified interfaces with automatic prompt optimization
 
 | Function | Examples | Type | Status | Returns | Multimodal | What It Does |
 |----------|----------|------|--------|---------|------------|--------------|
-| `AI.IF` | [notebook](functions/ai_if/ai_if.ipynb) · [sql](functions/ai_if/ai_if.sql) | Scalar | Preview | BOOL | STRUCT prompt | Evaluate a natural language condition. Optimizes query plan to reduce Gemini calls. |
-| `AI.SCORE` | [notebook](functions/ai_score/ai_score.ipynb) · [sql](functions/ai_score/ai_score.sql) | Scalar | Preview | FLOAT64 | Tuple | Rate inputs on a scale you describe. Auto-generates a scoring rubric. |
-| `AI.CLASSIFY` | [notebook](functions/ai_classify/ai_classify.ipynb) · [sql](functions/ai_classify/ai_classify.sql) | Scalar | Preview | STRING or ARRAY | Direct | Classify inputs into categories you provide. Supports multi-label. |
+| `AI.IF` | [notebook](functions/ai_if/ai_if.ipynb) · [sql](functions/ai_if/ai_if.sql) | Scalar | GA (`optimization_mode` Preview) | BOOL | STRUCT prompt | Evaluate a natural language condition. Optimizes query plan to reduce Gemini calls. |
+| `AI.SCORE` | [notebook](functions/ai_score/ai_score.ipynb) · [sql](functions/ai_score/ai_score.sql) | Scalar | GA | FLOAT64 | Tuple | Rate inputs on a scale you describe. Auto-generates a scoring rubric. |
+| `AI.CLASSIFY` | [notebook](functions/ai_classify/ai_classify.ipynb) · [sql](functions/ai_classify/ai_classify.sql) | Scalar | GA (`optimization_mode` Preview) | STRING or ARRAY | Direct | Classify inputs into categories you provide. Supports multi-label. |
 | `AI.AGG` | [notebook](functions/ai_agg/ai_agg.ipynb) · [sql](functions/ai_agg/ai_agg.sql) | Aggregate | GA | STRING or STRUCT | Direct | Aggregate data with natural language instructions. Auto-batches beyond context window; supports structured output via output_schema. |
+| `AI.TRANSLATE` | [notebook](functions/ai_translate/ai_translate.ipynb) · [sql](functions/ai_translate/ai_translate.sql) | Scalar | GA | STRING or STRUCT | — | Translate text per row into a target language (literal or per-row column) via Cloud Translation `nmt` or `translation-llm`; `return_details => TRUE` returns `status = 'OK'` and `$.detected_language_code`. |
 
 ### Embeddings & Search — Create vectors, compute similarity, search semantically
 
 | Function | Examples | Type | Status | Requires Model | Multimodal | What It Does |
 |----------|----------|------|--------|----------------|------------|--------------|
-| `AI.EMBED` | [notebook](functions/ai_embed/ai_embed.ipynb) · [sql](functions/ai_embed/ai_embed.sql) | Scalar | Preview | No | Content param | Create text or image embeddings. Specify endpoint directly. |
+| `AI.EMBED` | [notebook](functions/ai_embed/ai_embed.ipynb) · [sql](functions/ai_embed/ai_embed.sql) | Scalar | GA (`model` Preview) | No | Content param | Create text or image embeddings via Vertex AI endpoints (GA) or in-BigQuery `model => 'embeddinggemma-300m'` (Preview). |
 | `AI.GENERATE_EMBEDDING` | [notebook](functions/ai_generate_embedding/ai_generate_embedding.ipynb) · [sql](functions/ai_generate_embedding/ai_generate_embedding.sql) | TVF | GA | Yes | Content param | Create embeddings from text, images, or video via a remote model. |
 | `ML.GENERATE_EMBEDDING` | [notebook](functions/ml_generate_embedding/ml_generate_embedding.ipynb) · [sql](functions/ml_generate_embedding/ml_generate_embedding.sql) | TVF | GA | Yes | Content param | Legacy predecessor to AI.GENERATE_EMBEDDING. Use AI.GENERATE_EMBEDDING for new work. |
-| `AI.SIMILARITY` | [notebook](functions/ai_similarity/ai_similarity.ipynb) · [sql](functions/ai_similarity/ai_similarity.sql) | Scalar | Preview | No | Content param | Cosine similarity between two inputs. Generates embeddings at runtime. |
+| `AI.SIMILARITY` | [notebook](functions/ai_similarity/ai_similarity.ipynb) · [sql](functions/ai_similarity/ai_similarity.sql) | Scalar | GA (`model` Preview) | No | Content param | Cosine similarity between two inputs via Vertex AI endpoints (GA) or `model => 'embeddinggemma-300m'` (Preview). |
 | `VECTOR_SEARCH` | [notebook](functions/vector_search/vector_search.ipynb) · [sql](functions/vector_search/vector_search.sql) | TVF | GA (single-search/hybrid syntax Preview) | No | — | Top-K nearest neighbor search on pre-computed embeddings. Supports vector indexes and hybrid (semantic + keyword) search. |
 | `AI.SEARCH` | [notebook](functions/ai_search/ai_search.ipynb) · [sql](functions/ai_search/ai_search.sql) | TVF | GA (`mode` Preview) | No | — | Semantic or hybrid search on tables with autonomous embedding generation. |
 
@@ -151,9 +152,9 @@ See the [Unstructured Data Infrastructure](reference/unstructured-data-infrastru
 
 Reach for it when a query carries **both** descriptive words and an exact token — but know what it buys, because `top_k` gates it twice. First the pool: BigQuery hands the lexical leg only the top `10 * top_k` rows by semantic rank, and a row deeper than that gets no lexical rank at all, however perfectly it matches. Inside the pool the lexical leg ranks the *entire* candidate pool — BM25 matches take lexical ranks `1..m` and the remaining pooled rows fall back to their semantic order behind them — so no pooled row forfeits a term. Then the score: `distance = 1 - ( 1/(60 + rank_vector) + 1/(61 + rank_lexical) )`, where 60 is the canonical RRF constant and the lexical leg behaves as though its ranks start at 2 — the same arithmetic as writing its base as 61 — and a lexical match is worth promotion to lexical rank 1, or `1/62` ≈ `0.016` of score, which has to beat the row holding the last slot. Effective reach is the smaller of the two, `min(score gate, 10 * top_k)`: at `top_k` of 10 a matched row can come from semantic rank 23, at 30 from 110, at 50 from 468 — and from `top_k` of 51 up the pool is what binds, so 640 at 64, 1,000 at 100, 3,000 at 300. Hybrid re-ranks and widens recall in proportion to `top_k`, never unboundedly: to retrieve a row at semantic rank `R` by exact token, size `top_k` to *at least* `R/10` — that is a floor, not a recipe. Below a few hundred ranks deep the score gate is the one that binds, and it asks for more: a row at semantic rank 100 needs `top_k` = 29, not 10. Read the real number off the reach table. If an opaque identifier is *all* the user typed, use `WHERE sku = @sku` instead — a predicate cannot be outranked by a fusion score, and it has no pool. See [Hybrid Search](reference/embedding-generation-and-semantic-search.md#hybrid-search-capability) for the measured formula, the full reach table, and the vector-index DDL rules.
 
-**Embedding task types:** The `task_type` parameter tells the embedding model how the text will be used, which changes the resulting vector.
+**Embedding task types:** The `task_type` parameter tells task-typed text embedding models (`gemini-embedding-001`, `text-embedding-005`, `text-multilingual-embedding-002`) how the text will be used, which changes the resulting vector. Note that **`gemini-embedding-2` uses unified task-agnostic training and rejects `task_type` and `title`** (`400 Bad Request: task_type/title is not supported for gemini-embedding-2 model`) — omit both when calling `endpoint => 'gemini-embedding-2'`.
 
-**Asymmetric** — embed documents and queries with different task types:
+**Asymmetric** — embed documents and queries with different task types (`gemini-embedding-001` / `text-embedding-005` / `text-multilingual-embedding-002`):
 
 | Use Case | Embed Documents With | Embed Queries With |
 |----------|---------------------|-------------------|
@@ -170,14 +171,15 @@ Reach for it when a query carries **both** descriptive words and an exact token 
 | Grouping by category | `CLASSIFICATION` |
 | Organizing into clusters | `CLUSTERING` |
 
-When unsure, default to `RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY`. See the [`AI.EMBED` notebook](functions/ai_embed/ai_embed.ipynb) for details.
+When using a task-typed model and unsure, default to `RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY`. See the [`AI.EMBED` notebook](functions/ai_embed/ai_embed.ipynb) for details.
 
-### Document Processing — Extract structured data from documents
+### Document Processing — Extract structured data and chunk documents
 
 | Function | Examples | Type | Status | Requires Model | Multimodal | What It Does |
 |----------|----------|------|--------|----------------|------------|--------------|
-| `ML.PROCESS_DOCUMENT` | [notebook](functions/ml_process_document/ml_process_document.ipynb) · [sql](functions/ml_process_document/ml_process_document.sql) | TVF | GA | Yes | Object table | Extract structured data from documents in Cloud Storage using Document AI processors. |
-| `AI.PARSE_DOCUMENT` ⚠️ | [notebook](functions/ai_parse_document/ai_parse_document.ipynb) · [sql](functions/ai_parse_document/ai_parse_document.sql) | TVF | Preview (⚠️ **offline** since 2026-06-01; **reference docs withdrawn**) | No* | Object table | OCR + layout parsing + chunking via Document AI Layout Parser. No `CREATE MODEL` needed. **Does not execute, and its reference page now returns 404. Use `ML.PROCESS_DOCUMENT` in the meantime — see notebook.** |
+| `AI.CHUNK_DOCUMENT` | [notebook](functions/ai_chunk_document/ai_chunk_document.ipynb) · [sql](functions/ai_chunk_document/ai_chunk_document.sql) | TVF | GA | No | URI / `ObjectRef` subquery / Object table | Split PDF, HTML, DOCX, PPTX, and XLSX/XLSM documents in Cloud Storage into layout-aware chunks with ancestor headings and 1-indexed PDF page spans (`start_page`, `end_page`). Zero `CREATE MODEL` or manual processor DDL. |
+| `ML.PROCESS_DOCUMENT` | [notebook](functions/ml_process_document/ml_process_document.ipynb) · [sql](functions/ml_process_document/ml_process_document.sql) | TVF | GA | Yes | Object table | Extract structured data from documents in Cloud Storage using specialized Document AI processors (Invoice, Expense, Form, OCR). |
+| `AI.PARSE_DOCUMENT` ⚠️ | [notebook](functions/ai_parse_document/ai_parse_document.ipynb) · [sql](functions/ai_parse_document/ai_parse_document.sql) | TVF | Preview (⚠️ **offline** since 2026-06-01; **reference docs withdrawn**) | No* | Object table | Historical pre-withdrawal record of Document AI Layout Parser TVF. **Use `AI.CHUNK_DOCUMENT` for RAG chunking or `ML.PROCESS_DOCUMENT` for specialized entity extraction.** |
 
 `ML.PROCESS_DOCUMENT` is also a member of the family below — everything there about connections, IAM, per-row failures and the model object applies to it.
 
@@ -232,11 +234,11 @@ flowchart TD
         G1 ~~~ G2 ~~~ G3
     end
 
-    subgraph MGD["2. Managed Task Functions (Gemini · No CREATE MODEL)"]
+    subgraph MGD["2. Managed Task Functions (Gemini &amp; Cloud Translation · No CREATE MODEL)"]
         direction LR
         M1["<b>AI.IF &amp; AI.SCORE</b> (Row-Level)<br/>AI.IF — Boolean filter (SELECT/WHERE/JOIN)<br/>AI.SCORE — Auto-rubric FLOAT64 rating"]
-        M2["<b>AI.CLASSIFY</b> (Categorization)<br/>Single or multi-label category assignment<br/>(STRING or ARRAY&lt;STRING&gt;)"]
-        M3["<b>AI.AGG</b> (Aggregate Summarization)<br/>Group-level synthesis across rows<br/>with GROUP BY"]
+        M2["<b>AI.CLASSIFY &amp; AI.TRANSLATE</b><br/>Single/multi-label category assignment<br/>Per-row Cloud Translation (nmt / llm)"]
+        M3["<b>AI.AGG</b> (Aggregate Summarization)<br/>Group-level synthesis &amp; output_schema<br/>across rows with GROUP BY"]
         M1 ~~~ M2 ~~~ M3
     end
 
@@ -258,7 +260,7 @@ flowchart TD
 
     subgraph DOC["5. Document Processing &amp; Pre-Trained Cloud AI Service Models"]
         direction LR
-        D1["<b>Document AI</b><br/>ML.PROCESS_DOCUMENT (Object table + REMOTE)<br/>AI.PARSE_DOCUMENT (Layout Parser)"]
+        D1["<b>Document Chunking &amp; Extraction</b><br/>AI.CHUNK_DOCUMENT (TVF · No Model)<br/>ML.PROCESS_DOCUMENT (Object table + REMOTE)"]
         D2["<b>Text &amp; Speech Cloud AI (REMOTE)</b><br/>ML.TRANSLATE (Translation V3)<br/>ML.UNDERSTAND_TEXT · ML.TRANSCRIBE"]
         D3["<b>Vision Cloud AI (REMOTE)</b><br/>ML.ANNOTATE_IMAGE (Vision API)<br/>Object tables + Cloud Resource Connection"]
         D1 ~~~ D2 ~~~ D3
@@ -309,6 +311,7 @@ bigquery-ai/
 │   ├── ai_score/
 │   ├── ai_classify/
 │   ├── ai_agg/
+│   ├── ai_translate/
 │   ├── ai_embed/
 │   ├── ai_generate_embedding/
 │   ├── vector_search/
@@ -318,8 +321,9 @@ bigquery-ai/
 │   ├── ai_predict/
 │   ├── ai_evaluate/
 │   ├── ai_key_drivers/
+│   ├── ai_chunk_document/
 │   ├── ml_process_document/
-│   ├── ai_parse_document/
+│   ├── ai_parse_document/       # Offline archive — use ai_chunk_document or ml_process_document
 │   ├── ml_translate/
 │   ├── ml_understand_text/
 │   ├── ml_annotate_image/

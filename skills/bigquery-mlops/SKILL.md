@@ -2,7 +2,7 @@
 name: bigquery-mlops
 description: "Use when operationalizing, deploying, registering, exporting, importing, serving, monitoring, or scheduling BigQuery ML (ML.*), BigQuery AI (AI.*), or external models logging to BigQuery — across 8 production orchestrators (Scheduled Queries, Dataform, Cloud Workflows, dbt, Vertex AI KFP, Managed Airflow), Vertex AI Model Registry, EXPORT/IMPORT MODEL (XGBoost, ONNX, TensorFlow), REMOTE endpoints, drift/skew monitoring (ML.VALIDATE_DATA_DRIFT, ML.METRICS), and point-in-time feature stores (ML.ENTITY_FEATURES_AT_TIME)."
 metadata:
-  version: "0.10.0"
+  version: "0.11.0"
 ---
 
 # BigQuery MLOps & Production Operations (`bigquery-mlops`)
@@ -10,7 +10,7 @@ metadata:
 BigQuery MLOps operationalizes **three distinct production workloads** using one unified SQL and GCP control plane:
 
 1. **Native BigQuery ML Models (`CREATE MODEL` + `ML.*`)** — scheduled drift checks, conditional retraining, model-registry versioning, artifact export/import, and point-in-time feature serving.
-2. **BigQuery AI Foundation Workflows (`AI.*`, `VECTOR_SEARCH`, `ML.PROCESS_DOCUMENT`)** — recurring batch enrichment (`AI.CLASSIFY`, `AI.SCORE`, `AI.GENERATE_TABLE`), scheduled `AI.FORECAST` / `AI.DETECT_ANOMALIES` runs, incremental `AI.EMBED` + `ALTER VECTOR INDEX` maintenance, and `ARRAY<FLOAT64>` embedding drift monitoring.
+2. **BigQuery AI Foundation Workflows (`AI.*`, `VECTOR_SEARCH`, `ML.PROCESS_DOCUMENT`)** — recurring batch enrichment (`AI.CLASSIFY`, `AI.SCORE`, `AI.TRANSLATE`, `AI.GENERATE_TABLE`), scheduled `AI.FORECAST` / `AI.DETECT_ANOMALIES` runs, incremental `AI.CHUNK_DOCUMENT` + `AI.EMBED` + `ALTER VECTOR INDEX` maintenance, and `ARRAY<FLOAT64>` embedding drift monitoring.
 3. **External Models Logging to BigQuery (Vertex AI Endpoints, Cloud Run, GKE, Vendor APIs)** — because `ML.VALIDATE_DATA_DRIFT`, `ML.DESCRIBE_DATA`, `ML.METRICS`, and `ML.FEATURES_AT_TIME` operate directly on **BigQuery tables with no `MODEL` object required**, BigQuery serves as a zero-infrastructure monitoring, evaluation, and feature-store plane for models served anywhere that log inference requests and ground-truth labels to BigQuery.
 
 ```mermaid
@@ -108,7 +108,7 @@ Before returning any MLOps SQL, DAG, workflow YAML, or Python pipeline code, ver
   - [`reference/feature-store-and-temporal-joins.md`](reference/feature-store-and-temporal-joins.md) — Point-in-time feature store (`ML.ENTITY_FEATURES_AT_TIME`, `ML.FEATURES_AT_TIME`), table-shape rules (`ignore_feature_nulls`), the 3-arm skew audit, and Vertex AI Feature Store sync
 - **Lens 3 — Per-Statement Syntax Cards (`../bigquery-ml/syntax/` & `../bigquery-ai/syntax/`)**:
   - [`../bigquery-ml/syntax/INDEX.md`](../bigquery-ml/syntax/INDEX.md) — [`export-model.md`](../bigquery-ml/syntax/export-model.md), [`imported-models-tensorflow-tensorflow_lite-onnx-xgboost.md`](../bigquery-ml/syntax/imported-models-tensorflow-tensorflow_lite-onnx-xgboost.md), [`remote-remote-model-over-a-vertex-ai-endpoint-the-mechanism.md`](../bigquery-ml/syntax/remote-remote-model-over-a-vertex-ai-endpoint-the-mechanism.md), [`transform_only.md`](../bigquery-ml/syntax/transform_only.md), [`mlvalidate_data_drift.md`](../bigquery-ml/syntax/mlvalidate_data_drift.md), [`mlvalidate_data_skew.md`](../bigquery-ml/syntax/mlvalidate_data_skew.md), [`mlmetrics.md`](../bigquery-ml/syntax/mlmetrics.md), [`mlentity_features_at_time.md`](../bigquery-ml/syntax/mlentity_features_at_time.md), [`mlfeatures_at_time.md`](../bigquery-ml/syntax/mlfeatures_at_time.md)
-  - [`../bigquery-ai/syntax/INDEX.md`](../bigquery-ai/syntax/INDEX.md) — [`aievaluate.md`](../bigquery-ai/syntax/aievaluate.md), [`aiembed.md`](../bigquery-ai/syntax/aiembed.md), [`vector_search.md`](../bigquery-ai/syntax/vector_search.md)
+  - [`../bigquery-ai/syntax/INDEX.md`](../bigquery-ai/syntax/INDEX.md) — [`aievaluate.md`](../bigquery-ai/syntax/aievaluate.md), [`aiembed.md`](../bigquery-ai/syntax/aiembed.md), [`vector_search.md`](../bigquery-ai/syntax/vector_search.md), [`aichunk_document.md`](../bigquery-ai/syntax/aichunk_document.md), [`aitranslate.md`](../bigquery-ai/syntax/aitranslate.md)
 - **Lens 4 — Worked Walkthroughs (`../bigquery-ml/narrative/` & `../bigquery-ai/narrative/`)**:
   - Pipelines: [`sql_scripting.md`](../bigquery-ml/narrative/sql_scripting.md), [`scheduled_queries.md`](../bigquery-ml/narrative/scheduled_queries.md), [`dataform.md`](../bigquery-ml/narrative/dataform.md), [`cloud_workflows.md`](../bigquery-ml/narrative/cloud_workflows.md), [`dbt.md`](../bigquery-ml/narrative/dbt.md), [`vertex_kfp.md`](../bigquery-ml/narrative/vertex_kfp.md), [`composer_airflow.md`](../bigquery-ml/narrative/composer_airflow.md), [`airflow_with_kfp.md`](../bigquery-ml/narrative/airflow_with_kfp.md)
   - Registry, Serving, Monitoring & Feature Store: [`export.md`](../bigquery-ml/narrative/export.md), [`imported.md`](../bigquery-ml/narrative/imported.md), [`remote.md`](../bigquery-ml/narrative/remote.md), [`transform_only.md`](../bigquery-ml/narrative/transform_only.md), [`model_monitoring.md`](../bigquery-ml/narrative/model_monitoring.md), [`evaluation.md`](../bigquery-ml/narrative/evaluation.md), [`feature_store.md`](../bigquery-ml/narrative/feature_store.md), [`feature_store_workflow.md`](../bigquery-ml/narrative/feature_store_workflow.md)

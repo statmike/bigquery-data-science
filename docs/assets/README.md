@@ -7,8 +7,9 @@ This directory holds static visual assets used by the GitHub repository social p
 | File | Responsibility |
 | :--- | :--- |
 | [`README.md`](./README.md) | Directory map and regeneration instructions for static visual assets. |
+| [`readme_architecture.svg`](./readme_architecture.svg) | Canonical `1280×504` SVG source for the 3-stage, 4-skill architecture diagram. |
 | [`social_card.html`](./social_card.html) / [`social_card.png`](./social_card.png) | `1280×640` repository social preview card using the four-class palette (`data`, `config`, `route`, `compute`). |
-| [`readme_architecture.html`](./readme_architecture.html) / [`readme_architecture.png`](./readme_architecture.png) | `1280×490` PyPI fallback PNG for the front-door architecture diagram in `README.md`. |
+| [`readme_architecture.html`](./readme_architecture.html) / [`readme_architecture.png`](./readme_architecture.png) | `1280×504` PyPI fallback PNG for the front-door architecture diagram in `README.md`. |
 
 ## Regenerating PNG Assets
 
@@ -16,6 +17,6 @@ From the repository root:
 
 ```bash
 DIR="$(pwd)/docs/assets"
-google-chrome --headless=new --disable-gpu --hide-scrollbars --window-size=1280,640 --virtual-time-budget=8000 --screenshot="$DIR/social_card.png" "file://$DIR/social_card.html"
-google-chrome --headless=new --disable-gpu --hide-scrollbars --window-size=1280,490 --virtual-time-budget=8000 --screenshot="$DIR/readme_architecture.png" "file://$DIR/readme_architecture.html"
+google-chrome --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --default-background-color=ffffffff --window-size=1280,504 --screenshot="$DIR/readme_architecture.png" "file://$DIR/readme_architecture.html"
+google-chrome --headless=new --disable-gpu --hide-scrollbars --force-device-scale-factor=1 --default-background-color=ffffffff --window-size=1280,640 --screenshot="$DIR/social_card.png" "file://$DIR/social_card.html"
 ```

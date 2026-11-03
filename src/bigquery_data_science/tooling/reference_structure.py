@@ -57,13 +57,11 @@ def check_reference(project_root: Path) -> ReferenceResult:
 
     for orphan in sorted(pages - linked):
         result.errors.append(
-            f"{REFERENCE_DIRNAME}/{orphan} exists but {INDEX_FILENAME} "
-            "does not link to it"
+            f"{REFERENCE_DIRNAME}/{orphan} exists but {INDEX_FILENAME} does not link to it"
         )
     for missing in sorted(linked - pages):
         result.errors.append(
-            f"{INDEX_FILENAME} links to {REFERENCE_DIRNAME}/{missing}, "
-            "which does not exist"
+            f"{INDEX_FILENAME} links to {REFERENCE_DIRNAME}/{missing}, which does not exist"
         )
 
     for page in sorted(pages & linked):

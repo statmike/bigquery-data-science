@@ -70,7 +70,7 @@ print(f'Dataset {PROJECT_ID}.{DATASET_ID} ready')
 ```
 
 ```python
-import subprocess as _sp, json as _json
+import subprocess as _sp, json as _json, re as _re
 
 # Create connection (idempotent)
 _sp.run(['bq', 'mk', '--connection', '--location', LOCATION,
@@ -83,10 +83,11 @@ r = _sp.run(['bq', 'show', '--connection', '--format=json',
              '--project_id', PROJECT_ID, '--location', LOCATION, CONNECTION_ID],
             capture_output=True, text=True, check=True)
 sa = _json.loads(r.stdout)['cloudResource']['serviceAccountId']
+sa_display = _re.sub(r'bqcx-\d+-', 'bqcx-000000000000-', sa)
 _sp.run(['gcloud', 'projects', 'add-iam-policy-binding', PROJECT_ID,
          f'--member=serviceAccount:{sa}', '--role=roles/aiplatform.user', '--quiet'],
         capture_output=True, text=True)
-print(f'Connection {CONNECTION_ID} ready (SA: {sa})')
+print(f'Connection {CONNECTION_ID} ready (SA: {sa_display})')
 ```
 
 ```python
@@ -94,7 +95,7 @@ print(f'Connection {CONNECTION_ID} ready (SA: {sa})')
 client.query(f'''
 CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.gemini_flash`
   REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
-  OPTIONS (endpoint = 'gemini-2.5-flash')
+  OPTIONS (endpoint = 'gemini-3.8-flash')
 ''').result()
 print('Model gemini_flash ready')
 ```
@@ -292,4 +293,37 @@ for _, row in df_agg.iterrows():
     print(f'=== {row["topic"]} ===')
     print(row['topic_summary'])
     print()
+```
+
+### Structured category scorecards with `AI.AGG(..., output_schema => ...)`
+
+When topic summaries feed a BI dashboard or product-backlog table instead of a slide deck, pass `output_schema` to `AI.AGG` so each `GROUP BY` row returns a typed `STRUCT` alongside standard SQL aggregates (`COUNT(*)`, `AVG(star_rating)`, `AVG(urgency)`). Unlike `AI.GENERATE`, `AI.AGG` returns **only** the fields declared in `output_schema` (no `status` or `full_response` wrapper fields), which we unpack with `scorecard.*` across up to the recommended **10,000 rows per group**.
+
+```python
+# Structured topic scorecard combining SQL aggregates with typed AI.AGG(output_schema => ...)
+query = f"""
+WITH topic_scorecards AS (
+  SELECT
+    topic,
+    COUNT(*) AS review_count,
+    ROUND(AVG(star_rating), 1) AS avg_stars,
+    ROUND(AVG(urgency), 1) AS avg_urgency,
+    AI.AGG(
+      review_text,
+      'Summarize the key theme, recommended action, and retention risk (LOW, MEDIUM, or HIGH) for this topic. Keep it concise.',
+      output_schema => 'key_theme STRING, recommended_action STRING, retention_risk STRING'
+    ) AS scorecard
+  FROM `{PROJECT_ID}.{DATASET_ID}.workflow_content_scored`
+  GROUP BY topic
+)
+SELECT
+  topic,
+  review_count,
+  avg_stars,
+  avg_urgency,
+  scorecard.*
+FROM topic_scorecards
+ORDER BY avg_urgency DESC
+"""
+client.query(query).to_dataframe()
 ```

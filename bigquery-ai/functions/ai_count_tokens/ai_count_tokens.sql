@@ -6,7 +6,11 @@
 --
 -- No connection, no CREATE MODEL, no ObjectRef required.
 --
+-- Status: GA (announced 2026-10-27). Strictly text-only (STRING input):
+--   multimodal STRUCT / ObjectRef inputs are rejected (re-verified at GA on
+--   2026-11-02), so full_response always reports modality "TEXT".
 -- Signature: AI.COUNT_TOKENS(INPUT [, endpoint => ENDPOINT])
+--   (Live signature also accepts optional title => STRING, model => STRING.)
 -- Returns: STRUCT<result INT64, full_response JSON>
 --   result        — total INPUT token count (NULL if input is NULL or API error)
 --   full_response — JSON with per-modality token detail
@@ -48,7 +52,7 @@ LIMIT 5;
 -- model used by AI.GENERATE is used.
 SELECT
   review,
-  AI.COUNT_TOKENS(review, endpoint => 'gemini-2.5-pro').result AS num_tokens
+  AI.COUNT_TOKENS(review, endpoint => 'gemini-4-argon').result AS num_tokens
 FROM `bigquery-public-data.imdb.reviews`
 LIMIT 5;
 

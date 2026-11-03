@@ -1,10 +1,8 @@
 > **Source (`statmike/bigquery-data-science`):** **Notebook:** [`bigquery-ai/functions/ai_parse_document/ai_parse_document.ipynb`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/functions/ai_parse_document/ai_parse_document.ipynb) · **SQL:** [`bigquery-ai/functions/ai_parse_document/ai_parse_document.sql`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/functions/ai_parse_document/ai_parse_document.sql)
 
-> **⚠️ NOT CURRENTLY WORKING — DOCUMENTATION WITHDRAWN:** The `AI.PARSE_DOCUMENT` function (preview) was taken offline for revision on 2026-06-01, and its status has since escalated. As of 2026-09-01 the reference page returns HTTP 404, the function is absent from the BigQuery AI functions navigation tree, and it is absent from the generative AI overview. This notebook does not run.
+> **⚠️ NOT CURRENTLY WORKING — SUPERSEDED BY `functions/ai_chunk_document` (`AI.CHUNK_DOCUMENT`):** The `AI.PARSE_DOCUMENT` function (Preview) was taken offline on 2026-06-01, and its reference page was withdrawn (HTTP 404 as of 2026-09-01). Its GA successor is **`functions/ai_chunk_document` (`AI.CHUNK_DOCUMENT`)** (launched 2026-10-21), which splits PDF, HTML, DOCX, PPTX, XLSX, and XLSM files into typed `chunk_id`, `start_page`, `end_page`, `content`, and `status` columns with **no `CREATE MODEL` step** and an auto-provisioned `bq-created-layout-parser` Document AI processor. For specialized Document AI extractors (invoices, receipts, forms, custom processors), use **`functions/ml_process_document` (`ML.PROCESS_DOCUMENT`)**.
 >
-> **Use `functions/ml_process_document` (`ML.PROCESS_DOCUMENT`) in the meantime.** It reaches the same Document AI Layout Parser, at the cost of the `CREATE MODEL` step this function existed to remove, and it returns one JSON column (`ml_process_document_result`) rather than typed `chunk_id`/`start_page`/`end_page`/`content` fields.
->
-> The stored outputs below are a record of this notebook running before the withdrawal, not current behavior. Check the [BigQuery release notes](https://docs.cloud.google.com/bigquery/docs/release-notes) for restoration — there is precedent (`AI.AGG` was pulled and re-enabled in April–May 2026).
+> This notebook does not execute and is preserved as a historical archive of pre-withdrawal behavior.
 
 # AI.PARSE_DOCUMENT — BigQuery AI Functions
 
@@ -17,6 +15,7 @@
 - You want a simpler alternative to `ML.PROCESS_DOCUMENT` that skips the remote model creation step
 
 **Alternatives:**
+- `functions/ai_chunk_document` (`AI.CHUNK_DOCUMENT`) — GA direct successor for layout-aware document chunking and RAG; requires no `CREATE MODEL` and auto-provisions the `bq-created-layout-parser` Document AI processor.
 - `functions/ml_process_document` (`ML.PROCESS_DOCUMENT`) — Requires `CREATE MODEL` with a Document AI remote service, but supports all processor types (invoice parser, form parser, OCR, custom extractors). Use when you need specialized extraction beyond layout parsing.
 
 **Key differences from ML.PROCESS_DOCUMENT:**
@@ -25,8 +24,6 @@
 - `ML.PROCESS_DOCUMENT` requires creating a remote model with `REMOTE_SERVICE_TYPE = 'CLOUD_AI_DOCUMENT_V1'`
 - `AI.PARSE_DOCUMENT` is **Layout Parser only** — it returns chunks (`chunk_id`, `start_page`, `end_page`, `content`)
 - `ML.PROCESS_DOCUMENT` supports **all Document AI processor types** (invoice, receipt, form, OCR, custom)
-
-**Featured in:** `workflows/document_rag` (Document RAG Pipeline)
 
 **References:** `RESOURCES.md` (Full syntax reference) | [Official documentation](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-parse-document) | `setup` (Setup guide)
 

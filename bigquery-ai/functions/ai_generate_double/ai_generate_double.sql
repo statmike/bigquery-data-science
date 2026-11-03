@@ -41,7 +41,7 @@ SELECT
   text,
   (AI.GENERATE_DOUBLE(
     CONCAT('Rate reading difficulty 1.0-10.0: ', text),
-    endpoint => 'gemini-2.5-flash'
+    endpoint => 'gemini-3.8-flash'
   )).result AS difficulty
 FROM UNNEST([
   'The cat sat on the mat.',

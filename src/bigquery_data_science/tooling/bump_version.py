@@ -106,14 +106,10 @@ def check_version_lockstep(
         return [f"pyproject.toml: {exc}"]
 
     target_version = (
-        validate_semver(expected_version)
-        if expected_version is not None
-        else pyproject_version
+        validate_semver(expected_version) if expected_version is not None else pyproject_version
     )
     if pyproject_version != target_version:
-        errors.append(
-            f"pyproject.toml: expected {target_version!r}, got {pyproject_version!r}"
-        )
+        errors.append(f"pyproject.toml: expected {target_version!r}, got {pyproject_version!r}")
 
     init_path = repo_root / "src" / "bigquery_data_science" / "__init__.py"
     if init_path.is_file():
@@ -129,14 +125,10 @@ def check_version_lockstep(
 
     citation_path = repo_root / "CITATION.cff"
     if citation_path.is_file():
-        cit_match = _CITATION_VERSION_RE.search(
-            citation_path.read_text(encoding="utf-8")
-        )
+        cit_match = _CITATION_VERSION_RE.search(citation_path.read_text(encoding="utf-8"))
         cit_ver = cit_match.group(2).strip() if cit_match else None
         if cit_ver != target_version:
-            errors.append(
-                f"CITATION.cff: expected {target_version!r}, got {cit_ver!r}"
-            )
+            errors.append(f"CITATION.cff: expected {target_version!r}, got {cit_ver!r}")
     else:
         errors.append("CITATION.cff: file missing")
 
@@ -145,9 +137,7 @@ def check_version_lockstep(
         plugin_data = json.loads(plugin_path.read_text(encoding="utf-8"))
         plugin_ver = plugin_data.get("version") if isinstance(plugin_data, dict) else None
         if plugin_ver != target_version:
-            errors.append(
-                f"plugin.json: expected {target_version!r}, got {plugin_ver!r}"
-            )
+            errors.append(f"plugin.json: expected {target_version!r}, got {plugin_ver!r}")
     else:
         errors.append("plugin.json: file missing")
 
@@ -186,8 +176,7 @@ def check_version_lockstep(
             fm_ver = _extract_skill_frontmatter_version(skill_md)
             if fm_ver != target_version:
                 errors.append(
-                    f"skills/{skill_dir.name}/SKILL.md: expected {target_version!r}, "
-                    f"got {fm_ver!r}"
+                    f"skills/{skill_dir.name}/SKILL.md: expected {target_version!r}, got {fm_ver!r}"
                 )
             manifest_path = skill_dir / MANIFEST_FILENAME
             if manifest_path.is_file():
@@ -199,20 +188,14 @@ def check_version_lockstep(
                         f"{target_version!r}, got {mf_ver!r}"
                     )
             else:
-                errors.append(
-                    f"skills/{skill_dir.name}/{MANIFEST_FILENAME}: file missing"
-                )
+                errors.append(f"skills/{skill_dir.name}/{MANIFEST_FILENAME}: file missing")
 
     test_pkg_path = repo_root / "tests" / "test_packaging.py"
     if test_pkg_path.is_file():
-        tp_match = _TEST_EXPECTED_VERSION_RE.search(
-            test_pkg_path.read_text(encoding="utf-8")
-        )
+        tp_match = _TEST_EXPECTED_VERSION_RE.search(test_pkg_path.read_text(encoding="utf-8"))
         tp_ver = tp_match.group(2) if tp_match else None
         if tp_ver != target_version:
-            errors.append(
-                f"tests/test_packaging.py: expected {target_version!r}, got {tp_ver!r}"
-            )
+            errors.append(f"tests/test_packaging.py: expected {target_version!r}, got {tp_ver!r}")
 
     return errors
 

@@ -194,9 +194,9 @@ Measured: 2.5 rejects a value off its grid (`96` fails); 3.0 rejects a value abo
 
 **Provisioned throughput:** Not specified. Billed at the evaluation, inspection, and prediction rate (BigQuery ML on-demand pricing). TimesFM 3.0 moves to token-based pricing on **2026-12-01**; the pricing page publishes the formula (each data point is one token): `input tokens = S * (L * (N_target + N_past_cov) + (L + H) * N_fut_cov)` and `output tokens = S * H * (N_target + N_past_cov)` -- `S` series, `L` context length, `H` horizon, `N_*` the target / past-covariate / future-covariate column counts -- at $0.05 / mtok input and $0.20 / mtok output. Note that 3.0's default context is the full 2,048 points, so an unspecified `context_window` also maximizes `L`.
 
-**BigFrames API:** `bigframes.bigquery.ai.forecast(df, data_col=..., timestamp_col=...)` — Wraps `AI.FORECAST` SQL directly. No model object needed. Supports `id_cols`, `horizon`, `confidence_level`, `context_window`, and `model` parameters. Note: `bigframes.ml.forecasting.ARIMAPlus` is a different model (ARIMA_PLUS, not TimesFM).
+**BigFrames API:** `bigframes.bigquery.ai.forecast(df, data_col=..., timestamp_col=...)` — Wraps `AI.FORECAST` SQL directly. No model object needed. Supports `id_cols`, `horizon`, `confidence_level`, `context_window`, and `model` parameters. Note: `bigframes.ml.forecasting.ARIMAPlus` is a different model (`ARIMA_PLUS`, not TimesFM).
 
-> **Wrapper skew:** the BigFrames wrapper (`bigframes` 2.39.0) declares `model: str = "TimesFM 2.0"` -- a version the SQL reference page no longer lists -- while the SQL function defaults to TimesFM 2.5. Calling `bbq.ai.forecast()` without `model` therefore runs a different model than the equivalent SQL; measured 2026-10-09, the unpinned wrapper call still executes, and `model="TimesFM 3.0"` passes through to the univariate form. The wrapper has no `target_cols` or covariate arguments. Pass `model` explicitly from BigFrames, and use SQL for the multivariate form.
+> **Wrapper skew (`bigframes 2.51.0`):** `bigframes.bigquery.ai.forecast()` still defaults `model: str = "TimesFM 2.0"` — a version the SQL reference page no longer lists — while the SQL function defaults to `'TimesFM 2.5'`. Calling `bbq.ai.forecast()` without `model` therefore runs a different model than the equivalent SQL; `model="TimesFM 2.5"` and `model="TimesFM 3.0"` pass through to the univariate form. The wrapper has no `target_cols` or covariate arguments. Always pass `model` explicitly from BigFrames, and use SQL for the multivariate form.
 
 ---
 
@@ -257,7 +257,7 @@ FROM AI.DETECT_ANOMALIES(
 
 **Provisioned throughput:** Not specified. Billed at the evaluation, inspection, and prediction rate.
 
-**BigFrames API:** No direct equivalent for TimesFM-based anomaly detection. Use `%%bigquery` magics or `session.read_gbq_query()` to execute AI.DETECT_ANOMALIES SQL from BigFrames. Note: `bigframes.ml.forecasting.ARIMAPlus.detect_anomalies()` exists but uses ARIMA_PLUS, not TimesFM.
+**BigFrames API:** No direct equivalent for TimesFM-based anomaly detection in `bigframes 2.51.0`. Use `%%bigquery` magics or `session.read_gbq_query()` to execute AI.DETECT_ANOMALIES SQL from BigFrames. Note: `bigframes.ml.forecasting.ARIMAPlus.detect_anomalies()` exists but uses ARIMA_PLUS, not TimesFM.
 
 ---
 
@@ -303,10 +303,10 @@ The `label` subfield of `predicted_<label>_probs` is typed `STRING` even when th
 
 **Supported models:** TabFM only. Not selectable -- there is no `model` argument and no version pinning.
 
-**Best practices:** Keep the feature set tight; the 50-column cap is a hard limit, not a guideline. Split train/predict deterministically (e.g. `FARM_FINGERPRINT`) so that the same rows train and predict on every run -- note this pins the *split* only; the predictions themselves are not reproducible (see Limitations). Pair every AI.PREDICT call with `AI.EVALUATE` on a held-out set -- without a metric you have no idea whether the zero-shot prediction is any good. Use it as a baseline: if a trained `CREATE MODEL` beats it materially, the training cost is justified; if not, you have saved a model lifecycle.
+**Best practices:** Keep the feature set tight; the 50-column cap is a hard limit, not a guideline. Split train/predict deterministically (e.g. `FARM_FINGERPRINT`) so that the same rows train and predict on every run -- note this pins the *split* only; the predictions themselves are not reproducible (see Limitations). To evaluate TabFM reproducibly without paying for a second ensemble inference pass, materialize `AI.PREDICT` output once to a table and score the persisted predictions with model-free [`ML.METRICS`](../../bigquery-ml/reference/model-free-functions.md#mlmetrics) (computing deterministic `precision`, `recall`, `accuracy`, `f1_score` or the 6 regression metrics overall, per slice via `segment_by_cols`, or at custom probability thresholds by thresholding `predicted_<label>_probs` into a `BOOL` column in SQL). Use `AI.PREDICT` as a zero-DDL baseline: if a trained `CREATE MODEL` beats it materially, the training cost is justified; if not, you have saved a model lifecycle.
 
 **Limitations:**
-- **Output is not deterministic.** Repeating a byte-identical `AI.PREDICT` call over the same `FARM_FINGERPRINT` split returns slightly different predictions -- consistent with the model averaging shuffled ensemble passes (`n_ensembles`, whose value Google does not document). Demonstrated by `functions/ai_predict/ai_predict.ipynb` cells 25 and 28, whose top-5 multisets differ (`5760` vs `5728` in one slot) despite identical SQL and an `ORDER BY value DESC LIMIT 5`, so tie-breaking cannot explain it. The `workflows/tabular_prediction/` notebook shows the downstream consequence: `AI.EVALUATE` scores its *own* fresh TabFM predictions rather than the rows you materialized, so the two disagree (measured across four runs: regression MAE 236.52 / 236.35 / 235.84, classification accuracy 0.9468 / 0.9362 / 0.9468 -- regression drift well under 1%, classification drift about 1pp, or 2 rows in 94). **Materialize results once and join to them; do not re-run the prediction to reproduce a number.** Drift appears to be input-dependent -- `workflows/data_enrichment/` reproduced exactly across two runs on a 6-row prediction relation -- so absence of drift on a small input is not evidence of determinism.
+- **Output is not deterministic.** Repeating a byte-identical `AI.PREDICT` call over the same `FARM_FINGERPRINT` split returns slightly different predictions -- consistent with the model averaging shuffled ensemble passes (`n_ensembles`, whose value Google does not document). Demonstrated by `functions/ai_predict/ai_predict.ipynb` cells 25 and 28, whose top-5 multisets differ (`5760` vs `5728` in one slot) despite identical SQL and an `ORDER BY value DESC LIMIT 5`, so tie-breaking cannot explain it. The `workflows/tabular_prediction/` notebook shows the downstream consequence: `AI.EVALUATE` scores its *own* fresh TabFM predictions rather than the rows you materialized, so the two disagree (measured across four runs: regression MAE 236.52 / 236.35 / 235.84, classification accuracy 0.9468 / 0.9362 / 0.9468 -- regression drift well under 1%, classification drift about 1pp, or 2 rows in 94). **Materialize results once and score them with [`ML.METRICS`](../../bigquery-ml/reference/model-free-functions.md#mlmetrics); do not re-run the prediction to reproduce a number.** Drift appears to be input-dependent -- `workflows/data_enrichment/` reproduced exactly across two runs on a 6-row prediction relation -- so absence of drift on a small input is not evidence of determinism.
 - **50 feature columns** maximum (documented; was 20 until October 2026 — measured 2026-10-12: 50 runs, 51 fails with *The number of features 51 exceeds the maximum allowed number of features 50*). Escalation path is emailing bqml-feedback@google.com.
 - **10 classification categories** maximum (documented).
 - **Practical row ceiling, undocumented but observed:** a call with 10,000 training rows fails with `Resources exceeded ... allotted memory`; 8,000 rows succeeds. Budget for roughly 5,000 training rows on on-demand slots. Re-checked 2026-09-15: the two caps above are on **columns and classes**, not rows — the page still documents no row limit, so this remains an observation of ours rather than a published figure.
@@ -316,20 +316,20 @@ The `label` subfield of `predicted_<label>_probs` is typed `STRING` even when th
 
 **Locations:** Not stated on the AI.PREDICT page. The AI.EVALUATE page says TabFM is available in all supported BigQuery ML locations (non-remote models), plus the US and EU multi-regions.
 
-**Pricing:** Today, standard BigQuery slot / bytes-processed pricing. **From 2026-10-30**, TabFM moves to token-based pricing: you are charged for TabFM tokens plus slots/bytes for the non-inference parts of the query.
+**Pricing:** Standard BigQuery slot / bytes-processed pricing prior to token-based billing, then TabFM token billing plus slots/bytes for the non-inference parts of the query. **Effective-date doc discrepancy (re-checked 2026-11-02):** the BigQuery ML pricing page states token-based TabFM billing takes effect on **2026-11-17** (`November 17, 2026`), whereas the `AI.PREDICT` syntax reference page still prints stale **2026-10-30** (`10/30/2026`).
 
 ```
 Input tokens  = (train_rows * columns + predict_rows * (columns - 1)) * n_ensembles
 Output tokens = predict_rows * n_ensembles
 ```
 
-at $0.05 / mtok input and $0.20 / mtok output (re-read on the pricing page 2026-10-12; formula and rates unchanged). Note that `n_ensembles` -- the number of shuffled passes the model averages -- is a multiplier on your bill that Google does not document the value of.
+at $0.05 / mtok input and $0.20 / mtok output. Note that `n_ensembles` -- the number of shuffled passes the model averages -- is a multiplier on your bill that Google does not document the value of.
 
 > **A `COUNT(*)` over `AI.PREDICT` does not run the model.** Measured 2026-10-12: `SELECT COUNT(*) FROM AI.PREDICT(...)` returned in under 2 seconds with the right row count, while the same call selecting `predicted_<label>` took the usual 45-50 seconds -- the planner prunes the inference when no predicted column is referenced. Two consequences: a row-count smoke test proves nothing about whether the call *works* (the 10-class cap, for one, is only enforced once inference runs), and a probe that references a predicted column is what you need to see an error or pay for a prediction.
 
 **Provisioned throughput:** Not specified.
 
-**BigFrames API:** No wrapper. `bigframes.bigquery.ai` has `forecast` but no `predict` -- checked against **bigframes 2.39.0**, this project's pin in `uv.lock` and the version that executed `functions/ai_predict/ai_predict.ipynb`. Use `%%bigquery` magics or `session.read_gbq_query()`.
+**BigFrames API:** `bigframes.bigquery.ai.predict(training_data, data, *, label_col=...)` (added in `bigframes 2.51.0`, returning a BigFrames `DataFrame` with `predicted_<label>` and classification probability columns; earlier releases such as `bigframes 2.39.0` lacked this wrapper and required `session.read_gbq_query()`).
 
 ---
 
@@ -431,7 +431,7 @@ The TabFM branch accepts no `model`, `horizon`, `id_cols`, `context_window`, `da
 
 > **GOTCHA -- the label column's TYPE decides which convention you get, and it is not announced anywhere in the output.** A `BOOL` `label_col` is scored as **binary**: `precision`, `recall` and `f1_score` describe the positive (`TRUE`) class only. The `STRING` rendering of the identical values is scored as **multiclass and macro-averaged**, even with exactly two classes. `accuracy` is the same either way. Measured on one imbalanced problem (12 positives of 62 rows, TabFM confusion matrix TP 12 / FP 11 / FN 0 / TN 39): the `BOOL` label returned precision `0.5217391304347826` and recall `1.0`, the `STRING` label returned `0.7608695652173914` and `0.89` -- the two-class means. Four isolated runs of each agreed. On balanced data the two nearly coincide, which is how this hides until the classes are lopsided. **This is a BigQuery-wide convention, not an `AI.EVALUATE` behavior** -- `ML.METRICS` follows the identical rule, measured side by side in [`bigquery-ml/functions/evaluation/`](../../bigquery-ml/functions/evaluation/).
 
-> Note what is **missing** relative to `ML.EVALUATE` on a trained classification model: TabFM's AI.EVALUATE returns no `log_loss` and no `roc_auc`, and no confusion matrix. If you need threshold-tuning or ranking metrics, this function will not give them to you.
+> Note what is **missing** relative to `ML.EVALUATE` on a trained classification model: TabFM's `AI.EVALUATE` returns no `log_loss`, no `roc_auc`, and no confusion matrix — and it runs a fresh TabFM inference pass rather than scoring your persisted predictions. Materialize `AI.PREDICT` output once (keeping `predicted_<label>_probs`) and pass that table to model-free [`ML.METRICS`](../../bigquery-ml/reference/model-free-functions.md#mlmetrics) to compute deterministic `precision`, `recall`, `accuracy`, and `f1_score` (or the 6 regression metrics, plus sliced `segment_by_cols` evaluations or custom-cutoff `BOOL` evaluations) at zero additional TabFM token cost; `log_loss`, `roc_auc`, and confusion matrices require a trained BQML model (`ML.EVALUATE` / `ML.CONFUSION_MATRIX` / `ML.ROC_CURVE`) or custom SQL aggregations over `predicted_<label>_probs`.
 
 **Supported models:** TimesFM 2.5 (default), TimesFM 3.0 (Preview) on the forecast branch -- univariate only; there is no `target_cols` argument. TabFM on the prediction branch, where the `model` argument is not accepted.
 
@@ -443,4 +443,4 @@ The TabFM branch accepts no `model`, `horizon`, `id_cols`, `context_window`, `da
 
 **Provisioned throughput:** Not specified. Billed at the evaluation, inspection, and prediction rate.
 
-**BigFrames API:** No direct equivalent for either branch. Use `%%bigquery` magics or `session.read_gbq_query()` to execute AI.EVALUATE SQL from BigFrames. Note: `bigframes.ml.forecasting.ARIMAPlus.evaluate()` exists but uses ARIMA_PLUS, not TimesFM.
+**BigFrames API:** `bigframes.bigquery.ai.evaluate(...)` (added in `bigframes 2.51.0` for TimesFM and TabFM evaluation; `bigframes.ml.forecasting.ARIMAPlus.evaluate()` evaluates `ARIMA_PLUS`, not TimesFM).

@@ -105,6 +105,8 @@ This workflow uses a real catalog instead of generated data for a hard reason: *
 
 `bigquery-public-data.thelook_ecommerce.products` has 29,120 rows with unique 32-character hex SKUs — exactly the kind of token that defeats an embedding model. Taking every fourth row yields 7,275 products spanning all 26 categories and 1,593 brands: over the row floor, and roughly 45 MB once 768-dimension vectors land next to them.
 
+The generated column uses `endpoint => 'gemini-embedding-2'` with `model_params => JSON '{"outputDimensionality": 768}'`. Reducing `gemini-embedding-2` from its 3,072-dimension default to 768 dimensions (via Matryoshka truncation) keeps `workflow_catalog_products` under BigQuery's `<= 2,000`-dimension limit for `CREATE VECTOR INDEX` in Step 6, while `AI.SEARCH` in Steps 3–4 automatically forwards both `endpoint` and `model_params` from the generated column definition to the query-time embedding call.
+
 The source table has no model number, so this step synthesizes a deterministic one from the brand initials and the product id.
 
 **The design choice that makes the rest of the notebook a proof rather than a coincidence:** `search_text` holds the product name, brand, department, and category — **and deliberately not the SKU or the model number.** Those two live in their own columns and are reachable only lexically. Pure vector search therefore *cannot* retrieve by SKU, because the SKU was never embedded.
@@ -125,7 +127,8 @@ CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_catalog_auto` (
     GENERATED ALWAYS AS (
       AI.EMBED(search_text,
         connection_id => '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}',
-        endpoint => 'text-embedding-005')
+        endpoint => 'gemini-embedding-2',
+        model_params => JSON '{{"outputDimensionality": 768}}')
     ) STORED OPTIONS (asynchronous = TRUE)
 )
 '''
@@ -520,7 +523,7 @@ def sku_search(top_k, with_lexical):
       FROM VECTOR_SEARCH(
         TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_catalog_products`,
         'embedding',
-        query_value => (AI.EMBED(content => @q, endpoint => 'text-embedding-005')).result,{lexical_args}
+        query_value => (AI.EMBED(content => @q, endpoint => 'gemini-embedding-2', model_params => JSON '{{"outputDimensionality": 768}}')).result,{lexical_args}
         top_k => {top_k},
         distance_type => 'COSINE'
       )
@@ -560,7 +563,7 @@ sku_vector_rank = client.query(f'''
     FROM VECTOR_SEARCH(
       TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_catalog_products`,
       'embedding',
-      query_value => (AI.EMBED(content => @q, endpoint => 'text-embedding-005')).result,
+      query_value => (AI.EMBED(content => @q, endpoint => 'gemini-embedding-2', model_params => JSON '{{"outputDimensionality": 768}}')).result,
       top_k => -1,
       distance_type => 'COSINE'
     )
@@ -642,27 +645,27 @@ if found is not None and int(found['position']) > 5:
 
 `SEARCH()` found this SKU in Step 3 and `lexical_search_columns` now includes `sku`, so the token is present and reachable. What decides whether the row comes back is the page size, and the sweep above runs the identical query at four of them.
 
-**The lexical leg is not shown the whole catalog.** BigQuery hands it the top `10 * top_k` rows by semantic rank and nothing else. That candidate pool is the first gate: a row deeper than `10 * top_k` never reaches BM25 at all and receives no lexical rank, however perfectly the token matches. This SKU sits at semantic rank 2,072 of 7,275 — the cell prints exactly how far down it is — so `top_k => 5` pools 50 rows and `top_k => 64` pools 640, and the row is thousands of places outside both.
+**The lexical leg is not shown the whole catalog.** BigQuery hands it the top `10 * top_k` rows by semantic rank and nothing else. That candidate pool is the first gate: a row deeper than `10 * top_k` never reaches BM25 at all and receives no lexical rank, however perfectly the token matches. This SKU sits at semantic rank 423 of 7,275 — the cell prints exactly how far down it is — so `top_k => 5` pools 50 rows and `top_k => 42` pools 420, stopping three rows short of the target.
 
-The sweep brackets the boundary rather than asserting it. `ceil(2,072 / 10) = 208` is the smallest page whose pool reaches this row, and the two sizes either side of it are the whole argument: at `top_k => 207` the pool stops two rows short and the target is absent; at `top_k => 208` it comes back. One row of page size, nothing else about the query touched.
+`ceil(423 / 10) = 43` is the smallest page whose pool reaches this row (`pool = 430`), and the sweep tests `top_k => 42`, `=> 43`, and `=> 64`. At `top_k => 42` the pool stops three rows short and the target is absent. At `top_k => 43` the target enters the 430-row pool — **yet it is still absent from the returned page**, whereas at `top_k => 64` it comes back at position 48 (`distance = 0.981536164002`). Why didn't entering the pool at `top_k => 43` suffice?
 
-The returned scores say so directly. *Inside* the pool the lexical leg ranks every candidate: BM25 matches take lexical ranks 1, 2, 3 …, and the pooled rows it does not match fall in behind them in vector order, so no pooled row forfeits a term. When nothing matches, lexical rank equals vector rank the whole way down and the page comes back as `1 - (1/(60 + r) + 1/(61 + r))` — `0.967478`, `0.967998`, `0.968502`, `0.968990`, `0.969464`. That is the zero-match signature, and it is what the `top_k => 5`, `=> 64` and `=> 207` pages all print, in the same order as the vector-only page. The cell sets the best distance from the 207-row page beside `1 - (1/61 + 1/62)` so the two can be read against each other.
+First, inspect the returned scores when the target misses the pool (`top_k => 5` and `=> 42`). *Inside* the pool the lexical leg ranks every candidate: BM25 matches take lexical ranks 1, 2, 3 …, and the pooled rows it does not match fall in behind them in vector order, so no pooled row forfeits a term. When nothing in the pool matches, lexical rank equals vector rank the whole way down and the page comes back as `1 - (1/(60 + r) + 1/(61 + r))` — `0.967478`, `0.967998`, `0.968502`, `0.968990`, `0.969464`. That is the zero-match signature. The cell sets the best distance from the 42-row page beside `1 - (1/61 + 1/62)` so the two can be read against each other.
 
-Clearing the pool is necessary, not sufficient. A pooled match still has to outscore the row holding the last slot. What the match buys is the move to lexical rank 1, worth a flat `1/62 = 0.0161` of fused score however emphatic the match, and the row it has to displace sits at semantic rank `top_k` and, pushed down one place by the match, lexical rank `top_k + 1`. So the second gate is the deepest `R` satisfying
+Clearing the pool is necessary, not sufficient — and `top_k => 43` proves why. A pooled match still has to outscore the row holding the last slot. What the match buys is the move to lexical rank 1, worth a flat `1/62 = 0.0161` of fused score however emphatic the match, and the row it has to displace sits at semantic rank `top_k` and, pushed down one place by the match, lexical rank `top_k + 1`. So the second gate is the deepest `R` satisfying
 
     1/(60 + R) + 1/62  >  1/(60 + top_k) + 1/(62 + top_k)
 
-**Effective reach is the smaller of the two gates.** The score gate binds on short pages, where a fixed `0.0161` can only displace so much. From `top_k = 51` upward the pool gate takes over and pins reach to exactly `10 * top_k`:
+**Effective reach is the smaller of the two gates.** The score gate binds on short pages, where a fixed `0.0161` can only displace so much. At `top_k = 43`, the pool holds 430 rows, but the scoring gate only reaches semantic rank 262 — so our target at rank 423 is pooled, given lexical rank 1, and still outscored by the 43rd semantic row. From `top_k = 51` upward the pool gate takes over and pins reach to exactly `10 * top_k`:
 
-| `top_k` | 2 | 3 | 5 | 10 | 20 | 30 | 40 | 50 | 51 | 64 | 100 | 208 | 300 |
-|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| deepest semantic rank retrievable | 3 | 6 | 10 | 23 | 56 | 110 | 212 | 468 | 510 | 640 | 1,000 | 2,080 | 3,000 |
+| `top_k` | 2 | 3 | 5 | 10 | 20 | 30 | 40 | 43 | 50 | 51 | 64 | 100 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| deepest semantic rank retrievable | 3 | 6 | 10 | 23 | 56 | 110 | 212 | 262 | 468 | 510 | 640 | 1,000 |
 
-Read the table as a sizing rule, and read it in that order. **`R/10` is a floor, not a recipe.** `top_k` has to be at least `R/10` to put a target at semantic rank `R` into the pool at all, and on short pages it has to be larger still to clear the score gate — a row at semantic rank 100 is already inside the pool at `top_k => 10`, but needs `top_k => 29` to survive the scoring comparison. Only above `top_k = 51`, where the pool gate binds alone, does `R/10` become the answer as well as the floor. A five-row page reaches semantic rank 10 and a 64-row page reaches 640, while a 32-character hex string used as a `query_value` puts its own row 2,072 deep in this 7,275-row catalog — which is why it takes exactly `top_k => 208` to pull back by token alone.
+Read the table as a sizing rule, and read it in that order. **`R/10` is a floor, not a recipe.** `top_k` has to be at least `R/10` to put a target at semantic rank `R` into the pool at all, and on pages below `top_k = 51` it has to be larger still to clear the score gate — a row at semantic rank 423 is already inside the pool at `top_k => 43`, but needs the scoring gate to reach past 423 (which happens at `top_k => 49`, and comfortably at `top_k => 64` where reach is 640 and the target lands at position 48). Only above `top_k = 51`, where the pool gate binds alone, does `R/10` become the answer as well as the floor.
 
-**That makes reach a diagnostic, not a design.** With the SKU as the `query_value` the vector leg contributes nothing but an arbitrary rank, so the row's only route onto the page is `1/62` carrying it across two thousand positions — and ranking a 2,080-row pool to find one known identifier is work a predicate would not do at all. The case worth engineering for is the one a shopper actually types: words *and* an identifier.
+**That makes reach a diagnostic, not a design.** With the SKU as the `query_value` the vector leg contributes nothing but an arbitrary rank, so the row's only route onto the page is `1/62` carrying it across hundreds of positions — and ranking a 640-row pool to find one known identifier is work a predicate would not do at all. The case worth engineering for is the one a shopper actually types: words *and* an identifier.
 
-So give the row **both** signals — a `query_value` that describes what the product *is*, so the vector leg ranks it on its own merits and lands it inside the pool, and the opaque SKU as `lexical_search_query_value`, so the lexical leg puts it at rank 1. The next cell holds `top_k` at 64. The description alone places the target at semantic rank 49, well inside both the 640-row pool and the 640-deep reach, so the `1/62` has a short distance to carry it instead of thousands of ranks; what changes is how far up the page it lands and whether anything is pushed off the end of it.
+So give the row **both** signals — a `query_value` that describes what the product *is*, so the vector leg ranks it on its own merits and lands it inside the pool, and the opaque SKU as `lexical_search_query_value`, so the lexical leg puts it at rank 1. The next cell holds `top_k` at 64. The description alone places the target at semantic rank 49, well inside both the 640-row pool and the 640-deep reach, so the `1/62` has a short distance to carry it instead of hundreds of ranks; what changes is how far up the page it lands and whether anything is pushed off the end of it.
 
 The description below is built from the target's own `department` and `category` at run time rather than typed in, so it stays correct when `thelook_ecommerce` is regenerated and a different product becomes the target. It contains no SKU and no brand — it is what a shopper would type from memory. The SKU stays in the lexical argument, untouched.
 
@@ -688,7 +691,7 @@ def search_page(with_lexical: bool):
       FROM VECTOR_SEARCH(
         TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_catalog_products`,
         'embedding',
-        query_value => (AI.EMBED(content => @vq, endpoint => 'text-embedding-005')).result,{lexical_args}
+        query_value => (AI.EMBED(content => @vq, endpoint => 'gemini-embedding-2', model_params => JSON '{{"outputDimensionality": 768}}')).result,{lexical_args}
         top_k => {HYBRID_TOP_K},
         distance_type => 'COSINE'
       )
@@ -707,7 +710,7 @@ target_rank = client.query(f'''
     FROM VECTOR_SEARCH(
       TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_catalog_products`,
       'embedding',
-      query_value => (AI.EMBED(content => @vq, endpoint => 'text-embedding-005')).result,
+      query_value => (AI.EMBED(content => @vq, endpoint => 'gemini-embedding-2', model_params => JSON '{{"outputDimensionality": 768}}')).result,
       top_k => -1,
       distance_type => 'COSINE'
     )
@@ -742,7 +745,7 @@ if len(target_position) and int(target_position.iloc[0]) > 10:
 
 ### Does the lexical leg damage a query it cannot help?
 
-The exact token is worth exactly one thing: lexical rank 1, a flat `1/62` of fused score, and only for a row the candidate pool already holds. How far that carries a row is set by `top_k` and nothing else — ten ranks deep on a five-row page, 640 on a 64-row one. Both results above are the same arithmetic at two depths: at semantic rank 2,072 the row never enters a 640-row pool and nothing happens, while at semantic rank 49 it is pooled comfortably and the `1/62` lifts it thirty places.
+The exact token is worth exactly one thing: lexical rank 1, a flat `1/62` of fused score, and only for a row the candidate pool already holds. How far that carries a row is set by `top_k` and nothing else — ten ranks deep on a five-row page, 262 on a 43-row page, 640 on a 64-row one. Both results above are the same arithmetic at two depths: at semantic rank 423 the row misses a 420-row pool (`top_k => 42`), falls short of the 262-rank scoring gate (`top_k => 43`), and only scrapes onto a 64-row page at position 48, while at semantic rank 49 it is pooled comfortably and the `1/62` lifts it 31 places to position 18 of 64.
 
 The remaining question is the cost. `SEARCH()` returned zero rows for the paraphrase in Step 3, so it is tempting to assume the lexical half contributes nothing here. It does not work out that way: `SEARCH()` requires *every* query token to be present, while BM25 scores *partial* overlap, so a product named `... Two-Layer Thermal` still matches on `layer`. Run the same pair of calls and let the code print what actually moved.
 
@@ -754,7 +757,7 @@ vector_only_need = client.query(f'''
   FROM VECTOR_SEARCH(
     TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_catalog_products`,
     'embedding',
-    query_value => (AI.EMBED(content => @q, endpoint => 'text-embedding-005')).result,
+    query_value => (AI.EMBED(content => @q, endpoint => 'gemini-embedding-2', model_params => JSON '{{"outputDimensionality": 768}}')).result,
     top_k => 5,
     distance_type => 'COSINE'
   )
@@ -766,7 +769,7 @@ hybrid_need = client.query(f'''
   FROM VECTOR_SEARCH(
     TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_catalog_products`,
     'embedding',
-    query_value => (AI.EMBED(content => @q, endpoint => 'text-embedding-005')).result,
+    query_value => (AI.EMBED(content => @q, endpoint => 'gemini-embedding-2', model_params => JSON '{{"outputDimensionality": 768}}')).result,
     top_k => 5,
     distance_type => 'COSINE',
     lexical_search_columns => ['sku', 'model_number', 'brand', 'name'],
@@ -852,7 +855,7 @@ ranks = client.query(f'''
   FROM VECTOR_SEARCH(
     TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_catalog_products`,
     'embedding',
-    query_value => (AI.EMBED(content => @vq, endpoint => 'text-embedding-005')).result,
+    query_value => (AI.EMBED(content => @vq, endpoint => 'gemini-embedding-2', model_params => JSON '{{"outputDimensionality": 768}}')).result,
     top_k => -1,
     distance_type => 'COSINE'
   )
@@ -911,7 +914,7 @@ SELECT query.q, base.sku, base.name, distance
 FROM VECTOR_SEARCH(
   TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_catalog_products`,
   'embedding',
-  (SELECT q, (AI.EMBED(content => q, endpoint => 'text-embedding-005')).result AS emb
+  (SELECT q, (AI.EMBED(content => q, endpoint => 'gemini-embedding-2', model_params => JSON '{{"outputDimensionality": 768}}')).result AS emb
    FROM UNNEST([@sku_q, @need_q]) AS q),
   'emb',
   top_k => 3,
@@ -938,11 +941,11 @@ What each approach did with the queries this notebook ran:
 
 | Query | `SEARCH()` full text | `AI.SEARCH mode => 'VECTOR'` | `AI.SEARCH mode => 'HYBRID'` | `VECTOR_SEARCH` + `lexical_search_columns` |
 |---|---|---|---|---|
-| Exact SKU and nothing else | finds the single row | **fails** — the SKU was never embedded | **fails** — the lexical half sees only `column_to_search` | **decided by `top_k`** — out of reach at `top_k => 5`, `=> 64` and `=> 207`, returned at `=> 208`, because the lexical leg only sees the top `10 * top_k` rows and this SKU sits at semantic rank 2,072 |
-| A description of the product, SKU passed separately as the lexical query | cannot express — one query string | cannot express — no separate lexical query | cannot express — no separate lexical query | **the configuration to reach for** — the row earns a vector rank *and* lexical rank 1, and is promoted from vector rank 49 to position 19 of 64 rather than scraping onto the end of the page |
-| Paraphrased need | **fails — 0 rows** | best | not run in this notebook | no damage — four of the five rows are retained and reordered, and BM25 partial overlap on `layer` swaps in a fifth |
+| Exact SKU and nothing else | finds the single row | **fails** — the SKU was never embedded | **fails** — the lexical half sees only `column_to_search` | **decided by `top_k`** — out of reach at `top_k => 5`, `=> 42` (pool 420) and `=> 43` (pool 430, scoring gate 262), returned at `=> 64` (position 48 of 64), because this SKU sits at semantic rank 423 |
+| A description of the product, SKU passed separately as the lexical query | cannot express — one query string | cannot express — no separate lexical query | cannot express — no separate lexical query | **the configuration to reach for** — the row earns a vector rank *and* lexical rank 1, and is promoted from vector rank 49 to position 18 of 64 rather than scraping onto the end of the page |
+| Paraphrased need | **fails — 0 rows** | best | not run in this notebook | no damage — three of the five rows are retained, and BM25 partial overlap swaps in two relevant thermal/outdoor items |
 
-Read the first two rows together. The exact token is worth lexical rank 1 and nothing else, a flat `1/62` of fused score, so how deep it reaches is a property of the page size rather than of the query: ten rows at `top_k => 5`, 110 at `top_k => 30`, and a flat `10 * top_k` from `top_k => 51` up — 640 rows at `top_k => 64`. For a target at semantic rank `R`, size `top_k` to at least `R/10`, and to whatever more the reach table demands on short pages. Adding a semantic `query_value` that describes the product is what lets a short page work at all, because the vector leg then does most of the carrying instead of leaving `1/62` to cross thousands of ranks.
+Read the first two rows together. The exact token is worth lexical rank 1 and nothing else, a flat `1/62` of fused score, so how deep it reaches is a property of the page size rather than of the query: ten rows at `top_k => 5`, 110 at `top_k => 30`, 262 at `top_k => 43`, and a flat `10 * top_k` from `top_k => 51` up — 640 rows at `top_k => 64`. For a target at semantic rank `R`, size `top_k` to at least `R/10`, and to whatever more the reach table demands on pages below `top_k = 51`. Adding a semantic `query_value` that describes the product is what lets a short page work at all, because the vector leg then does most of the carrying instead of leaving `1/62` to cross hundreds of ranks.
 
 And how the two search functions compare as tools:
 

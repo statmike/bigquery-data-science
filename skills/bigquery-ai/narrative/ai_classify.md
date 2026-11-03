@@ -179,7 +179,7 @@ SELECT
   AI.CLASSIFY(
     product,
     ['Electronics', 'Clothing', 'Home & Kitchen', 'Sports', 'Books'],
-    endpoint => 'gemini-2.5-flash'
+    endpoint => 'gemini-3.8-flash'
   ) AS category
 FROM UNNEST([
   'Wireless noise-cancelling headphones',

@@ -88,6 +88,7 @@ Signed URLs expire after 6 hours. Row-level access policies restrict which URLs 
 - Connection must be in the same region as the dataset.
 
 **AI function integration:** every one of these reads the `ref` column as-is — an `ObjectRef` — with no signing step in between.
+- `AI.CHUNK_DOCUMENT` — zero-DDL layout-aware document chunking (`TABLE object_table` or `(SELECT ... ref ...)` subquery).
 - `ML.PROCESS_DOCUMENT` — document extraction via Document AI processors.
 - `AI.GENERATE_TEXT` / `AI.GENERATE` — text generation from object data: `STRUCT(text AS prompt, [ref] AS object_refs)`.
 - `AI.GENERATE_EMBEDDING` — embeddings from image/video data: a `content` column of `ObjectRef`.

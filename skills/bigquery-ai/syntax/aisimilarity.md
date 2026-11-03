@@ -2,10 +2,10 @@
 
 > **Source:** [`bigquery-ai/reference/embedding-generation-and-semantic-search.md#aisimilarity`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/embedding-generation-and-semantic-search.md#aisimilarity)
 
-- **Description:** (Preview) Scalar function that computes the cosine similarity between two inputs (text or images). Creates embeddings for both inputs at runtime and computes the cosine similarity between them. Values closer to 1 indicate more similar inputs.
+- **Description:** Scalar function that computes the cosine similarity between two inputs (text or multimodal objects). Creates embeddings for both inputs at runtime and returns their cosine similarity (`FLOAT64`), where values closer to `1` indicate higher semantic similarity.
 - **Use cases:** Semantic search without precomputed embeddings, recommendation, classification, prototyping similarity queries.
 - [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-similarity)
-- **Type:** Scalar function (returns FLOAT64) -- Preview
+- **Type:** Scalar function (returns FLOAT64) -- GA
 
 **Syntax (text with endpoint):**
 ```sql
@@ -42,11 +42,11 @@ AI.SIMILARITY(
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `content1` | STRING, ObjectRef, or ObjectRefRuntime | Required | First value to compare. An `ObjectRef` is enough — no signing step. For `gemini-embedding-2`: can be a STRUCT (text, images, audio, video, PDFs). |
+| `content1` | STRING, ObjectRef, or ObjectRefRuntime | Required | First value to compare. An `ObjectRef` is enough — no signing step. For `gemini-embedding-2`: can be a STRING, an `ObjectRef`, or a STRUCT (text, images, audio, video, PDFs). |
 | `content2` | STRING, ObjectRef, or ObjectRefRuntime | Required | Second value to compare. Same types as `content1`. |
-| `endpoint` | STRING | Required (unless `model` specified) | Embedding model endpoint (e.g., `text-embedding-005`, `multimodalembedding@001`, `gemini-embedding-2`). |
+| `endpoint` | STRING | Required (unless `model` specified) | Embedding model endpoint (e.g., `gemini-embedding-2`, `gemini-embedding-001`, `text-embedding-005`, `multimodalembedding@001`). |
 | `model` | STRING | Optional (Preview) | Built-in text embedding model. Only supported value: `embeddinggemma-300m`. When specified, cannot use `endpoint`, `model_params`, or `connection_id`. No Vertex AI charges. |
-| `model_params` | JSON literal | Optional | For text: any parameters object fields including `outputDimensionality`. For multimodal: only `dimension`. |
+| `model_params` | JSON literal | Optional | For `gemini-embedding-2`, `gemini-embedding-001`, and `text-embedding-005`: camelCase `JSON '{"outputDimensionality": 768}'`. For `multimodalembedding@001`: `JSON '{"dimension": 512}'`. |
 | `connection_id` | STRING | Optional for text; Required for multimodal | Connection in format `PROJECT_ID.LOCATION.CONNECTION_ID`. |
 
 **Outputs:** Returns FLOAT64 (cosine similarity). NULL on error.
@@ -74,6 +74,6 @@ AI.SIMILARITY(
 
 **Provisioned throughput:** Not specified in documentation.
 
-**BigFrames API:** No direct equivalent. Use `%%bigquery` magics or `session.read_gbq_query()` to execute AI.SIMILARITY SQL from BigFrames.
+**BigFrames API:** `bigframes.bigquery.ai.similarity(content1, content2, *, endpoint=..., model=..., connection_id=..., model_params=...)` (available in `bigframes 2.51.0+`) — Scalar wrapper returning a Series of `FLOAT64` cosine similarity scores directly.
 
 ---

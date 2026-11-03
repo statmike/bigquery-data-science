@@ -50,8 +50,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
                 "query": {
                     "type": "string",
                     "description": (
-                        "Natural-language task description "
-                        "(e.g. 'forecast daily sales')."
+                        "Natural-language task description (e.g. 'forecast daily sales')."
                     ),
                 },
                 "task": {
@@ -96,8 +95,7 @@ TOOLS: tuple[dict[str, Any], ...] = (
                 "query": {
                     "type": "string",
                     "description": (
-                        "Keyword or phrase to search for "
-                        "(e.g. 'reservation', 'xgboost_version')."
+                        "Keyword or phrase to search for (e.g. 'reservation', 'xgboost_version')."
                     ),
                 },
                 "skill": {
@@ -191,8 +189,7 @@ RESOURCE_TEMPLATES: tuple[dict[str, Any], ...] = (
         "uriTemplate": "bqds://narrative/{skill}/{topic}",
         "name": "BigQuery Live-Verified Walkthrough Narrative (Lens 4)",
         "description": (
-            "Read a complete notebook walkthrough (e.g. "
-            "bqds://narrative/bigquery-ai/ai_agg)."
+            "Read a complete notebook walkthrough (e.g. bqds://narrative/bigquery-ai/ai_agg)."
         ),
         "mimeType": "text/markdown",
     },
@@ -306,9 +303,7 @@ def _read_resource(uri: str, skills_dir: Path | None = None) -> str:
     root = (skills_dir if skills_dir is not None else get_skills_dir()).resolve()
     cleaned = uri.strip()
     if not cleaned.startswith("bqds://"):
-        raise ValueError(
-            f"Unsupported resource URI scheme in '{cleaned}' (expected 'bqds://')."
-        )
+        raise ValueError(f"Unsupported resource URI scheme in '{cleaned}' (expected 'bqds://').")
     path_part = cleaned[len("bqds://") :].strip("/")
     parts = [p for p in path_part.split("/") if p]
     if any(p in ("..", ".") for p in parts) or len(parts) < 2:
@@ -333,9 +328,7 @@ def _read_resource(uri: str, skills_dir: Path | None = None) -> str:
                 return target.read_text(encoding="utf-8")
             if lens == "syntax":
                 lookup_res = lookup_symbol(stem, skills_dir=root)
-                if lookup_res.found and (
-                    not skill_name or lookup_res.skill == skill_name
-                ):
+                if lookup_res.found and (not skill_name or lookup_res.skill == skill_name):
                     return lookup_res.format_text()
             elif lens == "narrative":
                 wt = get_walkthrough(f"{skill_name}/{stem}", skills_dir=root)
@@ -458,21 +451,15 @@ def _get_prompt(
 def _call_tool(tool_name: str, arguments: dict[str, Any]) -> str:
     """Execute one MCP tool call and return the formatted text payload."""
     if tool_name == "triage_bigquery_task":
-        raw_query = str(
-            arguments.get("query") or arguments.get("task") or ""
-        ).strip()
+        raw_query = str(arguments.get("query") or arguments.get("task") or "").strip()
         if not raw_query:
-            raise ValueError(
-                "triage_bigquery_task requires a non-empty 'query' or 'task' string."
-            )
+            raise ValueError("triage_bigquery_task requires a non-empty 'query' or 'task' string.")
         return triage_task(raw_query).format_text()
 
     if tool_name == "lookup_bigquery_syntax":
         symbol = str(arguments.get("symbol") or "").strip().strip("`").strip()
         if not symbol:
-            raise ValueError(
-                "lookup_bigquery_syntax requires a non-empty 'symbol' string."
-            )
+            raise ValueError("lookup_bigquery_syntax requires a non-empty 'symbol' string.")
         result = lookup_symbol(symbol)
         if not result.found:
             raise ValueError(result.format_text())
@@ -481,17 +468,13 @@ def _call_tool(tool_name: str, arguments: dict[str, Any]) -> str:
     if tool_name == "search_bigquery_gotchas":
         query = str(arguments.get("query") or "").strip()
         if not query:
-            raise ValueError(
-                "search_bigquery_gotchas requires a non-empty 'query' string."
-            )
+            raise ValueError("search_bigquery_gotchas requires a non-empty 'query' string.")
         skill = arguments.get("skill")
         skill_filter = str(skill).strip() if skill else None
         limit_raw = arguments.get("limit")
         limit = (
             int(limit_raw)
-            if isinstance(limit_raw, int)
-            and not isinstance(limit_raw, bool)
-            and limit_raw > 0
+            if isinstance(limit_raw, int) and not isinstance(limit_raw, bool) and limit_raw > 0
             else DEFAULT_SEARCH_LIMIT
         )
         hits = search_catalog(
@@ -506,9 +489,7 @@ def _call_tool(tool_name: str, arguments: dict[str, Any]) -> str:
     if tool_name == "get_bigquery_walkthrough":
         topic = str(arguments.get("topic") or "").strip()
         if not topic:
-            raise ValueError(
-                "get_bigquery_walkthrough requires a non-empty 'topic' string."
-            )
+            raise ValueError("get_bigquery_walkthrough requires a non-empty 'topic' string.")
         wt = get_walkthrough(topic)
         if not wt.get("found"):
             raise ValueError(str(wt.get("content", f"Walkthrough '{topic}' not found.")))
@@ -517,9 +498,7 @@ def _call_tool(tool_name: str, arguments: dict[str, Any]) -> str:
     if tool_name == "review_bigquery_sql":
         sql = str(arguments.get("sql") or "").strip()
         if not sql:
-            raise ValueError(
-                "review_bigquery_sql requires a non-empty 'sql' string."
-            )
+            raise ValueError("review_bigquery_sql requires a non-empty 'sql' string.")
         return review_sql(sql).format_text()
 
     raise ValueError(f"Unknown tool '{tool_name}'.")

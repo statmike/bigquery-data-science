@@ -2,10 +2,10 @@
 
 # AI.SIMILARITY — BigQuery AI Functions
 
-`AI.SIMILARITY` is a scalar function that computes cosine similarity between two inputs by generating embeddings at runtime. Specify an endpoint, or use the built-in `embeddinggemma-300m` model with no Vertex AI charges. Values closer to 1 indicate more similar inputs.
+`AI.SIMILARITY` is a scalar function that computes cosine similarity between two inputs by generating embeddings at runtime using `gemini-embedding-2` (or the built-in `embeddinggemma-300m` model with no Vertex AI charges). Values closer to 1 indicate more similar inputs.
 
 **When to use it:**
-- You want to compare two specific texts or images for similarity
+- You want to compare two specific texts or multimodal inputs (images, PDFs) for similarity
 - You need a quick similarity check without pre-computed embeddings
 - You are prototyping a similarity-based feature
 - You want zero-cost text similarity using the built-in model (`embeddinggemma-300m`)
@@ -15,7 +15,7 @@
 - `functions/ai_embed` (`AI.EMBED`) — Create embeddings yourself and compute distance manually
 - `functions/ai_search` (`AI.SEARCH`) — Simplified semantic search with autonomous embedding generation
 
-**Multimodal:** Supports image input via `reference/unstructured-data-infrastructure.md#objectref-and-objectrefruntime-schema-reference` (ObjectRef) with `multimodalembedding@001`. For PDFs, use `gemini-embedding-2` (GA), which compares PDFs directly without rendering to images.
+**Multimodal:** `gemini-embedding-2` (GA) supports image, PDF, audio, and video comparison via `reference/unstructured-data-infrastructure.md#objectref-and-objectrefruntime-schema-reference` (ObjectRef), as well as cross-modal text-to-image/PDF similarity in a shared 3,072-dimension vector space (legacy `multimodalembedding@001` also supports images and video).
 
 **Featured in:** `workflows/multimodal_analysis` (Multimodal Analysis)
 
@@ -113,7 +113,7 @@ SELECT
   AI.SIMILARITY(
     content1 => 'BigQuery is a data warehouse',
     content2 => 'BigQuery stores and analyzes data',
-    endpoint => 'text-embedding-005'
+    endpoint => 'gemini-embedding-2'
   ) AS similarity
 """
 df = client.query(query).to_dataframe()
@@ -132,7 +132,7 @@ SELECT
   AI.SIMILARITY(
     content1 => text_a,
     content2 => text_b,
-    endpoint => 'text-embedding-005'
+    endpoint => 'gemini-embedding-2'
   ) AS similarity
 FROM
   UNNEST(['machine learning', 'deep learning', 'cooking recipes']) AS text_a,
@@ -153,7 +153,7 @@ SELECT
   AI.SIMILARITY(
     content1 => 'comfortable typing device',
     content2 => product,
-    endpoint => 'text-embedding-005'
+    endpoint => 'gemini-embedding-2'
   ) AS similarity
 FROM UNNEST([
   'mechanical keyboard with ergonomic design',
@@ -185,10 +185,10 @@ WITH items AS (
 SELECT
   a.id AS id_a, a.text AS text_a,
   b.id AS id_b, b.text AS text_b,
-  AI.SIMILARITY(content1 => a.text, content2 => b.text, endpoint => 'text-embedding-005') AS similarity
+  AI.SIMILARITY(content1 => a.text, content2 => b.text, endpoint => 'gemini-embedding-2') AS similarity
 FROM items a, items b
 WHERE a.id < b.id
-  AND AI.SIMILARITY(content1 => a.text, content2 => b.text, endpoint => 'text-embedding-005') > 0.8
+  AND AI.SIMILARITY(content1 => a.text, content2 => b.text, endpoint => 'gemini-embedding-2') > 0.75
 ORDER BY similarity DESC
 """
 client.query(query).to_dataframe()
@@ -221,11 +221,11 @@ client.query(query).to_dataframe()
 ---
 ## Multimodal — Document and Cross-Modal Similarity
 
-`AI.SIMILARITY` supports image-to-image and text-to-image comparison using `multimodalembedding@001`. A `connection_id` is required. The function takes an inline `OBJ.MAKE_REF` to access images from GCS.
+`AI.SIMILARITY` supports image-to-image, PDF-to-PDF, and cross-modal text-to-image/PDF comparison using `gemini-embedding-2` (GA). A `connection_id` is required. The function takes an inline `OBJ.MAKE_REF` to access files from GCS.
 
-> **Also GA:** `gemini-embedding-2` supports PDF comparison directly — no rendering to PNG needed — and the same cross-modal text-to-image comparison. The examples below use `multimodalembedding@001` with rendered PNGs.
+> **Note:** Legacy `multimodalembedding@001` also supports image comparison, while `gemini-embedding-2` is the unified model for text, images, PDFs, audio, and video.
 
-Below we render invoice and receipt PDFs from this project's `data/documents` (document set) to PNG images, then compare them directly and cross-modally with text.
+Below we render invoice and receipt PDFs from this project's `data/documents` (document set) to PNG images, then compare them directly and cross-modally with text using `gemini-embedding-2`.
 
 ```python
 import shutil, subprocess
@@ -273,7 +273,7 @@ print(f'Rendered and uploaded {len(docs)} document images to gs://{BUCKET}/{pref
 
 ### 6. Document-to-document similarity
 
-Compare two document images using inline ObjectRef. The function embeds both with `multimodalembedding@001` and returns cosine similarity. Same-type documents (invoice vs invoice) should score higher than cross-type pairs.
+Compare two document images using inline `ObjectRef`. The function embeds both with `gemini-embedding-2` and returns cosine similarity. Same-type documents (invoice vs invoice) score higher than cross-type pairs.
 
 ```python
 # Compare an invoice pair vs an invoice-receipt pair
@@ -292,7 +292,7 @@ for label, doc_a, doc_b in [
           'gs://{BUCKET}/bq_ai_functions/ai_similarity/{doc_b}',
           '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}'
         ),
-        endpoint => 'multimodalembedding@001',
+        endpoint => 'gemini-embedding-2',
         connection_id => '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}'
       ) AS similarity
     """
@@ -315,7 +315,7 @@ SELECT
       CONCAT('gs://{BUCKET}/bq_ai_functions/ai_similarity/', doc_name),
       '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}'
     ),
-    endpoint => 'multimodalembedding@001',
+    endpoint => 'gemini-embedding-2',
     connection_id => '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}'
   ), 4) AS similarity
 FROM
@@ -346,7 +346,7 @@ SELECT
   AI.SIMILARITY(
     content1 => text_a,
     content2 => text_b,
-    endpoint => 'text-embedding-005'
+    endpoint => 'gemini-embedding-2'
   ) AS similarity
 FROM
   UNNEST(['machine learning', 'cooking']) AS text_a,
@@ -374,7 +374,7 @@ SELECT
   AI.SIMILARITY(
     content1 => 'data warehouse',
     content2 => 'analytics platform',
-    endpoint => 'text-embedding-005'
+    endpoint => 'gemini-embedding-2'
   ) AS similarity
 """
 df = bpd.read_gbq_query(query)

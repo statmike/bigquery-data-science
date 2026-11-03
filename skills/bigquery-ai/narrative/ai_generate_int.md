@@ -138,7 +138,7 @@ SELECT
   element,
   (AI.GENERATE_INT(
     CONCAT('What is the atomic number of ', element, '?'),
-    endpoint => 'gemini-2.5-flash'
+    endpoint => 'gemini-3.8-flash'
   )).result AS atomic_number
 FROM UNNEST(['Hydrogen', 'Carbon', 'Oxygen', 'Iron', 'Gold']) AS element
 """

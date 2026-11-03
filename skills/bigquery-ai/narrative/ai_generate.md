@@ -18,7 +18,7 @@
 
 **Multimodal:** Supports document, image, and video input via `reference/unstructured-data-infrastructure.md#objectref-and-objectrefruntime-schema-reference` (ObjectRef). Pass a STRUCT prompt with `ObjectRef` fields to analyze unstructured data from Cloud Storage.
 
-**Thinking:** Supports extended reasoning via `model_params` — use `thinking_budget` (Gemini 2.5) or `thinking_level` (Gemini 3.0+) to control reasoning depth.
+**Thinking:** Supports extended reasoning via `model_params` — use `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"` on Gemini 3.x and 4.x models; legacy Gemini 2.5 models used `thinking_budget`) to control reasoning depth.
 
 **Featured in:** `workflows/content_analysis` (Content Analysis Pipeline) | `workflows/data_enrichment` (Data Enrichment) | `workflows/rag_pipeline` (RAG Pipeline) | `workflows/document_intelligence` (Document Intelligence) | `workflows/content_moderation` (Content Moderation) | `workflows/multimodal_analysis` (Multimodal Analysis) | `workflows/document_rag` (Document RAG Pipeline) | `workflows/metric_diagnostics` (Metric Diagnostics) | `workflows/tabular_prediction` (Zero-Shot Tabular Prediction)
 
@@ -29,7 +29,7 @@
 
 Set your project and location, authenticate, and create a temporary dataset for this notebook.
 
-> `AI.GENERATE` doesn't require a connection or model — it uses end-user credentials and defaults to `gemini-2.5-flash`. The [multimodal examples](#examples--multimodal-with-objectref) later in this notebook add a connection for GCS access. See the `setup` (Setup Reference) for details.
+> `AI.GENERATE` doesn't require a connection or model — it uses end-user credentials and defaults to `gemini-3.5-flash-lite` (pin `endpoint => 'gemini-3.8-flash'` or `endpoint => 'gemini-4-argon'` for reproducible production behavior). The [multimodal examples](#examples--multimodal-with-objectref) later in this notebook add a connection for GCS access. See the `setup` (Setup Reference) for details.
 
 ```python
 import os
@@ -176,14 +176,14 @@ if 'usageMetadata' in full:
 
 ### 4. Specifying an endpoint
 
-Override the default model (`gemini-2.5-flash`) with any Gemini model.
+Override the default model (`gemini-3.5-flash-lite`) with any Gemini model, such as `'gemini-3.8-flash'` or the frontier reasoning tier `'gemini-4-argon'`.
 
 ```python
 query = """
 SELECT
   (AI.GENERATE(
     'Write a haiku about data warehouses.',
-    endpoint => 'gemini-2.5-pro'
+    endpoint => 'gemini-4-argon'
   )).result AS haiku
 """
 df = client.query(query).to_dataframe()
@@ -266,21 +266,17 @@ df = client.query(query).to_dataframe()
 print(df.iloc[0]['creative_name'])
 ```
 
-### 8. Thinking budget
+### 8. Thinking configuration (`thinking_level`)
 
-Gemini 2.5 models support "thinking" — internal reasoning before responding. Control the thinking budget (in tokens) to balance quality vs cost.
-
-> **Gemini 3.0+:** Use `thinking_level` (`LOW`, `MEDIUM`, `HIGH`) in `thinking_config` instead of `thinking_budget`:
-> ```sql
-> model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}'
-> ```
+Gemini 3.x and 4.x models (`gemini-3.8-flash`, `gemini-4-argon`) support extended internal reasoning before responding. Configure `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`) in `thinking_config` to balance reasoning depth and latency (note: legacy Gemini 2.5 models used an integer `thinking_budget` in tokens).
 
 ```python
 query = """
 SELECT
   (AI.GENERATE(
     'What is the sum of all prime numbers less than 50?',
-    model_params => JSON '{"generation_config": {"thinking_config": {"thinking_budget": 2048}}}'
+    endpoint => 'gemini-4-argon',
+    model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}'
   )).result AS answer
 """
 df = client.query(query).to_dataframe()
@@ -692,12 +688,14 @@ df_products[['product', 'category', 'price', 'features']].to_pandas()
 
 ### Specifying an endpoint
 
+`bbq.ai.generate` passes `'gemini-3.8-flash'` and `'gemini-4-argon'` directly to BigQuery SQL with zero client-side warnings (unlike the legacy `bigframes.ml.llm.GeminiTextGenerator` estimator in `bigframes 2.51.0`, which validates against a hardcoded `_GEMINI_ENDPOINTS` tuple up to `'gemini-3.5-flash'`).
+
 ```python
 df = bpd.DataFrame({'prompt': ['Write a haiku about data warehouses.']})
 
 result = bbq.ai.generate(
     df['prompt'],
-    endpoint='gemini-2.5-pro'
+    endpoint='gemini-4-argon'
 )
 
 result.struct.field('result').to_pandas()

@@ -90,13 +90,19 @@ TARGET_DIR="$WORK/installed-skills"
 [[ -f "$TARGET_DIR/.mcp.json" ]] || fail "installed .mcp.json missing"
 
 "$BIN/bigquery-data-science" list --json >/dev/null || fail "list --json failed"
-"$BIN/bigquery-data-science" review-sql "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.5-flash')" --json >/dev/null || fail "review-sql --json failed"
+"$BIN/bigquery-data-science" review-sql "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.8-flash')" --json >/dev/null || fail "review-sql --json failed"
 
 ARIMA_OUT="$("$BIN/bigquery-data-science" lookup ARIMA_PLUS)" || fail "lookup ARIMA_PLUS failed"
 grep -qi "ARIMA_PLUS" <<<"$ARIMA_OUT" || fail "lookup ARIMA_PLUS output missing ARIMA_PLUS"
 
 FORECAST_OUT="$("$BIN/bigquery-data-science" lookup AI.FORECAST)" || fail "lookup AI.FORECAST failed"
 grep -qi "AI.FORECAST" <<<"$FORECAST_OUT" || fail "lookup AI.FORECAST output missing AI.FORECAST"
+
+CHUNK_OUT="$("$BIN/bigquery-data-science" lookup AI.CHUNK_DOCUMENT)" || fail "lookup AI.CHUNK_DOCUMENT failed"
+grep -qi "AI.CHUNK_DOCUMENT" <<<"$CHUNK_OUT" || fail "lookup AI.CHUNK_DOCUMENT output missing AI.CHUNK_DOCUMENT"
+
+TRANS_OUT="$("$BIN/bigquery-data-science" lookup AI.TRANSLATE)" || fail "lookup AI.TRANSLATE failed"
+grep -qi "AI.TRANSLATE" <<<"$TRANS_OUT" || fail "lookup AI.TRANSLATE output missing AI.TRANSLATE"
 
 TRIAGE_OUT="$("$BIN/bigquery-data-science" triage "forecast daily sales")" || fail "triage failed"
 grep -qi "forecast" <<<"$TRIAGE_OUT" || fail "triage output missing forecast guidance"
@@ -121,7 +127,7 @@ requests = [
     {"jsonrpc": "2.0", "id": 2, "method": "tools/list", "params": {}},
     {"jsonrpc": "2.0", "id": 3, "method": "tools/call", "params": {"name": "triage_bigquery_task", "arguments": {"query": "forecast daily sales"}}},
     {"jsonrpc": "2.0", "id": 4, "method": "tools/call", "params": {"name": "lookup_bigquery_syntax", "arguments": {"symbol": "ARIMA_PLUS"}}},
-    {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "review_bigquery_sql", "arguments": {"sql": "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.5-flash')"}}},
+    {"jsonrpc": "2.0", "id": 5, "method": "tools/call", "params": {"name": "review_bigquery_sql", "arguments": {"sql": "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.8-flash')"}}},
     {"jsonrpc": "2.0", "id": 6, "method": "resources/list", "params": {}},
     {"jsonrpc": "2.0", "id": 7, "method": "prompts/list", "params": {}},
 ]

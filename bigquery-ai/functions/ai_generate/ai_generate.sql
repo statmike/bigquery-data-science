@@ -3,7 +3,7 @@
 -- Scalar function that sends prompts to Gemini models and returns generated text
 -- or structured output. No model creation required.
 --
--- Default model: gemini-2.5-flash
+-- Default model: gemini-3.5-flash-lite (pin gemini-3.8-flash or gemini-4-argon)
 -- Returns: STRUCT<result STRING, full_response JSON, status STRING>
 --          (or custom schema fields when output_schema is specified)
 -- Multimodal: Supports documents, images, and video via ObjectRef (see examples 13-15)
@@ -54,11 +54,11 @@ FROM (
 -- =============================================================================
 -- Example 4: Specifying an endpoint
 -- =============================================================================
--- Override the default model (gemini-2.5-flash) with any Gemini model.
+-- Override the default model (gemini-3.5-flash-lite) with any Gemini model.
 SELECT
   (AI.GENERATE(
     'Write a haiku about data warehouses.',
-    endpoint => 'gemini-2.5-pro'
+    endpoint => 'gemini-4-argon'
   )).result AS haiku;
 
 
@@ -115,14 +115,15 @@ SELECT
 
 
 -- =============================================================================
--- Example 8: Using model_params — thinking budget
+-- Example 8: Using model_params — thinking_level
 -- =============================================================================
--- Gemini 2.5 models support thinking. Set a thinking budget to control
--- how much reasoning the model does before responding.
+-- Gemini 3.x and 4.x models configure reasoning depth via thinking_level
+-- ("LOW", "MEDIUM", "HIGH") in thinking_config.
 SELECT
   (AI.GENERATE(
     'What is the sum of all prime numbers less than 50?',
-    model_params => JSON '{"generation_config": {"thinking_config": {"thinking_budget": 2048}}}'
+    endpoint => 'gemini-4-argon',
+    model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}'
   )).result AS answer;
 
 

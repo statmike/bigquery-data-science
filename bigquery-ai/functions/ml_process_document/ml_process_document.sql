@@ -9,6 +9,11 @@
 --
 -- Returns: processor-specific fields + ml_process_document_result (JSON),
 --          ml_process_document_status, and all object table columns
+-- Companion: For layout-aware chunking into typed (chunk_id, start_page,
+-- end_page, content, status) rows without CREATE MODEL — e.g. for RAG and
+-- embeddings — use AI.CHUNK_DOCUMENT (see ../ai_chunk_document/). Use
+-- ML.PROCESS_DOCUMENT for specialized extractors (invoices, receipts, forms,
+-- custom Document AI processors).
 --
 -- Full reference: ../../RESOURCES.md
 -- Official docs: https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-process-document

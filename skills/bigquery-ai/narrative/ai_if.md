@@ -161,7 +161,7 @@ Override the auto-selected model with a specific Gemini model.
 query = """
 SELECT
   statement,
-  AI.IF(CONCAT(statement, ' is a factually accurate statement'), endpoint => 'gemini-2.5-flash') AS is_accurate
+  AI.IF(CONCAT(statement, ' is a factually accurate statement'), endpoint => 'gemini-3.8-flash') AS is_accurate
 FROM UNNEST([
   'The Earth orbits the Sun.',
   'Water boils at 50 degrees Celsius.',

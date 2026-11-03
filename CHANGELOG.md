@@ -5,6 +5,30 @@ All notable changes to `bigquery-data-science` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] - 2026-11-02
+
+### Added
+- **2 New GA BigQuery AI SQL Functions (`AI.CHUNK_DOCUMENT` & `AI.TRANSLATE`):**
+  - **`bigquery-ai/functions/ai_chunk_document/`** (`.sql` + live-executed `.ipynb` + Lens 3 `aichunk_document.md` + Lens 4 narrative): Layout-aware table-valued function that chunks unstructured documents in Cloud Storage (`PDF`, `HTML`, `DOCX`, `PPTX`, `XLSX`, `XLSM`) via direct `'gs://...'` URI literals/wildcards (`13` output columns), `TABLE project.dataset.object_table` (`13` output columns), or `(SELECT ..., OBJ.MAKE_REF(uri) AS ref FROM ...)` subqueries (`5 + N` output columns) with configurable `chunk_size` (`[1, 2000]` tokens, default `1000`), 1-indexed PDF page spans (`start_page`, `end_page`), ancestor section headings prepended, and zero `CREATE MODEL` or manual Document AI processor provisioning.
+  - **`bigquery-ai/functions/ai_translate/`** (`.sql` + live-executed `.ipynb` + Lens 3 `aitranslate.md` + Lens 4 narrative): Zero-DDL Cloud Translation Advanced scalar function (`model => 'nmt'` default or `'translation-llm'`) running under caller end-user credentials with dynamic per-row `target_language` and `source_language` column expressions and `return_details => TRUE` diagnostic `STRUCT<result STRING, status STRING, details JSON>` output (`status = 'OK'` on success; `$.detected_language_code`).
+- **Unblocked & Rebuilt `bigquery-ai/workflows/document_rag/` (`14/14` AI Workflows Live):**
+  - Replaced the retired `AI.PARSE_DOCUMENT` step with `AI.CHUNK_DOCUMENT` $\to$ `AI.EMBED` $\to$ `VECTOR_SEARCH` $\to$ `AI.GENERATE`, restoring full end-to-end execution with page-level provenance citations (`0` blocked workflows remain across all `32` repository workflows).
+- **GoogleSQL Reusable Column Aliases, VPC Service Controls `ObjectRef` & Open Embedding `CREATE MODEL` Documentation:**
+  - Documented GoogleSQL reusable column aliases (`reusable_column_aliases_mode`, 5-tier resolution precedence, and `|> EXTEND` portable pipe alternative) in `bigquery-ai/reference/general-purpose-functions.md` and `bigquery-ai/overview.ipynb`, VPC Service Controls limitations for `ObjectRef` in `bigquery-ai/setup/README.md` and `bigquery-ai/reference/unstructured-data-infrastructure.md`, and `CREATE MODEL` syntax for open-source Vertex AI embedding models (`bigqueryml-syntax-create-remote-model-embedding-maas`).
+
+### Changed
+- **6 BigQuery AI Functions Promoted from Preview to GA:**
+  - Promoted `AI.COUNT_TOKENS` (text-only `STRING` signature re-verified at GA), `AI.IF`, `AI.SCORE`, `AI.CLASSIFY` (`optimization_mode` distilled mode remains Preview), `AI.EMBED`, and `AI.SIMILARITY` (built-in `model => 'embeddinggemma-300m'` remains Preview) across reference guides, READMEs, `namespace-matrix.md`, and all 4 Agent Skills with 3-way `check-status-labels` parity.
+- **Repository-Wide Model-Currency Modernization (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-3.5-flash-lite`, `gemini-embedding-2`):**
+  - Standardized all explicit Flash (`gemini-3.8-flash`), Pro/reasoning (`gemini-4-argon`), Flash-Lite (`gemini-3.5-flash-lite`), and Embedding (`gemini-embedding-2`, 3,072 default dimensions; `outputDimensionality: 768` on `CREATE MODEL`, `AI.GENERATE_EMBEDDING`, and `ML.GENERATE_EMBEDDING`) endpoints across 29 live re-executed notebooks (`0` errors), 2 static notebooks (`generate.ipynb` with `google_search_retrieval` retirement note and `data_enrichment.ipynb`), 19 `.sql` companions, reference guides, and all 4 Agent Skills (`bigquery-data-science`, `bigquery-ml`, `bigquery-ai`, `bigquery-mlops`).
+  - Added `preferred_defaults` and `legacy_models` enforcement to `skills/pinned-models.json` and `check-pinned-models` (blocking legacy endpoints outside explicit model-comparison contexts), added a static `review-sql` warning when `task_type` or `title` is used with `gemini-embedding-2` on `AI.EMBED` or `AI.SIMILARITY`, and routed BigFrames LLM/embedding sections through `bigframes.bigquery.ai.*` (`bbq.ai.*`) where `bigframes.ml.llm` client-side allowlists lag behind live BigQuery endpoints.
+- **Typed `AI.AGG(..., output_schema => ...)` Across 4 Multi-Function Workflows + `bigquery-ai/overview.ipynb`:**
+  - Upgraded and re-executed `log_analysis`, `content_analysis`, `content_moderation`, and `document_intelligence` to synthesize structured `STRUCT` rollups inside `GROUP BY` aggregations, and updated `bigquery-ai/overview.ipynb` with runnable `AI.TRANSLATE`, `AI.CHUNK_DOCUMENT`, and reusable column alias examples.
+- **Model Endpoint Allow-List, TabFM Pricing Date, `ML.METRICS` Cross-Links & BigFrames `2.51.0` Parity:**
+  - Registered `"nmt"` and `"translation-llm"` in `skills/pinned-models.json`; updated TabFM (`AI.PREDICT` / `AI.EVALUATE`) token billing effective date to `2026-11-17` (`$0.50 / 1M` tokens); added bidirectional cross-links between `ML.METRICS` (`bigquery-ml/functions/evaluation/`) and `AI.PREDICT` (`bigquery-ai/functions/ai_predict/`, `workflows/tabular_prediction/`); documented Dataform `preserveGovernanceControls` GA in `bigquery-mlops` and `bigframes` `2.51.0` wrappers (`bbq.ai.predict`, `bbq.ai.evaluate`, `bbq.ai.embed`, `bbq.ai.similarity`).
+- **4-Lens Catalog, CLI/MCP & GitHub Actions Node 24 Modernization:**
+  - Resynchronized all `139` Lens 3 syntax cards (`93` ML + `46` AI) and `106` Lens 4 worked narratives (`61` ML + `45` AI; `109` total `.ipynb`, `89` `.sql` scripts), expanded `catalog.py` routing/aliases and `review-sql` static diagnostics, and upgraded `.github/workflows/{ci,release}.yml` to native Node 24 actions (`actions/checkout@v7`, `astral-sh/setup-uv@v10.3.3`, `actions/upload-artifact@v7`, `actions/download-artifact@v8`) removing `FORCE_JAVASCRIPT_ACTIONS_TO_NODE24`.
+
 ## [0.10.0] - 2026-10-26
 
 ### Added

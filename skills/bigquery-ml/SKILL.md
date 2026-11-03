@@ -2,7 +2,7 @@
 name: bigquery-ml
 description: Use when training, evaluating, deploying, or monitoring a machine learning model in BigQuery with SQL (CREATE MODEL and ML.* functions) — picking a model type, choosing a preprocessing function, point-in-time feature retrieval, causal inference (including AI.CAUSAL_EFFECT), or production retraining pipelines across 23 model types, 49 functions, 18 workflows, and 8 pipelines.
 metadata:
-  version: "0.10.0"
+  version: "0.11.0"
 ---
 
 # BigQuery ML (`bigquery-ml`)
@@ -23,7 +23,7 @@ This skill packages a verified, field-tested 4-Lens reference distilled from liv
    - **Image tensor functions (`ML.DECODE_IMAGE`, `ML.RESIZE_IMAGE`, `ML.CONVERT_COLOR_SPACE`, `ML.CONVERT_IMAGE_TYPE`)** require a BigQuery `ENTERPRISE` Edition reservation and fail on on-demand pricing.
 4. **Are you composing an end-to-end workflow or scheduling a production pipeline** (drift-check → conditional retrain → score across 8 orchestrators) → see [`reference/workflows-and-pipelines.md`](reference/workflows-and-pipelines.md)
 5. **Are you estimating the causal effect of an intervention or treatment?** → see the causal cluster in [`reference/workflows-and-pipelines.md`](reference/workflows-and-pipelines.md): `propensity_score_matching`, `price_elasticity_dml`, `uplift_cate`, `difference_in_differences`, `synthetic_control`, and `causal_effect` (`AI.CAUSAL_EFFECT`, documented in `bigquery-ml` so all causal estimators live side by side).
-6. **Do you already have saved predictions and just need evaluation metrics?** → `ML.METRICS` requires no model object; see [`reference/regression.md`](reference/regression.md) and [`reference/classification.md`](reference/classification.md).
+6. **Do you already have saved predictions (from BQML, `AI.PREDICT` TabFM, or an external endpoint) and just need evaluation metrics?** → `ML.METRICS` requires no model object; see [`reference/regression.md`](reference/regression.md) and [`reference/classification.md`](reference/classification.md).
 7. **Are you joining historical features to labeled events?** → use `ML.ENTITY_FEATURES_AT_TIME` / `ML.FEATURES_AT_TIME` in [`reference/preprocessing-functions.md`](reference/preprocessing-functions.md) and the `feature_store_workflow` narrative in [`narrative/feature_store_workflow.md`](narrative/feature_store_workflow.md).
 
 If the task is ambiguous between trained models (`bigquery-ml`), zero-training foundation models (`bigquery-ai`), or production orchestration/monitoring (`bigquery-mlops`), consult [`../bigquery-data-science/SKILL.md`](../bigquery-data-science/SKILL.md) first.

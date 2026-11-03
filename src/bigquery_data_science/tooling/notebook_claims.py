@@ -6,9 +6,7 @@ import json
 import re
 from pathlib import Path
 
-_HIGH_PRECISION_FLOAT_RE = re.compile(
-    r"(?<![A-Za-z0-9_~≈.-])\d+\.\d{5,}(?![A-Za-z0-9_.-])"
-)
+_HIGH_PRECISION_FLOAT_RE = re.compile(r"(?<![A-Za-z0-9_~≈.-])\d+\.\d{5,}(?![A-Za-z0-9_.-])")
 _FORMULA_FRACTION_RE = re.compile(r"\b\d+\s*/\s*\d+|\b1\s*-\s*\(")
 _RRF_DERIVATION_RE = re.compile(r"1/\(6[01]\s*\+")
 _MIN_PREFIX_MATCH_LEN = 7
@@ -80,9 +78,7 @@ def check_single_notebook_claims(
             continue
         raw_source = cell.get("source", [])
         source = (
-            "".join(str(s) for s in raw_source)
-            if isinstance(raw_source, list)
-            else str(raw_source)
+            "".join(str(s) for s in raw_source) if isinstance(raw_source, list) else str(raw_source)
         )
         if _RRF_DERIVATION_RE.search(source):
             continue
@@ -111,19 +107,13 @@ def check_notebook_claims(
         return check_single_notebook_claims(resolved_target, resolved_root)
 
     notebooks: list[Path] = []
-    if (resolved_target / "bigquery-ml").is_dir() or (
-        resolved_target / "bigquery-ai"
-    ).is_dir():
+    if (resolved_target / "bigquery-ml").is_dir() or (resolved_target / "bigquery-ai").is_dir():
         for domain in ("bigquery-ml", "bigquery-ai"):
             domain_dir = resolved_target / domain
             if domain_dir.is_dir():
                 notebooks.extend(sorted(domain_dir.rglob("*.ipynb")))
     else:
-        notebooks = [
-            p
-            for p in sorted(resolved_target.rglob("*.ipynb"))
-            if ".venv" not in p.parts
-        ]
+        notebooks = [p for p in sorted(resolved_target.rglob("*.ipynb")) if ".venv" not in p.parts]
 
     errors: list[str] = []
     for nb_path in notebooks:

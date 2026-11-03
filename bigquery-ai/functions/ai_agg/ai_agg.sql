@@ -134,12 +134,12 @@ FROM error_logs;
 -- =============================================================================
 -- Example 6: Specifying an endpoint
 -- =============================================================================
--- Override the default model with any Gemini model (no thinking budget models).
+-- Override the default model with a specific Gemini endpoint (e.g., gemini-3.8-flash).
 SELECT
   AI.AGG(
     review,
     'What do customers like and dislike? Be concise.',
-    endpoint => 'gemini-2.5-flash'
+    endpoint => 'gemini-3.8-flash'
   ) AS summary
 FROM UNNEST([
   'Fast delivery but the box was crushed.',

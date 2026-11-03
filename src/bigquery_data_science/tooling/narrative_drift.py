@@ -70,14 +70,11 @@ def check_skill_narratives(skill_dir: Path, repo_root: Path) -> DriftResult | No
         else:
             candidates = _find_notebooks(project_root, narrative.stem)
             if not candidates:
-                result.missing_source.append(
-                    f"{narrative.name} has no source notebook"
-                )
+                result.missing_source.append(f"{narrative.name} has no source notebook")
                 continue
             if len(candidates) > 1:
                 relative = ", ".join(
-                    str(candidate.relative_to(project_root))
-                    for candidate in candidates
+                    str(candidate.relative_to(project_root)) for candidate in candidates
                 )
                 result.missing_source.append(
                     f"{narrative.name} is ambiguous ({relative}) — add a "
@@ -86,10 +83,7 @@ def check_skill_narratives(skill_dir: Path, repo_root: Path) -> DriftResult | No
                 continue
             notebook = candidates[0]
 
-        regenerated = (
-            convert_notebook(notebook_path=notebook, subproject_root=project_root)
-            + "\n"
-        )
+        regenerated = convert_notebook(notebook_path=notebook, subproject_root=project_root) + "\n"
         if regenerated != narrative.read_text(encoding="utf-8"):
             result.stale.append(narrative.name)
 
@@ -121,8 +115,7 @@ def sync_skill_narratives(skill_dir: Path, repo_root: Path) -> int:
     project_root = (repo_root / source_project).resolve()
     declared: dict[str, str] = dict(manifest.get("narrative_sources") or {})
     declared_sources = {
-        (project_root / rel_nb).resolve(): md_name
-        for md_name, rel_nb in declared.items()
+        (project_root / rel_nb).resolve(): md_name for md_name, rel_nb in declared.items()
     }
     narrative_dir = skill_dir / NARRATIVE_DIRNAME
     narrative_dir.mkdir(parents=True, exist_ok=True)

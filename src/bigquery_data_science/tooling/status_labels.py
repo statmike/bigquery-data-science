@@ -7,9 +7,7 @@ from pathlib import Path
 
 _BACKTICK_SYMBOL_RE = re.compile(r"`([A-Z][A-Z0-9_.]*)`")
 _H2_SINGLE_SYMBOL_RE = re.compile(r"^##\s+`([A-Z][A-Z0-9_.]*)`\s*$")
-_REF_STATUS_LINE_RE = re.compile(
-    r"^\s*-\s+\*\*(?:[^*]*Status[^*]*|Type:?)\*\*[:\s]*(.*)$"
-)
+_REF_STATUS_LINE_RE = re.compile(r"^\s*-\s+\*\*(?:[^*]*Status[^*]*|Type:?)\*\*[:\s]*(.*)$")
 _HISTORICAL_PREVIEW_RE = re.compile(r"preview\s+since\s+\d{4}", re.IGNORECASE)
 
 
@@ -118,10 +116,7 @@ def parse_reference_h2_statuses(reference_dir: Path) -> dict[str, tuple[str, str
             if status_match:
                 norm = normalize_status(line)
                 if norm in ("GA", "Preview", "GA / Preview", "Retired"):
-                    if (
-                        current_symbol in statuses
-                        and statuses[current_symbol][0] == "Retired"
-                    ):
+                    if current_symbol in statuses and statuses[current_symbol][0] == "Retired":
                         continue
                     statuses[current_symbol] = (
                         norm,
@@ -135,15 +130,8 @@ def check_status_labels(
     skills_root: Path | None = None,
 ) -> list[str]:
     """Return status-label inconsistencies across READMEs, `reference/*.md`, and matrix."""
-    resolved_skills = (
-        skills_root if skills_root is not None else (repo_root / "skills")
-    )
-    matrix_path = (
-        resolved_skills
-        / "bigquery-data-science"
-        / "reference"
-        / "namespace-matrix.md"
-    )
+    resolved_skills = skills_root if skills_root is not None else (repo_root / "skills")
+    matrix_path = resolved_skills / "bigquery-data-science" / "reference" / "namespace-matrix.md"
     if not matrix_path.is_file():
         return [f"Missing namespace matrix: {matrix_path}"]
 

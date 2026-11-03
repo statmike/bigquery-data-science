@@ -55,7 +55,7 @@ Work through [the individual function notebooks](../functions/) first. A workflo
 | [Semantic Search System](semantic_search/) | AI.EMBED, VECTOR_SEARCH, AI.SEARCH | The same search index built three ways — manual, simplified, and hybrid — so you can see what each layer of convenience costs you |
 | [Catalog Search](catalog_search/) | AI.EMBED, VECTOR_SEARCH, AI.SEARCH | Hybrid retrieval over a real product catalog: what rank fusion buys for an exact-token lookup and what it does not, plus a corpus large enough to actually populate a vector index |
 | [RAG Pipeline](rag_pipeline/) | AI.GENERATE_TABLE, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | Generate a knowledge base, embed it, retrieve against it, and answer questions with the retrieved context |
-| [Document RAG](document_rag/) ⚠️ | AI.PARSE_DOCUMENT, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | The same pipeline over real PDFs. **Blocked** — see the note below |
+| [Document RAG](document_rag/) | AI.CHUNK_DOCUMENT, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | The same pipeline over real single- and multi-page PDFs — layout-aware chunking with page citations, asymmetric embeddings, and grounded answers |
 | [Image Deduplication](image_deduplication/) | AI.EMBED, VECTOR_SEARCH | Grouping near-duplicate images by embedding similarity to keep train/test splits honest |
 
 ### Prediction and diagnosis
@@ -70,10 +70,10 @@ Work through [the individual function notebooks](../functions/) first. A workflo
 
 | Workflow | Functions Used | What It Shows |
 |----------|---------------|---------------|
-| [Content Analysis Pipeline](content_analysis/) | AI.GENERATE_TABLE, AI.CLASSIFY, AI.SCORE, AI.GENERATE, AI.AGG | The canonical generate → classify → score → summarize chain |
-| [Content Moderation](content_moderation/) | AI.GENERATE_TABLE, AI.IF, AI.CLASSIFY, AI.SCORE, AI.GENERATE, AI.AGG | Flagging as a cheap first pass before the expensive per-row calls |
-| [Log Analysis](log_analysis/) | AI.GENERATE_TABLE, AI.CLASSIFY, AI.SCORE, AI.AGG, AI.EMBED, VECTOR_SEARCH | Triaging support tickets, plus hybrid retrieval by error code — and the clearest measurement of how far up the ranking a lexical hit can lift a row, and why `top_k` decides whether you ever see it |
-| [Document Intelligence](document_intelligence/) | AI.CLASSIFY, AI.GENERATE, AI.SCORE, AI.AGG | Classify mixed documents, extract fields, score quality, summarize |
+| [Content Analysis Pipeline](content_analysis/) | AI.GENERATE_TABLE, AI.CLASSIFY, AI.SCORE, AI.GENERATE, AI.AGG (text + output_schema) | The canonical generate → classify → score → summarize chain, in prose and typed scorecards |
+| [Content Moderation](content_moderation/) | AI.GENERATE_TABLE, AI.IF, AI.CLASSIFY, AI.SCORE, AI.GENERATE, AI.AGG (text + output_schema) | Flagging as a cheap first pass before the expensive per-row calls and structured queue triage |
+| [Log Analysis](log_analysis/) | AI.GENERATE_TABLE, AI.CLASSIFY, AI.SCORE, AI.AGG (text + output_schema), AI.EMBED, VECTOR_SEARCH | Triaging support tickets into prose and typed escalation structs, plus hybrid retrieval by error code — and the clearest measurement of how far up the ranking a lexical hit can lift a row, and why `top_k` decides whether you ever see it |
+| [Document Intelligence](document_intelligence/) | AI.CLASSIFY, AI.GENERATE, AI.SCORE, AI.AGG (text + output_schema) | Classify mixed documents, extract fields, score quality, and summarize into executive prose and typed portfolio audits |
 
 ### Enrichment and multimodal
 
@@ -89,13 +89,12 @@ Work through [the individual function notebooks](../functions/) first. A workflo
 - **One notebook at a time.** Every workflow writes into the same `bq_ai_functions` dataset and they share a virtual environment. Running two concurrently will collide on both.
 - **They create real resources and real charges.** Each notebook ends with a cleanup section that drops what it made. Shared resources — the dataset, connections, remote models — are deliberately left in place for the next notebook.
 - **Restart & Run All is the intended way to run them.** Committed outputs are a record of a full clean pass; partial re-runs of individual cells can leave a notebook in a state its narration does not describe.
-- **⚠️ Document RAG does not run.** It depends on `AI.PARSE_DOCUMENT`, which Google took offline on 2026-06-01 and whose reference documentation has since been withdrawn entirely. Its committed outputs are a record of the workflow working before the withdrawal. Use [`ML.PROCESS_DOCUMENT`](../functions/ml_process_document/) for document extraction in the meantime.
 
 ---
 
 ## Conventions every workflow follows
 
-- **Self-contained data.** A workflow either generates its own sample data with `AI.GENERATE_TABLE`/inline SQL or reads from `bigquery-public-data`. Nothing depends on another notebook having run first.
+- **Self-contained data.** A workflow either generates its own sample data with `AI.GENERATE_TABLE`/inline SQL, stages bundled sample files from [`data/documents/`](../data/documents/), or reads from `bigquery-public-data`. Nothing depends on another notebook having run first.
 - **Named tables.** Tables use a `workflow_{short}_{stage}` prefix so it is obvious what created them and at what point in the pipeline.
 - **A `**Functions used:**` line** in the overview cell, linking each function back to its deep-dive notebook. Every function named there must also name this workflow in its own `**Featured in:**` line — the cross-references are required to be bidirectional, and the round-trip check is a step on the "New workflow" checklist in [PLANS.md](../PLANS.md) rather than something to remember by hand.
 - **A closing comparison table** where the workflow demonstrates more than one approach, always ending with a `**Best for**` row.

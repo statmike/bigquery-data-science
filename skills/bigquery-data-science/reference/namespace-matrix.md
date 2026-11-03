@@ -86,14 +86,15 @@ Most BigQuery ML and BigQuery AI features run on standard on-demand pricing, **e
 | `AI.GENERATE_BOOL` / `AI.GENERATE_DOUBLE` / `AI.GENERATE_INT` | `bigquery-ai` | Typed Scalar Generation | End-user creds (Connection optional) | On-demand OK | Preview | `bigquery-ai/narrative/ai_generate_bool.md` |
 | `AI.GENERATE_TABLE` | `bigquery-ai` | Structured TVF Generation | `CLOUD_RESOURCE` (`roles/aiplatform.user`) | On-demand OK | GA | `bigquery-ai/narrative/ai_generate_table.md` |
 | `AI.GENERATE_TEXT` / `ML.GENERATE_TEXT` | `bigquery-ai` | Remote Model Text TVF | `CLOUD_RESOURCE` (`roles/aiplatform.user`) | On-demand OK | GA | `bigquery-ai/narrative/ai_generate_text.md` |
-| `AI.COUNT_TOKENS` | `bigquery-ai` | Local Token Estimator | None | On-demand OK | Preview | `bigquery-ai/narrative/ai_count_tokens.md` |
-| `AI.IF` | `bigquery-ai` | Managed Boolean Filter | End-user creds (Connection optional) | On-demand OK | Preview | `bigquery-ai/narrative/ai_if.md` |
-| `AI.SCORE` | `bigquery-ai` | Managed Numeric Rubric Scorer | End-user creds (Connection optional) | On-demand OK | Preview | `bigquery-ai/narrative/ai_score.md` |
-| `AI.CLASSIFY` | `bigquery-ai` | Managed Category Classifier | End-user creds (Connection optional) | On-demand OK | Preview | `bigquery-ai/narrative/ai_classify.md` |
+| `AI.COUNT_TOKENS` | `bigquery-ai` | Local Token Estimator | None | On-demand OK | GA | `bigquery-ai/narrative/ai_count_tokens.md` |
+| `AI.IF` | `bigquery-ai` | Managed Boolean Filter | End-user creds (Connection optional) | On-demand OK | GA (`optimization_mode` Preview) | `bigquery-ai/narrative/ai_if.md` |
+| `AI.SCORE` | `bigquery-ai` | Managed Numeric Rubric Scorer | End-user creds (Connection optional) | On-demand OK | GA | `bigquery-ai/narrative/ai_score.md` |
+| `AI.CLASSIFY` | `bigquery-ai` | Managed Category Classifier | End-user creds (Connection optional) | On-demand OK | GA (`optimization_mode` Preview) | `bigquery-ai/narrative/ai_classify.md` |
 | `AI.AGG` | `bigquery-ai` | Managed Aggregate Synthesis | End-user creds (Connection optional) | On-demand OK | GA | `bigquery-ai/narrative/ai_agg.md` |
-| `AI.EMBED` | `bigquery-ai` | Scalar Text / Multimodal Embedding | None for `embeddinggemma-300m`; Connection for multimodal | On-demand OK | Preview | `bigquery-ai/narrative/ai_embed.md` |
-| `AI.GENERATE_EMBEDDING` / `ML.GENERATE_EMBEDDING` | `bigquery-ai` | Remote Model Embedding TVF | `CLOUD_RESOURCE` (`roles/aiplatform.user`) | On-demand OK | GA | `bigquery-ai/narrative/ai_generate_embedding.md` |
-| `AI.SIMILARITY` | `bigquery-ai` | Scalar Pairwise Semantic Similarity | None for `embeddinggemma-300m`; Connection for multimodal | On-demand OK | Preview | `bigquery-ai/narrative/ai_similarity.md` |
+| `AI.TRANSLATE` | `bigquery-ai` | Managed Scalar Row Translation (`nmt` / `translation-llm`) | End-user creds (no Connection param; `roles/cloudtranslate.user`) | On-demand OK | GA | `bigquery-ai/narrative/ai_translate.md` |
+| `AI.EMBED` | `bigquery-ai` | Scalar Text / Multimodal Embedding | None for `embeddinggemma-300m`; Connection for multimodal | On-demand OK | GA (`model` Preview) | `bigquery-ai/narrative/ai_embed.md` |
+| `AI.GENERATE_EMBEDDING` / `ML.GENERATE_EMBEDDING` | `bigquery-ai` | Remote Model Embedding TVF (incl. Vertex MaaS open-source embedding models) | `CLOUD_RESOURCE` (`roles/aiplatform.user`) | On-demand OK | GA | `bigquery-ai/narrative/ai_generate_embedding.md` |
+| `AI.SIMILARITY` | `bigquery-ai` | Scalar Pairwise Semantic Similarity | None for `embeddinggemma-300m`; Connection for multimodal | On-demand OK | GA (`model` Preview) | `bigquery-ai/narrative/ai_similarity.md` |
 | `VECTOR_SEARCH` | `bigquery-ai` | Vector & Hybrid RRF Search TVF | Only when query embedding uses remote model | On-demand OK (`ALTER VECTOR INDEX` needs Enterprise `BACKGROUND`) | GA / Preview (hybrid) | `bigquery-ai/narrative/vector_search.md` |
 | `AI.SEARCH` | `bigquery-ai` | Simplified Autonomous Search TVF | None (autonomous embedding column) | On-demand OK | GA (`mode` Preview) | `bigquery-ai/narrative/ai_search.md` |
 | `AI.FORECAST` | `bigquery-ai` | Zero-Training TimesFM Forecasting | None | On-demand OK | GA (2.5) / Preview (3.0) | `bigquery-ai/narrative/ai_forecast.md` |
@@ -101,7 +102,8 @@ Most BigQuery ML and BigQuery AI features run on standard on-demand pricing, **e
 | `AI.EVALUATE` | `bigquery-ai` | Zero-Training TimesFM / TabFM Eval | None | On-demand OK | GA (TS) / Preview (TabFM) | `bigquery-ai/narrative/ai_evaluate.md` |
 | `AI.PREDICT` | `bigquery-ai` | Zero-Training TabFM Prediction | None | On-demand OK | Preview | `bigquery-ai/narrative/ai_predict.md` |
 | `AI.KEY_DRIVERS` | `bigquery-ai` | Model-Free Driver Analysis TVF | None | On-demand OK | GA | `bigquery-ai/narrative/ai_key_drivers.md` |
-| `AI.PARSE_DOCUMENT` | `bigquery-ai` | **RETIRED (Offline 2026-06-01)** | Replaced by `ML.PROCESS_DOCUMENT` | N/A | Retired | `bigquery-ai/narrative/ai_parse_document.md` |
+| `AI.CHUNK_DOCUMENT` | `bigquery-ai` | Layout-Aware Document Chunking TVF (PDF, HTML, DOCX, PPTX, XLSX) | `CLOUD_RESOURCE` (`roles/storage.objectViewer` + `documentai.apiUser` + `serviceUsageConsumer`) | On-demand OK | GA | `bigquery-ai/narrative/ai_chunk_document.md` |
+| `AI.PARSE_DOCUMENT` | `bigquery-ai` | **RETIRED (Offline 2026-06-01)** | Replaced by `AI.CHUNK_DOCUMENT` + `ML.PROCESS_DOCUMENT` | N/A | Retired | `bigquery-ai/narrative/ai_parse_document.md` |
 
 ## Pre-Trained Cloud AI Service Models & Object Infrastructure (`bigquery-ai`)
 

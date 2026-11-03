@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bigquery-data-science"
-version = "0.10.0"
-description = "BigQuery ML, BigQuery AI, and 4-Lens Agent Skills: 104 live-verified SQL/Python workflows, zero-dependency CLI catalog & skill installer, and stdio MCP server."
+version = "0.11.0"
+description = "BigQuery ML, BigQuery AI, and 4-Lens Agent Skills: 106 live-verified SQL/Python workflows, zero-dependency CLI catalog & skill installer, and stdio MCP server."
 dynamic = ["readme"]
 requires-python = ">=3.11"
 license = { text = "Apache-2.0" }
@@ -44,7 +44,7 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-# Core notebook runtime for all 104 notebooks across bigquery-ml/ and bigquery-ai/
+# Core notebook runtime for all 109 notebooks across bigquery-ml/ and bigquery-ai/
 notebooks = [
     "google-cloud-bigquery>=3.25",
     "db-dtypes>=1.2",

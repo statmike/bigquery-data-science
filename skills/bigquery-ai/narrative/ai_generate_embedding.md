@@ -2,19 +2,19 @@
 
 # AI.GENERATE_EMBEDDING — BigQuery AI Functions
 
-`AI.GENERATE_EMBEDDING` is a table-valued function that creates embeddings from text, images, or video via a remote model. It supports multiple embedding models and returns statistics alongside the embedding vector.
+`AI.GENERATE_EMBEDDING` is a table-valued function that creates embeddings from text, images, PDFs, audio, or video via a remote model (`gemini-embedding-2`).
 
 **When to use it:**
-- You need to embed an entire table of text or images in batch
-- You want embedding statistics (token counts, truncation info)
-- You need multimodal embeddings (images, video, audio, PDFs)
-- You have an existing CREATE MODEL workflow for embeddings
+- You need to embed an entire table of text or multimodal documents in batch
+- You need multimodal embeddings (images, PDFs, video, audio) via a reusable `CREATE MODEL` handle
+- You want Matryoshka dimension reduction (`STRUCT(768 AS output_dimensionality)`) for `<= 2,000`-dimension vector indexes
+- You need `statistics` (token counts, truncation info) or `task_type` on legacy text models (`gemini-embedding-001`, `text-embedding-005`)
 
 **Alternatives:**
-- `functions/ai_embed` (`AI.EMBED`) — Scalar function, no model required, for inline embedding. Supports a built-in model (`embeddinggemma-300m`) with no Vertex AI charges.
-- `functions/ml_generate_embedding` (`ML.GENERATE_EMBEDDING`) — Legacy predecessor with ml_generate_embedding_ column prefixes
+- `functions/ai_embed` (`AI.EMBED`) — Scalar function, no model required, for inline embedding. Supports `gemini-embedding-2` and a built-in model (`embeddinggemma-300m`) with no Vertex AI charges.
+- `functions/ml_generate_embedding` (`ML.GENERATE_EMBEDDING`) — Legacy predecessor with `ml_generate_embedding_` column prefixes
 
-**Multimodal:** Supports image and video input via `reference/unstructured-data-infrastructure.md#objectref-and-objectrefruntime-schema-reference` (ObjectRef). Pass `ObjectRef` values in the `content` column. `gemini-embedding-2` (GA) extends this to audio and PDFs.
+**Multimodal:** `gemini-embedding-2` (GA) is the primary unified model for text, images, PDFs, audio, and video via `reference/unstructured-data-infrastructure.md#objectref-and-objectrefruntime-schema-reference` (ObjectRef) in the `content` column (3,072 dimensions by default).
 
 **References:** `RESOURCES.md` (Full syntax reference) | [Official documentation](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-generate-embedding) | `setup` (Setup guide)
 
@@ -94,7 +94,7 @@ print(f'Connection {CONNECTION_ID} ready (SA: {sa})')
 client.query(f'''
 CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_text`
   REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
-  OPTIONS (endpoint = \'text-embedding-005\')
+  OPTIONS (endpoint = \'gemini-embedding-2\')
 ''').result()
 print('Model embedding_text ready')
 ```
@@ -106,11 +106,11 @@ Progressive examples from simplest to most advanced. Each cell adds one new conc
 
 ### 1. Basic text embedding
 
-Input must have a `content` column (STRING). Returns the input columns plus `embedding`, `statistics`, and `status`.
+Input must have a `content` column (`STRING` or `ObjectRef`). With `gemini-embedding-2`, `AI.GENERATE_EMBEDDING` returns the input columns plus `embedding` (3,072 dimensions by default) and `status` (note: `gemini-embedding-2` omits the `statistics` column, which is only returned by legacy text models such as `gemini-embedding-001` and `text-embedding-005`).
 
 ```python
 query = f'''
-SELECT content, ARRAY_LENGTH(embedding) AS dims
+SELECT content, ARRAY_LENGTH(embedding) AS dims, status
 FROM AI.GENERATE_EMBEDDING(
   MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_text`,
   (SELECT text AS content
@@ -120,17 +120,29 @@ FROM AI.GENERATE_EMBEDDING(
 client.query(query).to_dataframe()
 ```
 
-### 2. Viewing embedding statistics
+### 2. Viewing embedding `statistics` (legacy text models)
 
-The `statistics` column contains token count and truncation information.
+While `gemini-embedding-2` returns `(embedding, status)` and omits `statistics`, legacy text embedding models (`gemini-embedding-001` and `text-embedding-005`) return a `statistics` JSON column containing token count and truncation information. Below we create helper models for `gemini-embedding-001` and `text-embedding-005` (cleaned up at the end of the notebook) to inspect `statistics`:
 
 ```python
 import json
 
+# Create notebook-specific legacy text models for statistics/task_type/comparison examples
+client.query(f'''
+CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_gemini`
+  REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
+  OPTIONS (endpoint = \'gemini-embedding-001\')
+''').result()
+client.query(f'''
+CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_text_005`
+  REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
+  OPTIONS (endpoint = \'text-embedding-005\')
+''').result()
+
 query = f'''
 SELECT content, embedding, statistics
 FROM AI.GENERATE_EMBEDDING(
-  MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_text`,
+  MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_gemini`,
   (SELECT 'What is machine learning and how does it work?' AS content)
 )
 '''
@@ -139,11 +151,11 @@ print(f'Dimensions: {len(df.iloc[0]["embedding"])}')
 print(f'Statistics: {json.loads(df.iloc[0]["statistics"])}')
 ```
 
-### 3. Using task_type for retrieval
+### 3. Using `task_type` and `title` (legacy text models)
 
-`task_type` tells the embedding model the intended use of the text, which changes how the embedding is generated. This is a critical configuration choice.
+> **Important (`gemini-embedding-2` vs legacy models):** `gemini-embedding-2` produces unified, task-agnostic embeddings and **rejects `task_type` and `title`** (failing with `400 INVALID_ARGUMENT`). Use `task_type` and `title` only with legacy text models (`gemini-embedding-001` or `text-embedding-005`).
 
-**Asymmetric task types** — documents and queries use *different* task types. Use this pattern for retrieval, where what you index differs in intent from what you search with:
+**Asymmetric task types** — documents and queries use *different* task types on `gemini-embedding-001` / `text-embedding-005`:
 
 | Use Case | Document Task Type | Query Task Type |
 |----------|-------------------|-----------------|
@@ -157,14 +169,14 @@ print(f'Statistics: {json.loads(df.iloc[0]["statistics"])}')
 - `CLASSIFICATION` — grouping texts by category
 - `CLUSTERING` — organizing texts into clusters
 
-> **Key point:** If your use case doesn't align with a specific task type, use `RETRIEVAL_DOCUMENT` when indexing and `RETRIEVAL_QUERY` when searching.
+With `RETRIEVAL_DOCUMENT` on `gemini-embedding-001` or `text-embedding-005`, you can also supply `title` in the options `STRUCT`:
 
 ```python
 query = f'''
 SELECT content, ARRAY_LENGTH(embedding) AS dims, statistics
 FROM AI.GENERATE_EMBEDDING(
-  MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_text`,
-  (SELECT text AS content
+  MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_gemini`,
+  (SELECT text AS content, 'Google Cloud Service Overview' AS title
    FROM UNNEST([
      'BigQuery is a serverless data warehouse.',
      'Cloud Functions runs event-driven code.',
@@ -176,9 +188,9 @@ FROM AI.GENERATE_EMBEDDING(
 client.query(query).to_dataframe()
 ```
 
-### 4. Materializing embeddings for VECTOR_SEARCH
+### 4. Reducing dimensions with `output_dimensionality` for `VECTOR_SEARCH`
 
-Save embeddings to a table so they can be searched with `VECTOR_SEARCH`.
+`gemini-embedding-2` defaults to `3,072` dimensions, whereas BigQuery `CREATE VECTOR INDEX` supports at most `2,000` dimensions. Pass `STRUCT(768 AS output_dimensionality)` to `AI.GENERATE_EMBEDDING` to materialize `768`-dimension Matryoshka vectors that can be indexed and searched with `VECTOR_SEARCH`:
 
 ```python
 query = f'''
@@ -194,7 +206,7 @@ FROM AI.GENERATE_EMBEDDING(
      'Kubernetes Engine runs containerized applications at scale.',
      'Pub/Sub is a messaging service for event-driven systems.'
    ]) AS text),
-  STRUCT('RETRIEVAL_DOCUMENT' AS task_type)
+  STRUCT(768 AS output_dimensionality)
 )
 '''
 client.query(query).result()
@@ -202,25 +214,17 @@ client.query(query).result()
 client.query(f'SELECT content, ARRAY_LENGTH(embedding) AS dims FROM `{PROJECT_ID}.{DATASET_ID}.ai_generate_embedding_docs`').to_dataframe()
 ```
 
-### 5. Using gemini-embedding-001 (higher dimensions)
+### 5. Comparing embedding models (`gemini-embedding-2`, `gemini-embedding-001`, `text-embedding-005`)
 
-`gemini-embedding-001` is a multilingual text embedding model that defaults to 3072 dimensions (vs 768 for `text-embedding-005`). Create a separate remote model for it, then compare.
+Compare the primary unified model `gemini-embedding-2` (3,072 dims, text + multimodal, task-agnostic) against legacy text models `gemini-embedding-001` (3,072 dims) and `text-embedding-005` (768 dims):
 
 ```python
-# Create remote model for gemini-embedding-001 (idempotent)
-client.query(f'''
-CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_gemini`
-  REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
-  OPTIONS (endpoint = \'gemini-embedding-001\')
-''').result()
-print('Model embedding_gemini ready')
-
-# Compare dimensions: text-embedding-005 (768) vs gemini-embedding-001 (3072)
+# Compare dimensions across gemini-embedding-2 (3072), gemini-embedding-001 (3072), and text-embedding-005 (768)
 query = f'''
 SELECT
-  'text-embedding-005' AS model,
+  'gemini-embedding-2' AS model,
   ARRAY_LENGTH(embedding) AS dims,
-  statistics
+  status
 FROM AI.GENERATE_EMBEDDING(
   MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_text`,
   (SELECT 'BigQuery is a data warehouse.' AS content)
@@ -229,9 +233,18 @@ UNION ALL
 SELECT
   'gemini-embedding-001',
   ARRAY_LENGTH(embedding),
-  statistics
+  status
 FROM AI.GENERATE_EMBEDDING(
   MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_gemini`,
+  (SELECT 'BigQuery is a data warehouse.' AS content)
+)
+UNION ALL
+SELECT
+  'text-embedding-005',
+  ARRAY_LENGTH(embedding),
+  status
+FROM AI.GENERATE_EMBEDDING(
+  MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_text_005`,
   (SELECT 'BigQuery is a data warehouse.' AS content)
 )
 '''
@@ -241,22 +254,22 @@ client.query(query).to_dataframe()
 ---
 ## Multimodal — Document Embedding
 
-`AI.GENERATE_EMBEDDING` supports image and video input via `multimodalembedding@001`. Input: a query with a `content` column containing ObjectRef values. Supports `output_dimensionality` (128, 256, 512, 1408 — default 1408).
+`AI.GENERATE_EMBEDDING` supports multimodal input (images, PDFs, audio, and video) via `gemini-embedding-2` (GA). Input: a query with a `content` column containing `ObjectRef` values. Defaults to `3,072` dimensions and supports Matryoshka dimension reduction via `output_dimensionality` (e.g., `768` or `256`).
 
-> **Also GA:** `gemini-embedding-2` supports text, images, audio, video, and PDFs — up to 3072 dimensions and 8192 tokens — and is served from multi-regional endpoints only (`us`, `eu`, `global`). Like `multimodalembedding@001`, it returns no `statistics` column. The examples below use `multimodalembedding@001`.
+> **Note:** Legacy `multimodalembedding@001` (1,408 dimensions) also supports images and video; `gemini-embedding-2` serves as the unified model across text, images, PDFs, audio, and video.
 
-Below we render invoice and receipt PDFs from this project's `data/documents` (document set) to PNG images, upload them to GCS, then embed them in batch.
+Below we render invoice and receipt PDFs from this project's `data/documents` (document set) to PNG images, upload them to GCS, then embed them in batch with `gemini-embedding-2`.
 
 ### Multimodal embedding model
 
-Create a remote model pointing to `multimodalembedding@001` for image and video embeddings.
+Create a remote model pointing to `gemini-embedding-2` for multimodal (image, PDF, audio, video) embeddings.
 
 ```python
 # Create remote multimodal embedding model (idempotent)
 client.query(f'''
 CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.embedding_multimodal`
   REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
-  OPTIONS (endpoint = \'multimodalembedding@001\')
+  OPTIONS (endpoint = \'gemini-embedding-2\')
 ''').result()
 print('Model embedding_multimodal ready')
 ```
@@ -309,7 +322,7 @@ print(f'Rendered and uploaded {len(docs)} document images to gs://{BUCKET}/{pref
 
 ### 6. Batch embed documents
 
-Use `AI.GENERATE_EMBEDDING` with the multimodal model on a subquery that builds ObjectRef values inline. The subquery must produce a `content` column with `ObjectRef` values. Each document image gets a 1408-dimension embedding.
+Use `AI.GENERATE_EMBEDDING` with the multimodal model on a subquery that builds `ObjectRef` values inline. The subquery must produce a `content` column with `ObjectRef` values. Each document image gets a 3,072-dimension embedding with `gemini-embedding-2`.
 
 ```python
 query = f'''
@@ -353,7 +366,7 @@ FROM AI.GENERATE_EMBEDDING(
   FROM UNNEST([
     'invoice_1.png', 'invoice_2.png', 'invoice_3.png'
   ]) AS doc_name),
-  STRUCT(256 AS output_dimensionality)
+  STRUCT(768 AS output_dimensionality)
 )
 '''
 client.query(query).to_dataframe()

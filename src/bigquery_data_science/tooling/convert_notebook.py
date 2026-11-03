@@ -38,9 +38,8 @@ def _is_header_table(cell: Any) -> bool:
 
 def _is_generic_install_helper(cell: Any) -> bool:
     """Return True when `cell` defines the generic `def install(` shim."""
-    return (
-        getattr(cell, "cell_type", None) == "code"
-        and "def install(" in str(getattr(cell, "source", ""))
+    return getattr(cell, "cell_type", None) == "code" and "def install(" in str(
+        getattr(cell, "source", "")
     )
 
 
@@ -109,20 +108,12 @@ def _build_provenance_banner(notebook_path: Path, subproject_root: Path) -> str:
     """Build the clickable GitHub provenance blockquote for a narrative file."""
     project_name = subproject_root.name
     relative_notebook = notebook_path.relative_to(subproject_root).as_posix()
-    repo_notebook = (
-        f"{project_name}/{relative_notebook}"
-        if project_name
-        else relative_notebook
-    )
-    parts = [
-        f"**Notebook:** [`{repo_notebook}`]({GITHUB_BLOB_BASE}/{repo_notebook})"
-    ]
+    repo_notebook = f"{project_name}/{relative_notebook}" if project_name else relative_notebook
+    parts = [f"**Notebook:** [`{repo_notebook}`]({GITHUB_BLOB_BASE}/{repo_notebook})"]
     sql_path = notebook_path.with_suffix(".sql")
     if sql_path.exists():
         relative_sql = sql_path.relative_to(subproject_root).as_posix()
-        repo_sql = (
-            f"{project_name}/{relative_sql}" if project_name else relative_sql
-        )
+        repo_sql = f"{project_name}/{relative_sql}" if project_name else relative_sql
         parts.append(f"**SQL:** [`{repo_sql}`]({GITHUB_BLOB_BASE}/{repo_sql})")
     return "> **Source (`statmike/bigquery-data-science`):** " + " · ".join(parts)
 

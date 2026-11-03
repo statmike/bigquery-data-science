@@ -5,7 +5,7 @@
 - **Description:** Aggregate function that uses a Vertex AI Gemini model to aggregate data based on natural language instructions. Automatically performs multi-level aggregation through batching, so it can analyze data exceeding the Gemini context window. Returns a single STRING per group (or a structured STRUCT when `output_schema` is specified).
 - **Use cases:** Sentiment analysis across reviews, content summarization of text or images, log analysis and incident investigation, agent performance analysis, finding common categories or patterns across data, summarizing grouped data.
 - [documentation](https://docs.cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-agg)
-- **Type:** Aggregate function -- returns a single STRING value per group (or STRUCT with `output_schema`). Use with GROUP BY for per-group results; without GROUP BY, aggregates all rows.
+- **Type:** Aggregate function -- returns a single STRING value per group (or STRUCT with `output_schema`). Use with GROUP BY for per-group results; without GROUP BY, aggregates all rows (GA)
 
 **Syntax:**
 ```sql
@@ -28,7 +28,7 @@ AI.AGG(
 | `INPUT` | STRING or STRUCT | Required (must be first argument) | The data to aggregate. STRING value, or STRUCT consisting of STRING values, object references, and arrays of either. **The reference page still specifies `ObjectRefRuntime` here — it is the only `AI.*` page that does.** A bare `ObjectRef` works anyway: `AI.AGG(STRUCT(ref), instruction)` over an object table returns real summaries (verified live 2026-09-15 over 50 PDFs), and the Known Issues below argue for it. |
 | `INSTRUCTION` | STRING | Required (must be second argument) | Natural language aggregation prompt describing what to extract or summarize from the input data. Can be a string literal or query parameter. |
 | `CONNECTION` | STRING | Optional | Connection to use, format: `[PROJECT_ID.]LOCATION.CONNECTION_ID`. If not specified, end-user credentials are used. |
-| `ENDPOINT` | STRING | Optional | Vertex AI endpoint. Any Gemini model that doesn't require thinking budget. If not specified, BigQuery chooses a model for you. |
+| `ENDPOINT` | STRING | Optional | Vertex AI endpoint. Any Gemini model that doesn't require thinking budget (e.g., `'gemini-3.8-flash'` or `'gemini-4-argon'`; defaults to `'gemini-3.5-flash-lite'` / cost-quality auto-selection when omitted). If not specified, BigQuery chooses a model for you. |
 | `max_error_ratio` | FLOAT64 | Optional | A FLOAT64 between 0.0 and 1.0 specifying the maximum acceptable ratio of row-level inference failures. Default is 1.0 (returns partial results). If exceeded, the query fails with an error describing frequent error types. |
 | `output_schema` | STRING | Optional | Schema for structured output as comma-separated fields (e.g. `'summary STRING, sentiment STRING'`). When specified, `AI.AGG` returns a STRUCT conforming to this schema instead of a plain STRING. |
 
@@ -43,7 +43,7 @@ AI.AGG(
 
 **Output cap:** 10,000 tokens per group.
 
-**Supported models:** Any Gemini model that doesn't require thinking budget (including `gemini-4-argon`, Gemini 3.x, and `gemini-2.5-*` models). If no endpoint specified, BigQuery dynamically chooses a model.
+**Supported models:** Any Gemini model that doesn't require thinking budget (including `gemini-3.8-flash`, `gemini-4-argon`, Gemini 3.x, and `gemini-2.5-*` models; defaults to `gemini-3.5-flash-lite` / cost-quality auto-selection when omitted). If no endpoint specified, BigQuery dynamically chooses a model.
 
 **Best practices:**
 - Use `TO_JSON_STRING` to pass multiple columns as structured input -- the model sees each row's full context.
@@ -56,6 +56,7 @@ AI.AGG(
 **Limitations:** Returns NULL on total failure (no detailed error info). No model parameter control (temperature, top_p, etc.). Output capped at 10,000 tokens per group. Recommended limit of 20 million rows per query and 1,000 distinct groups. Cannot use Gemini models that require thinking budget.
 
 **Known issues:**
+- Passing a `NULL` instruction string might return an internal error instead of an invalid-query error.
 - Input rows with 10 or more images in a single row might be skipped.
 - Input rows with arrays of ObjectRefRuntime objects that call `OBJ.GET_ACCESS_URL` might be skipped.
 - Some ObjectRefRuntime **image** objects created by `OBJ.GET_ACCESS_URL` might fail to process.
@@ -72,3 +73,5 @@ AI.AGG(
 **Provisioned throughput:** Not supported. Uses dynamic shared quota (DSQ) only.
 
 **BigFrames API:** No native BigFrames API. Use `bpd.read_gbq_query(sql)` to execute AI.AGG queries and get results as a BigFrames DataFrame.
+
+---

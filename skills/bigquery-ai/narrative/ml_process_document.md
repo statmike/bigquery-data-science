@@ -5,12 +5,13 @@
 `ML.PROCESS_DOCUMENT` is a table-valued function that processes documents stored in Cloud Storage using the Document AI API. It sends PDFs, images, and other documents (referenced via a BigQuery object table) to a Document AI processor and returns structured extraction results — entities, key-value pairs, and parsed fields — directly as BigQuery columns.
 
 **When to use it:**
-- You need to extract structured data from invoices, receipts, forms, or other documents at scale
+- You need to extract structured entities and fields from invoices, receipts, forms, W-2s, or custom Document AI processors at scale
 - You want to process documents stored in Cloud Storage without leaving BigQuery
-- You need OCR, form parsing, or document layout analysis within SQL queries
+- You need specialized Document AI processor output columns within SQL queries
 
 **Alternatives:**
-- `functions/ai_generate` (`AI.GENERATE`) — Multimodal Gemini prompts for ad-hoc document understanding (no Document AI processor required)
+- `functions/ai_chunk_document` (`AI.CHUNK_DOCUMENT`) — GA table-valued function for layout-aware document chunking (PDF, HTML, DOCX, PPTX, XLSX, XLSM) into typed `chunk_id`, `start_page`, `end_page`, `content`, and `status` rows with **no `CREATE MODEL` step** and an auto-provisioned `bq-created-layout-parser` processor (plus optional top-level `chunk_size => INT64` in `1..2000`). Reach for `AI.CHUNK_DOCUMENT` when building RAG or embedding pipelines; reach for `ML.PROCESS_DOCUMENT` when you need specialized entity extractors (Invoice Parser, Expense Parser, Form Parser, custom processors).
+- `functions/ai_generate` (`AI.GENERATE`) / `functions/ai_generate_table` (`AI.GENERATE_TABLE`) — Multimodal Gemini prompts for open-ended or schema-driven document extraction without a Document AI processor
 
 **It has four siblings.** `ML.PROCESS_DOCUMENT` is one of five functions that reach a pre-trained Cloud AI service through a remote model, rather than a Gemini endpoint. The other four work the same way — a `CREATE MODEL … REMOTE` handle that trains nothing, a JSON `*_result` column, a per-row `*_status` column, and no `ML.EVALUATE`:
 

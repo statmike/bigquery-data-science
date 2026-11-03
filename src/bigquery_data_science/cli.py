@@ -51,6 +51,8 @@ from bigquery_data_science.tooling.pinned_models import (
     check_pinned_models,
     find_allow_file,
     load_allow_list,
+    load_deprecated_models,
+    load_legacy_models,
 )
 from bigquery_data_science.tooling.reference_structure import check_reference
 from bigquery_data_science.tooling.run_notebook import (
@@ -308,18 +310,12 @@ def _cmd_sync_narratives(args: argparse.Namespace) -> int:
 def _cmd_check_links(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
     raw_sub = Path(args.subproject)
-    subproject = (
-        raw_sub.resolve()
-        if raw_sub.exists()
-        else (repo_root / raw_sub).resolve()
-    )
+    subproject = raw_sub.resolve() if raw_sub.exists() else (repo_root / raw_sub).resolve()
     siblings: list[Path] = []
     for sib in args.sibling or []:
         sib_path = Path(sib)
         siblings.append(
-            sib_path.resolve()
-            if sib_path.exists()
-            else (repo_root / sib_path).resolve()
+            sib_path.resolve() if sib_path.exists() else (repo_root / sib_path).resolve()
         )
     res = check_project(subproject, siblings, repo_root)
     status = "OK" if res.ok else "FAIL"
@@ -342,11 +338,7 @@ def _cmd_check_reference(args: argparse.Namespace) -> int:
 def _cmd_check_pinned_models(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
     raw_sub = Path(args.subproject)
-    subproject = (
-        raw_sub.resolve()
-        if raw_sub.exists()
-        else (repo_root / raw_sub).resolve()
-    )
+    subproject = raw_sub.resolve() if raw_sub.exists() else (repo_root / raw_sub).resolve()
     if args.allow_file:
         allow_file = Path(args.allow_file)
         if not allow_file.is_absolute() and not allow_file.exists():
@@ -356,7 +348,14 @@ def _cmd_check_pinned_models(args: argparse.Namespace) -> int:
             repo_root / "skills" / "pinned-models.json"
         )
     allowed = load_allow_list(allow_file, subproject, repo_root)
-    res = check_pinned_models(subproject, allowed)
+    deprecated = load_deprecated_models(allow_file) if allow_file.is_file() else {}
+    legacy_models = load_legacy_models(allow_file) if allow_file.is_file() else {}
+    res = check_pinned_models(
+        subproject,
+        allowed,
+        deprecated=deprecated,
+        legacy_models=legacy_models,
+    )
     status = "OK" if res.ok else "FAIL"
     print(f"[{status}] {subproject.name} ({len(res.pins)} model pins checked)")
     for pin in res.unlisted:
@@ -476,10 +475,7 @@ def _cmd_run_notebook(args: argparse.Namespace) -> int:
         return 1
 
     status = "OK" if res.ok else "FAIL"
-    print(
-        f"[{status}] {res.notebook_path.name} "
-        f"({res.executed_cells} code cells executed)"
-    )
+    print(f"[{status}] {res.notebook_path.name} ({res.executed_cells} code cells executed)")
     for cell_idx, ename, evalue in res.error_cells:
         print(
             f"  ERR (cell {cell_idx}): {ename}: {evalue}",
@@ -525,11 +521,29 @@ def _cmd_check_sql_companions(args: argparse.Namespace) -> int:
     return 0
 
 
+def _count_syntax_cards(skills_root: Path) -> int:
+    """Count non-`INDEX.md` Lens 3 syntax cards across skill subdirectories."""
+    if not skills_root.is_dir():
+        return 0
+    if (skills_root / "SKILL.md").is_file():
+        syntax_dirs = [skills_root / "syntax"]
+    else:
+        syntax_dirs = [
+            child / "syntax" for child in sorted(skills_root.iterdir()) if child.is_dir()
+        ]
+    return sum(
+        1
+        for syntax_dir in syntax_dirs
+        if syntax_dir.is_dir()
+        for card_path in syntax_dir.glob("*.md")
+        if card_path.name != "INDEX.md"
+    )
+
+
 def _cmd_sweep(args: argparse.Namespace) -> int:
     repo_root = Path(args.repo_root).resolve()
     skills_root_arg = str(
-        getattr(args, "skills_root_opt", None)
-        or getattr(args, "skills_root", "skills")
+        getattr(args, "skills_root_opt", None) or getattr(args, "skills_root", "skills")
     )
     skills_root = Path(skills_root_arg).resolve()
     failed = False
@@ -557,7 +571,8 @@ def _cmd_sweep(args: argparse.Namespace) -> int:
         print(f"  ERR: {err}", file=sys.stderr)
         failed = True
     if not syn_errors:
-        print("  [OK] all 137 syntax cards in sync")
+        card_count = _count_syntax_cards(skills_root)
+        print(f"  [OK] all {card_count} syntax cards in sync")
 
     print("4. Checking Lens 4 narrative drift against source notebooks...")
     nar_results = check_all_narratives(skills_root, repo_root)
@@ -572,6 +587,8 @@ def _cmd_sweep(args: argparse.Namespace) -> int:
 
     print("5. Checking domain reference structure, link policy, and pinned models...")
     allow_file = find_allow_file(skills_root) or (skills_root / "pinned-models.json")
+    deprecated = load_deprecated_models(allow_file) if allow_file.is_file() else {}
+    legacy_models = load_legacy_models(allow_file) if allow_file.is_file() else {}
     for proj_path in project_paths:
         ref_res = check_reference(proj_path)
         if not ref_res.ok:
@@ -595,7 +612,12 @@ def _cmd_sweep(args: argparse.Namespace) -> int:
 
         if allow_file.is_file():
             allowed = load_allow_list(allow_file, proj_path, repo_root)
-            pin_res = check_pinned_models(proj_path, allowed)
+            pin_res = check_pinned_models(
+                proj_path,
+                allowed,
+                deprecated=deprecated,
+                legacy_models=legacy_models,
+            )
             if not pin_res.ok:
                 for pin in pin_res.unlisted:
                     print(
@@ -604,9 +626,25 @@ def _cmd_sweep(args: argparse.Namespace) -> int:
                     )
                 failed = True
             else:
+                print(f"  [OK] {proj_path.name} pinned models ({len(pin_res.pins)} checked)")
+
+    if allow_file.is_file() and skills_root.is_dir():
+        skills_allowed = load_allow_list(allow_file, skills_root, repo_root)
+        skills_pin_res = check_pinned_models(
+            skills_root,
+            skills_allowed,
+            deprecated=deprecated,
+            legacy_models=legacy_models,
+        )
+        if not skills_pin_res.ok:
+            for pin in skills_pin_res.unlisted:
                 print(
-                    f"  [OK] {proj_path.name} pinned models ({len(pin_res.pins)} checked)"
+                    f"  UNLISTED (skills): {pin.format(skills_root)}",
+                    file=sys.stderr,
                 )
+            failed = True
+        else:
+            print(f"  [OK] skills pinned models ({len(skills_pin_res.pins)} checked)")
 
     sync_headers_script = repo_root / "architectures" / "headers" / "sync_headers.py"
     if sync_headers_script.is_file():
@@ -665,9 +703,7 @@ def _cmd_sweep(args: argparse.Namespace) -> int:
             print(f"  ERR (sql-companions): {err}", file=sys.stderr)
             failed = True
         if not sql_comp_errors:
-            print(
-                "  [OK] .ipynb -> .sql companions in sync and passed static SQL review"
-            )
+            print("  [OK] .ipynb -> .sql companions in sync and passed static SQL review")
 
     return 1 if failed else 0
 
@@ -1052,8 +1088,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_stat = sub.add_parser(
         "check-status-labels",
         help=(
-            "Verify Preview vs GA status label consistency across READMEs, "
-            "references, and skills."
+            "Verify Preview vs GA status label consistency across READMEs, references, and skills."
         ),
     )
     p_stat.add_argument(
@@ -1148,10 +1183,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_sql_comp = sub.add_parser(
         "check-sql-companions",
-        help=(
-            "Verify .ipynb -> .sql companion coverage and run review-sql across "
-            "all .sql files."
-        ),
+        help=("Verify .ipynb -> .sql companion coverage and run review-sql across all .sql files."),
     )
     p_sql_comp.add_argument(
         "skills_root",

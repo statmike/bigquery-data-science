@@ -1,12 +1,13 @@
 -- AI.PARSE_DOCUMENT — Progressive SQL Examples
 -- ================================================
--- !! NOT CURRENTLY WORKING — DOCUMENTATION WITHDRAWN !!
--- Taken offline for revision on 2026-06-01. As of 2026-09-01 the reference
--- page returns HTTP 404, and the function is absent from both the AI
--- functions navigation tree and the generative AI overview. These statements
--- do not execute. Use ML.PROCESS_DOCUMENT (../ml_process_document/) instead;
--- it reaches the same Document AI Layout Parser but needs a remote model and
--- a CREATE MODEL step, and returns one JSON column instead of typed chunks.
+-- !! NOT CURRENTLY WORKING — SUPERSEDED BY AI.CHUNK_DOCUMENT !!
+-- Taken offline on 2026-06-01 (reference page HTTP 404 as of 2026-09-01).
+-- These statements are preserved as a historical archive and do not execute.
+--   * For layout-aware document chunking and RAG without CREATE MODEL, use GA
+--     AI.CHUNK_DOCUMENT (../ai_chunk_document/), which auto-provisions
+--     bq-created-layout-parser and returns typed chunk_id/start_page/end_page/content/status.
+--   * For specialized Document AI processors (invoices, receipts, forms, OCR,
+--     custom extractors), use ML.PROCESS_DOCUMENT (../ml_process_document/).
 --
 -- Table-valued function that parses documents using the Document AI
 -- Layout Parser. Combines OCR, layout parsing, and chunking in a single

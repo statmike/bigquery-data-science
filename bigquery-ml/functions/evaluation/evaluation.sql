@@ -3,8 +3,9 @@
 -- ML.METRICS computes evaluation metrics from a relation that already holds an
 -- actual column and a predicted column. There is no model argument. Nothing is
 -- trained, nothing is loaded, and the predictions can come from anywhere --
--- BigQuery ML, Vertex AI batch prediction, a vendor scoring API, a CSV someone
--- emailed you. Preview as of 2026-09-10.
+-- BigQuery ML, materialized zero-shot AI.PREDICT / AI.CLASSIFY outputs
+-- (../../../bigquery-ai/functions/ai_predict/), Vertex AI batch prediction, a
+-- vendor scoring API, a CSV someone emailed you. Preview as of 2026-09-10.
 --
 -- Signature:
 --   ML.METRICS({TABLE t | (QUERY_STATEMENT)},
@@ -147,9 +148,10 @@ SELECT * FROM ML.METRICS(
 -- Example 3: Regression metrics on predictions BigQuery never made
 -- =============================================================================
 -- The point of the function: nothing here mentions a model, a connection, or a
--- training run. Any two same-typed columns will do -- a Vertex AI batch
--- prediction output, a vendor scoring API's results loaded to a table, last
--- quarter's forecast archived next to what actually happened.
+-- training run. Any two same-typed columns will do -- materialized zero-shot
+-- AI.PREDICT / AI.CLASSIFY output (../../../bigquery-ai/functions/ai_predict/),
+-- a Vertex AI batch prediction output, a vendor scoring API's results loaded to
+-- a table, last quarter's forecast archived next to what actually happened.
 SELECT * FROM ML.METRICS(
   TABLE `PROJECT_ID.DATASET.evaluation_predictions`,
   predicted_col => 'predicted_mass',
@@ -309,6 +311,10 @@ SELECT * FROM ML.METRICS(
 -- evaluation_predictions, and penguins wrapped in a GROUP BY.
 -- No mechanism is claimed. The practical advice is the point: if the query form
 -- errors, do not spend time reshaping the subquery -- materialize and use TABLE.
+-- Re-tested 2026-11-02: inline (QUERY_STATEMENT) calls on
+-- bigquery-public-data.ml_datasets.penguins and ml_datasets.iris with
+-- retry=None, job_retry=None succeeded, indicating backend progress during
+-- Preview; keep TABLE materialization and retry=None as defensive practice.
 
 
 -- =============================================================================

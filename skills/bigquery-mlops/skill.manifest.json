@@ -1,10 +1,10 @@
 {
   "name": "bigquery-mlops",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "source_project": null,
   "narrative_sources": {},
-  "generated_date": "2026-10-26",
-  "source_commit": "3e3f275",
+  "generated_date": "2026-11-03",
+  "source_commit": "5baa7a5",
   "reference_files": [
     "feature-store-and-temporal-joins.md",
     "model-registry-export-and-serving.md",

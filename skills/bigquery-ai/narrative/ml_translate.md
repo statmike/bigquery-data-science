@@ -17,11 +17,13 @@
 The shared setup — connection, service account roles, `CREATE MODEL` — is written once in `reference/cloud-ai-service-models.md` (Cloud AI Service Models). This notebook repeats the parts you need to run it standalone.
 
 **When to use it:**
-- You need stable, per-language machine translation over a column of text, at a published per-character price
-- You want the source language detected rather than declared
-- You want translation behavior that does not change when a model default moves
+- You need standalone language identification without paying to translate (`DETECT_LANGUAGE` mode returns language code + confidence)
+- A scheduled or shared workload must call Cloud Translation through a **Cloud Resource connection's service account** rather than end-user credentials
+- You want table-valued Cloud Translation V3 execution standardized alongside the other four `REMOTE_SERVICE_TYPE` models above
 
-**Alternative:** `functions/ai_generate` (`AI.GENERATE`) with a translation prompt. Example 8 runs both over the same rows. The tradeoff is real in both directions and the notebook takes a position at the end.
+**Alternatives:**
+- `functions/ai_translate` (`AI.TRANSLATE`) — GA managed scalar function (`SELECT AI.TRANSLATE(col, 'en')`) requiring **no `CREATE MODEL`**, **no `connection_id`** (always uses end-user credentials), **no `text_content` column-naming rule**, dynamic **per-row target/source language expressions**, and a choice of `'nmt'` (default) or `'translation-llm'`. Note that outside the `US` and `EU` multi-regions, `AI.TRANSLATE` routes to the global Cloud Translation endpoint without regional residency guarantees.
+- `functions/ai_generate` (`AI.GENERATE`) with a translation prompt — when you need to translate *and* summarize, extract, or steer tone/terminology in one pass. Example 8 runs `ML.TRANSLATE` and `AI.GENERATE` over the same rows, and the closing section compares all three options.
 
 **Two modes, one function:** `TRANSLATE_TEXT` (requires `target_language_code`) and `DETECT_LANGUAGE` (takes no target). The mode is a string inside the `STRUCT` argument.
 
@@ -604,8 +606,10 @@ df_bf.to_pandas().sort_values('review_id').reset_index(drop=True)
 ---
 ## Which one should you reach for?
 
-**Reach for `ML.TRANSLATE`** when translation is the whole job and you want it to behave the same way tomorrow: a fixed API, a published per-character price, a detected source language for free, and no prompt to maintain or re-test when a model default moves.
+**Reach for `functions/ai_translate` (`AI.TRANSLATE`)** as the default when translation is the job and you want scalar SQL ergonomics: `SELECT AI.TRANSLATE(comment, 'en')` runs with zero `CREATE MODEL` DDL, accepts any `STRING` expression (no `text_content` alias), evaluates `target_language` and `source_language` dynamically per row, and lets you choose between Cloud Translation `'nmt'` (default) and `'translation-llm'`. Watch two constraints: it authenticates strictly with end-user credentials (no `connection_id`), and outside the `US` and `EU` multi-regions it routes to the Cloud Translation global endpoint without regional residency guarantees (also note `return_details => TRUE` reports `status = 'OK'` on success rather than `''`).
 
-**Reach for `AI.GENERATE`** when the job is not really translation — translate *and* summarize, translate *and* keep the brand voice, translate *and* extract the complaint — or when you need to steer register, formality or terminology. One call does what would otherwise be a translation plus a second pass.
+**Reach for `ML.TRANSLATE`** when you need standalone language detection without translating (`DETECT_LANGUAGE` mode with confidence scores), when a scheduled pipeline or shared view must authenticate via a Cloud Resource connection's service account instead of caller EUC, or when you already manage Cloud Translation V3 through `REMOTE_SERVICE_TYPE = 'CLOUD_AI_TRANSLATE_V3'`.
 
-**What the notebook measured, not argued:** Example 7 compares run-to-run stability of the two under a disabled query cache, and Example 8 puts their outputs on the same eight rows so you can read them against each other.
+**Reach for `functions/ai_generate` (`AI.GENERATE`)** when the job is not really translation — translate *and* summarize, translate *and* keep the brand voice, translate *and* extract the complaint — or when you need to steer register, formality or terminology. One call does what would otherwise be a translation plus a second pass.
+
+**What the notebook measured, not argued:** Example 7 compares run-to-run stability of `ML.TRANSLATE` and `AI.GENERATE` under a disabled query cache, and Example 8 puts their outputs on the same eight rows so you can read them against each other.
