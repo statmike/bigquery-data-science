@@ -646,7 +646,7 @@ print(f'Bit-for-bit identical across uncached runs: {run_1.equals(run_2)}')
 
 ### Example 6: Side-by-side — `AI.CHUNK_DOCUMENT` vs `AI.GENERATE` vs `ML.PROCESS_DOCUMENT`
 
-BigQuery provides three distinct ways to work with documents in Cloud Storage. Here we run `AI.CHUNK_DOCUMENT` and multimodal `AI.GENERATE` (`endpoint => 'gemini-2.5-flash'`) on the exact same synthetic invoice (`invoice_001.pdf`), and compare both against `functions/ml_process_document` (`ML.PROCESS_DOCUMENT`):
+BigQuery provides three distinct ways to work with documents in Cloud Storage. Here we run `AI.CHUNK_DOCUMENT` and multimodal `AI.GENERATE` (`endpoint => 'gemini-3.8-flash'`) on the exact same synthetic invoice (`invoice_001.pdf`), and compare both against `functions/ml_process_document` (`ML.PROCESS_DOCUMENT`):
 
 - **`AI.CHUNK_DOCUMENT`** extracts deterministic, page-tracked Markdown text & tables ready to embed and index.
 - **`AI.GENERATE` (with `output_schema`)** reads the `ObjectRef` directly with Gemini in a single pass to synthesize or extract custom typed fields (`vendor`, `invoice_number`, `total_due`, `summary`) without creating chunks.
@@ -687,7 +687,7 @@ FROM (
         OBJ.MAKE_REF('{invoice_uri}', '{conn_arg}')
       ),
       connection_id => '{conn_arg}',
-      endpoint => 'gemini-2.5-flash',
+      endpoint => 'gemini-3.8-flash',
       output_schema => 'vendor STRING, invoice_number STRING, total_due FLOAT64, summary STRING'
     ) AS extracted
 )

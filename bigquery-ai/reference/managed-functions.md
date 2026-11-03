@@ -102,7 +102,7 @@ AI.IF(
 | `PROMPT` | STRING or STRUCT | Required (must be first argument) | The prompt value to send to the model. STRING or STRUCT with STRING/ARRAY\<STRING\>/ObjectRef/ARRAY\<ObjectRef\> fields. At most one video object. |
 | `EXAMPLES` | ARRAY\<STRUCT\<STRING, BOOL\>\> | Optional | Few-shot examples to guide the model. Each struct maps an example input string to an expected BOOL output. Example: `[("I love this product", TRUE), ("The product performed well", FALSE)]`. |
 | `CONNECTION` | STRING | Optional | Connection to use, format: `[PROJECT_ID].LOCATION.CONNECTION_ID`. If not specified, end-user credentials are used. |
-| `ENDPOINT` | STRING | Optional | Vertex AI endpoint. Any GA or preview Gemini model. If not specified, BigQuery ML dynamically chooses a model for best cost-to-quality tradeoff. |
+| `ENDPOINT` | STRING | Optional | Vertex AI endpoint. Any GA or preview Gemini model (e.g., `'gemini-3.8-flash'` or `'gemini-4-argon'`; defaults to `'gemini-3.5-flash-lite'` / cost-quality auto-selection when omitted). If not specified, BigQuery ML dynamically chooses a model for best cost-to-quality tradeoff. |
 | `EMBEDDINGS` | (Preview) | Optional | Embeddings for optimized mode. Can be generated on-the-fly via `AI.EMBED(...)` or pre-materialized. If autonomous embedding generation is enabled on the table, BigQuery automatically uses the embeddings. |
 | `OPTIMIZATION_MODE` | STRING | Optional (Preview) | `MINIMIZE_COST` (default when embeddings provided — trains a local distilled model, up to 230x token reduction) or `MAXIMIZE_QUALITY` (always uses remote LLM). Requires ~3,000 rows minimum. |
 | `MAX_ERROR_RATIO` | FLOAT64 | Optional | Range 0.0–1.0, default 1.0. If the error ratio exceeds this threshold, the query fails with an error describing the most frequent error types. Not supported when `optimization_mode` is `MINIMIZE_COST`. |
@@ -152,7 +152,7 @@ AI.SCORE(
 |-----------|------|----------|-------------|
 | `PROMPT` | STRING or STRUCT | Required (must be first argument) | The prompt describing the scoring criteria. STRING or STRUCT with STRING/ARRAY\<STRING\>/ObjectRef/ARRAY\<ObjectRef\> fields. At most one video object. For a document plus its criteria, the tuple form `('criteria text', ref)` is the usual shape. |
 | `CONNECTION` | STRING | Optional | Connection to use, format: `[PROJECT_ID].LOCATION.CONNECTION_ID`. |
-| `ENDPOINT` | STRING | Optional | Vertex AI endpoint. If not specified, BigQuery dynamically chooses a model. |
+| `ENDPOINT` | STRING | Optional | Vertex AI endpoint (e.g., `'gemini-3.8-flash'` or `'gemini-4-argon'`; defaults to `'gemini-3.5-flash-lite'` / cost-quality auto-selection when omitted). If not specified, BigQuery dynamically chooses a model. |
 | `MAX_ERROR_RATIO` | FLOAT64 | Optional | Range 0.0–1.0, default 1.0. If the error ratio exceeds this threshold, the query fails with an error. |
 
 **Outputs:**
@@ -209,7 +209,7 @@ AI.CLASSIFY(
 | `CATEGORIES` | ARRAY\<STRING\> or ARRAY\<STRUCT\<STRING, STRING\>\> | Required (must be second argument) | The categories to classify into. Without descriptions: `['positive', 'neutral', 'negative']`. With descriptions: `[('green', 'positive'), ('yellow', 'neutral'), ('red', 'negative')]`. Must be string literals (or use a DECLARE variable from a table column). |
 | `EXAMPLES` | ARRAY\<STRUCT\<STRING, STRING\>\> (single) or ARRAY\<STRUCT\<STRING, ARRAY\<STRING\>\>\> (multi) | Optional | Few-shot examples. For single mode: maps input to expected category. For multi mode: maps input to expected array of categories. Example: `[("This is a great phone", "tech"), ("The match was exciting", "sport")]`. |
 | `CONNECTION` | STRING | Optional | Connection to use, format: `[PROJECT_ID].LOCATION.CONNECTION_ID`. |
-| `ENDPOINT` | STRING | Optional | Vertex AI endpoint. If not specified, BigQuery dynamically chooses a model. |
+| `ENDPOINT` | STRING | Optional | Vertex AI endpoint (e.g., `'gemini-3.8-flash'` or `'gemini-4-argon'`; defaults to `'gemini-3.5-flash-lite'` / cost-quality auto-selection when omitted). If not specified, BigQuery dynamically chooses a model. |
 | `OUTPUT_MODE` | STRING | Optional | `'single'` or `'multi'`. Changes return type to ARRAY\<STRING\>. |
 | `EMBEDDINGS` | (Preview) | Optional | Embeddings for optimized mode, same as AI.IF. |
 | `OPTIMIZATION_MODE` | STRING | Optional (Preview) | `MINIMIZE_COST` or `MAXIMIZE_QUALITY`. Same as AI.IF. Note: `output_mode => 'multi'` is NOT supported in optimized mode. |
@@ -278,7 +278,7 @@ AI.AGG(
 | `INPUT` | STRING or STRUCT | Required (must be first argument) | The data to aggregate. STRING value, or STRUCT consisting of STRING values, object references, and arrays of either. **The reference page still specifies `ObjectRefRuntime` here — it is the only `AI.*` page that does.** A bare `ObjectRef` works anyway: `AI.AGG(STRUCT(ref), instruction)` over an object table returns real summaries (verified live 2026-09-15 over 50 PDFs), and the Known Issues below argue for it. |
 | `INSTRUCTION` | STRING | Required (must be second argument) | Natural language aggregation prompt describing what to extract or summarize from the input data. Can be a string literal or query parameter. |
 | `CONNECTION` | STRING | Optional | Connection to use, format: `[PROJECT_ID.]LOCATION.CONNECTION_ID`. If not specified, end-user credentials are used. |
-| `ENDPOINT` | STRING | Optional | Vertex AI endpoint. Any Gemini model that doesn't require thinking budget. If not specified, BigQuery chooses a model for you. |
+| `ENDPOINT` | STRING | Optional | Vertex AI endpoint. Any Gemini model that doesn't require thinking budget (e.g., `'gemini-3.8-flash'` or `'gemini-4-argon'`; defaults to `'gemini-3.5-flash-lite'` / cost-quality auto-selection when omitted). If not specified, BigQuery chooses a model for you. |
 | `max_error_ratio` | FLOAT64 | Optional | A FLOAT64 between 0.0 and 1.0 specifying the maximum acceptable ratio of row-level inference failures. Default is 1.0 (returns partial results). If exceeded, the query fails with an error describing frequent error types. |
 | `output_schema` | STRING | Optional | Schema for structured output as comma-separated fields (e.g. `'summary STRING, sentiment STRING'`). When specified, `AI.AGG` returns a STRUCT conforming to this schema instead of a plain STRING. |
 
@@ -293,7 +293,7 @@ AI.AGG(
 
 **Output cap:** 10,000 tokens per group.
 
-**Supported models:** Any Gemini model that doesn't require thinking budget (including `gemini-4-argon`, Gemini 3.x, and `gemini-2.5-*` models). If no endpoint specified, BigQuery dynamically chooses a model.
+**Supported models:** Any Gemini model that doesn't require thinking budget (including `gemini-3.8-flash`, `gemini-4-argon`, Gemini 3.x, and `gemini-2.5-*` models; defaults to `gemini-3.5-flash-lite` / cost-quality auto-selection when omitted). If no endpoint specified, BigQuery dynamically chooses a model.
 
 **Best practices:**
 - Use `TO_JSON_STRING` to pass multiple columns as structured input -- the model sees each row's full context.

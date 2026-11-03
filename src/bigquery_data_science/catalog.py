@@ -234,6 +234,8 @@ _EMBEDDING_KEYWORDS: tuple[str, ...] = (
     "ai.search",
     "vector_search",
     "embeddinggemma",
+    "gemini-embedding-2",
+    "gemini-embedding-001",
 )
 
 _MEDIA_KEYWORDS: tuple[str, ...] = (
@@ -400,6 +402,8 @@ _GENERATIVE_KEYWORDS: tuple[str, ...] = (
     "column aliases",
     "reusable_column_aliases_mode",
     "effective_project_options",
+    "gemini-3.8-flash",
+    "gemini-4-argon",
 )
 
 
@@ -1087,8 +1091,9 @@ def triage_task(
             primary_options=[
                 (
                     "Text/multimodal embeddings & similarity: `AI.EMBED` (GA scalar; "
-                    "`model => 'embeddinggemma-300m'` Preview), `AI.SIMILARITY` (GA "
-                    "scalar; `model => 'embeddinggemma-300m'` Preview), "
+                    "`endpoint => 'gemini-embedding-2'` or `model => 'embeddinggemma-300m'` "
+                    "Preview), `AI.SIMILARITY` (GA scalar; `endpoint => 'gemini-embedding-2'` "
+                    "or `model => 'embeddinggemma-300m'` Preview), "
                     "`AI.GENERATE_EMBEDDING` (GA TVF), and `AI.CHUNK_DOCUMENT` "
                     "(GA layout-aware document chunking TVF for RAG) in `bigquery-ai`"
                 ),
@@ -1113,7 +1118,8 @@ def triage_task(
             ),
             prerequisites=(
                 "`AI.EMBED` and `AI.SIMILARITY` with `model => 'embeddinggemma-300m'` "
-                "(Preview) require no connection; Vertex AI embedding endpoints use "
+                "(Preview) require no connection; Vertex AI embedding endpoints "
+                "(such as `endpoint => 'gemini-embedding-2'`) use "
                 "`roles/aiplatform.user` for multimodal or >48h jobs. Inside VPC-SC, "
                 "pass 1-arg `OBJ.MAKE_REF('gs://...')` with end-user credentials "
                 "(connection-backed `ObjectRef` HTTP links are rejected). "
@@ -1488,6 +1494,11 @@ class ReviewFinding:
     message: str
     remediation: str
 
+    @property
+    def code(self) -> str:
+        """Alias for `rule`."""
+        return self.rule
+
     def to_dict(self) -> dict[str, str]:
         """Convert the finding to a JSON-serializable dictionary."""
         return {
@@ -1511,6 +1522,16 @@ class SqlReviewResult:
     def ok(self) -> bool:
         """Return True when no ERROR-severity findings were raised."""
         return not any(f.severity == "ERROR" for f in self.findings)
+
+    @property
+    def error_count(self) -> int:
+        """Return count of ERROR-severity findings."""
+        return sum(1 for f in self.findings if f.severity == "ERROR")
+
+    @property
+    def warning_count(self) -> int:
+        """Return count of WARNING-severity findings."""
+        return sum(1 for f in self.findings if f.severity == "WARNING")
 
     def to_dict(self) -> dict[str, object]:
         """Convert the SQL review result to a JSON-serializable dictionary."""
@@ -1563,6 +1584,30 @@ _MODEL_TYPE_SQL_RE = re.compile(
 )
 _ENDPOINT_ARG_RE = re.compile(
     r"\b(?:endpoint|model)\s*(?:=>|=)\s*['\"]([^'\"]+)['\"]",
+    re.IGNORECASE,
+)
+_CREATE_MODEL_HANDLE_RE = re.compile(
+    r"\bCREATE\s+(?:OR\s+REPLACE\s+)?MODEL\s+(?:IF\s+NOT\s+EXISTS\s+)?(`[^`]+`|[A-Za-z0-9_.-]+)",
+    re.IGNORECASE,
+)
+_GEMINI_EMB2_PIN_RE = re.compile(
+    r"\b(?:endpoint|model)\s*(?:=>|=)\s*['\"]gemini-embedding-2['\"]",
+    re.IGNORECASE,
+)
+_MODEL_REF_RE = re.compile(
+    r"\bMODEL\s+(`[^`]+`|[A-Za-z0-9_.-]+)",
+    re.IGNORECASE,
+)
+_EMB_UNSUPPORTED_NAMED_ARG_RE = re.compile(
+    r"\b(?:task_type|title)\s*(?:=>|=)",
+    re.IGNORECASE,
+)
+_EMB_UNSUPPORTED_STRUCT_AS_RE = re.compile(
+    r"\bAS\s+(?:task_type|title)\b",
+    re.IGNORECASE,
+)
+_EMB_UNSUPPORTED_JSON_KEY_RE = re.compile(
+    r"['\"](?:task_type|title)['\"]\s*:",
     re.IGNORECASE,
 )
 
@@ -1902,13 +1947,19 @@ def review_sql(
             if endpoint_value in deprecated_models:
                 remediation = (
                     f"Replace retired `{endpoint_value}` with "
-                    f"`{deprecated_models[endpoint_value]}`."
+                    f"`{deprecated_models[endpoint_value]}` "
+                    "(or current preferred defaults `'gemini-3.8-flash'`, "
+                    "`'gemini-4-argon'`, `'gemini-3.5-flash-lite'`, "
+                    "`'gemini-embedding-2'`)."
                 )
             else:
                 remediation = (
-                    "Pin a current supported model such as `gemini-3.5-flash`, "
-                    "`gemini-3.1-flash-lite`, `gemini-2.5-pro`, `gemini-4-argon`, "
-                    "`TimesFM 2.5`, `TimesFM 3.0`, `nmt`, or `translation-llm`."
+                    "Pin a current supported model from `skills/pinned-models.json` "
+                    "such as `'gemini-3.8-flash'`, `'gemini-4-argon'`, "
+                    "`'gemini-3.5-flash-lite'`, `'gemini-embedding-2'`, "
+                    "`'gemini-embedding-001'`, `'text-embedding-005'`, "
+                    "`'embeddinggemma-300m'`, `'TimesFM 2.5'`, `'TimesFM 3.0'`, "
+                    "`'nmt'`, or `'translation-llm'`."
                 )
             findings.append(
                 ReviewFinding(
@@ -1921,6 +1972,70 @@ def review_sql(
                     remediation=remediation,
                 )
             )
+
+    emb2_handles: set[str] = set()
+    stmt_start = 0
+    for sep_match in re.finditer(r";|$", masked):
+        stmt_end = sep_match.start()
+        stmt_raw = uncommented[stmt_start:stmt_end]
+        stmt_masked = masked[stmt_start:stmt_end]
+        stmt_start = sep_match.end()
+        if not stmt_masked.strip():
+            continue
+
+        create_match = _CREATE_MODEL_HANDLE_RE.search(stmt_masked)
+        if create_match is not None:
+            raw_handle = create_match.group(1).strip("`").strip().lower()
+            short_handle = raw_handle.rsplit(".", 1)[-1]
+            if _GEMINI_EMB2_PIN_RE.search(stmt_raw):
+                emb2_handles.add(raw_handle)
+                emb2_handles.add(short_handle)
+            elif _ENDPOINT_ARG_RE.search(stmt_raw):
+                emb2_handles.discard(raw_handle)
+                emb2_handles.discard(short_handle)
+
+        uses_emb2 = _GEMINI_EMB2_PIN_RE.search(stmt_raw) is not None
+        if not uses_emb2 and emb2_handles:
+            for ref_match in _MODEL_REF_RE.finditer(stmt_masked):
+                ref_handle = ref_match.group(1).strip("`").strip().lower()
+                ref_short = ref_handle.rsplit(".", 1)[-1]
+                if ref_handle in emb2_handles or ref_short in emb2_handles:
+                    uses_emb2 = True
+                    break
+
+        if uses_emb2:
+            emb_struct_Calls = (
+                _iter_function_call_args(stmt_masked, "STRUCT")
+                + _iter_function_call_args(stmt_masked, "AI.GENERATE_EMBEDDING")
+                + _iter_function_call_args(stmt_masked, "ML.GENERATE_EMBEDDING")
+            )
+            has_unsupported_arg = (
+                _EMB_UNSUPPORTED_NAMED_ARG_RE.search(stmt_masked) is not None
+                or any(
+                    _EMB_UNSUPPORTED_STRUCT_AS_RE.search(call_args) is not None
+                    for call_args in emb_struct_Calls
+                )
+                or _EMB_UNSUPPORTED_JSON_KEY_RE.search(stmt_raw) is not None
+            )
+            if has_unsupported_arg:
+                findings.append(
+                    ReviewFinding(
+                        severity="WARNING",
+                        rule="GEMINI_EMBEDDING_2_UNSUPPORTED_ARGS",
+                        message=(
+                            "`gemini-embedding-2` rejects `task_type` and `title` "
+                            "arguments (`400 The task_type and title arguments of "
+                            "ai.embed are not supported for gemini-embedding-2 model`)."
+                        ),
+                        remediation=(
+                            "Omit `task_type` and `title` when using `'gemini-embedding-2'` "
+                            "(unified task-agnostic multimodal embedding), or use "
+                            "`'gemini-embedding-001'` / `'text-embedding-005'` when "
+                            "`task_type` or `title` is required."
+                        ),
+                    )
+                )
+                break
 
     gen_calls = [
         call_args
@@ -1938,9 +2053,9 @@ def review_sql(
                 rule="UNPINNED_AI_ENDPOINT",
                 message="Generative `AI.GENERATE*` call omits an explicit `endpoint =>` argument.",
                 remediation=(
-                    "Pin `endpoint => 'gemini-3.5-flash'` (or `'gemini-3.1-flash-lite'` / "
-                    "`'gemini-2.5-pro'` / `'gemini-4-argon'`) for reproducible "
-                    "production behavior."
+                    "Pin `endpoint => 'gemini-3.8-flash'` (or `'gemini-4-argon'` / "
+                    "`'gemini-3.5-flash-lite'`) from `skills/pinned-models.json` "
+                    "for reproducible production behavior."
                 ),
             )
         )

@@ -30,7 +30,7 @@ CREATE OR REPLACE TABLE `PROJECT_ID.DATASET.ai_search_knowledge_base` (
     GENERATED ALWAYS AS (
       AI.EMBED(content,
         connection_id => 'PROJECT_ID.LOCATION.CONNECTION_ID',
-        endpoint => 'text-embedding-005')
+        endpoint => 'gemini-embedding-2')
     ) STORED OPTIONS (asynchronous = TRUE)
 );
 

@@ -100,7 +100,7 @@ Progressive examples from simplest to most advanced. Each cell adds one new conc
 AI.SEARCH requires a base table with autonomous embedding generation enabled.
 This is configured with a `GENERATED ALWAYS AS` column that calls `AI.EMBED`, with `OPTIONS(asynchronous = TRUE)`. BigQuery then automatically generates and maintains embeddings when data is inserted or updated. The same column definition works in `ALTER TABLE ... ADD COLUMN`, so an existing table can be upgraded in place.
 
-**Note on task_type:** When you configure autonomous embedding generation, BigQuery handles the `task_type` automatically — it uses `RETRIEVAL_DOCUMENT` when indexing your table data and `RETRIEVAL_QUERY` when embedding search queries at runtime. This is the correct **asymmetric** pattern for retrieval. See the `functions/ai_embed` (`AI.EMBED`) notebook for the full list of task types.
+**Note on task_type:** `gemini-embedding-2` produces unified, task-agnostic embeddings (3,072 dimensions by default) and requires no `task_type` parameter. When autonomous embedding generation is configured with legacy asymmetric models (such as `text-embedding-005` or `gemini-embedding-001`), BigQuery handles `task_type` automatically — using `RETRIEVAL_DOCUMENT` when indexing your table data and `RETRIEVAL_QUERY` when embedding search queries at runtime. See the `functions/ai_embed` (`AI.EMBED`) notebook for details on task types.
 
 **Limitations:**
 - One automatically generated embedding column per table.
@@ -120,7 +120,7 @@ CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.ai_search_knowledge_base` (
     GENERATED ALWAYS AS (
       AI.EMBED(content,
         connection_id => '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}',
-        endpoint => 'text-embedding-005')
+        endpoint => 'gemini-embedding-2')
     ) STORED OPTIONS (asynchronous = TRUE)
 )
 '''

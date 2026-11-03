@@ -23,7 +23,7 @@ AI.SCORE(
 |-----------|------|----------|-------------|
 | `PROMPT` | STRING or STRUCT | Required (must be first argument) | The prompt describing the scoring criteria. STRING or STRUCT with STRING/ARRAY\<STRING\>/ObjectRef/ARRAY\<ObjectRef\> fields. At most one video object. For a document plus its criteria, the tuple form `('criteria text', ref)` is the usual shape. |
 | `CONNECTION` | STRING | Optional | Connection to use, format: `[PROJECT_ID].LOCATION.CONNECTION_ID`. |
-| `ENDPOINT` | STRING | Optional | Vertex AI endpoint. If not specified, BigQuery dynamically chooses a model. |
+| `ENDPOINT` | STRING | Optional | Vertex AI endpoint (e.g., `'gemini-3.8-flash'` or `'gemini-4-argon'`; defaults to `'gemini-3.5-flash-lite'` / cost-quality auto-selection when omitted). If not specified, BigQuery dynamically chooses a model. |
 | `MAX_ERROR_RATIO` | FLOAT64 | Optional | Range 0.0–1.0, default 1.0. If the error ratio exceeds this threshold, the query fails with an error. |
 
 **Outputs:**

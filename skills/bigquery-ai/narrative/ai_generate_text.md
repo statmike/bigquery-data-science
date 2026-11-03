@@ -95,7 +95,7 @@ print(f'Connection {CONNECTION_ID} ready (SA: {sa})')
 client.query(f'''
 CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.gemini_flash`
   REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
-  OPTIONS (endpoint = \'gemini-2.5-flash\')
+  OPTIONS (endpoint = 'gemini-3.8-flash')
 ''').result()
 print('Model gemini_flash ready')
 ```
@@ -364,4 +364,21 @@ model_name = f'{PROJECT_ID}.{DATASET_ID}.gemini_flash'
 result = bbq.ai.generate_text(model_name, df)
 
 result[['city', 'result']].to_pandas()
+```
+
+### Legacy `bigframes.ml.llm.GeminiTextGenerator` vs `bbq.ai.*`
+
+In `bigframes 2.51.0`, the `bigframes.bigquery.ai` namespace (`bbq.ai.generate_text`, `bbq.ai.generate`) passes `'gemini-3.8-flash'` and `'gemini-4-argon'` directly to BigQuery with zero client-side warnings. By contrast, the legacy `bigframes.ml.llm.GeminiTextGenerator` estimator validates `model_name` against a hardcoded client-side tuple (`_GEMINI_ENDPOINTS`, which currently lists up to `'gemini-3.5-flash'`) and emits a `UserWarning` for newer endpoints. Prefer `bbq.ai.generate_text` or `bbq.ai.generate` for new code; if maintaining existing `GeminiTextGenerator` pipelines, pin `'gemini-3.5-flash'`:
+
+```python
+from bigframes.ml.llm import GeminiTextGenerator
+
+# GeminiTextGenerator validates against _GEMINI_ENDPOINTS (up to 'gemini-3.5-flash' in bigframes 2.51.0);
+# prefer bbq.ai.generate_text / bbq.ai.generate above for 'gemini-3.8-flash' and 'gemini-4-argon'.
+generator = GeminiTextGenerator(
+    model_name='gemini-3.5-flash',
+    connection_name=f'{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}',
+)
+legacy_result = generator.predict(df[['prompt']], temperature=0.0)
+legacy_result[['prompt', 'ml_generate_text_llm_result']].to_pandas()
 ```

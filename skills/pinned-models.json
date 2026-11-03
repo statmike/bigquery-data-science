@@ -30,7 +30,61 @@
   "bigquery-ml": [
     "TimesFM 2.5"
   ],
+  "preferred_defaults": {
+    "flash": "gemini-3.8-flash",
+    "pro": "gemini-4-argon",
+    "flash_lite": "gemini-3.5-flash-lite",
+    "embedding": "gemini-embedding-2"
+  },
+  "legacy_models": {
+    "gemini-2.5-flash": {
+      "replacement": "gemini-3.8-flash",
+      "allow_in_code_cells": [],
+      "allow_in_sql": []
+    },
+    "gemini-2.5-pro": {
+      "replacement": "gemini-4-argon",
+      "allow_in_code_cells": [],
+      "allow_in_sql": []
+    },
+    "gemini-2.5-flash-lite": {
+      "replacement": "gemini-3.5-flash-lite",
+      "allow_in_code_cells": [],
+      "allow_in_sql": []
+    },
+    "text-embedding-005": {
+      "replacement": "gemini-embedding-2",
+      "allow_in_code_cells": [
+        "ai_embed",
+        "ai_generate_embedding",
+        "ai_similarity",
+        "ml_generate_embedding"
+      ],
+      "allow_in_sql": [
+        "ai_embed",
+        "ai_generate_embedding",
+        "ai_similarity",
+        "ml_generate_embedding"
+      ]
+    },
+    "multimodalembedding@001": {
+      "replacement": "gemini-embedding-2",
+      "allow_in_code_cells": [
+        "ai_embed",
+        "ai_generate_embedding",
+        "ai_similarity",
+        "ml_generate_embedding"
+      ],
+      "allow_in_sql": [
+        "ai_embed",
+        "ai_generate_embedding",
+        "ai_similarity",
+        "ml_generate_embedding"
+      ]
+    }
+  },
   "deprecated": {
     "gemini-3.1-flash-lite-preview": "gemini-3.1-flash-lite"
   }
 }
+

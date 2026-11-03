@@ -7,13 +7,13 @@ Use text embeddings *as classifier features* to place a product into a `departme
 **Models used:** `BOOSTED_TREE_CLASSIFIER`
 **Functions used:** `AI.EMBED`, `ML.EVALUATE`, `ML.PREDICT`, `VECTOR_SEARCH`
 
-Modernizes `Applied GenAI/Embeddings/Vertex AI GenAI Embeddings - As Features For Hierarchical Classification.ipynb` (retired — that notebook was removed from the repo when this workflow replaced it, so this is now the only copy): replaces the deprecated `PaLM2TextEmbeddingGenerator`/BigFrames pipeline with `AI.EMBED` (no connection needed for text) and native SQL `CREATE MODEL ... BOOSTED_TREE_CLASSIFIER` (embeddings passed as `ARRAY<FLOAT64>` feature columns directly — no need to unnest into hundreds of individual columns). Compares 3 ways of turning two embeddings (product, hierarchy node) into pairwise classifier features — reduced from the original's 5, and at a smaller embedding dimensionality, after finding the original's richest variants took **52 minutes to 9 hours 39 minutes each** to train (BigFrames `XGBClassifier`, full 768-dim embeddings, deep/forested trees).
+Modernizes `Applied GenAI/Embeddings/Vertex AI GenAI Embeddings - As Features For Hierarchical Classification.ipynb` (retired — that notebook was removed from the repo when this workflow replaced it, so this is now the only copy): replaces the deprecated `PaLM2TextEmbeddingGenerator`/BigFrames pipeline with `AI.EMBED` (no connection needed for text) and native SQL `CREATE MODEL ... BOOSTED_TREE_CLASSIFIER` (embeddings passed as `ARRAY<FLOAT64>` feature columns directly — no need to unnest into hundreds of individual columns). Compares 3 ways of turning two embeddings (product, hierarchy node) into pairwise classifier features — reduced from the original's 5, and at 768-dim Matryoshka embeddings (truncated from `gemini-embedding-2`'s 3,072-dim default), after finding the original's richest variants took **52 minutes to 9 hours 39 minutes each** to train (BigFrames `XGBClassifier`, full 768-dim embeddings, deep/forested trees).
 
 **Beyond the original notebook's scope: two baselines that test whether the pairwise approach is even the right tool for this job** — a direct multiclass classifier (predict the category straight from the product embedding, no candidate-pair framing at all) and a pure `VECTOR_SEARCH` nearest-neighbor lookup (no classifier, no training). Both are cheap to add and turn this notebook from "here's one technique" into "here's how to choose between techniques."
 
 **Data:** [`bigquery-public-data.thelook_ecommerce.products`](https://console.cloud.google.com/marketplace/product/bigquery-public-datasets) — 29,118 products (after dropping 2 with a NULL name), 2 departments (Men/Women), 36 `department: category` combinations (categories repeat across departments — e.g. both have "Accessories" — so the node label concatenates department + category to disambiguate). Products are split 90/10 (stratified by category) into TRAIN/TEST, then each split is cross-joined against all 38 hierarchy nodes (2 department + 36 category) to build the binary-classification training/serving tables — the multiclass baseline and vector search baseline use the products directly, with no cross-join.
 
-**GOTCHA (verified) driving the scope here:** even after cutting to 3 approaches at 256-dim embeddings and training natively via SQL (rather than BigFrames), each pairwise `BOOSTED_TREE_CLASSIFIER` on the ~1M-row (product × node) training table took **19–40 minutes** — a real, substantial cost, though more than 13x faster than the original's worst case. All 3 are submitted **concurrently** (verified live: BigQuery trains distinctly-named models in true parallel), so the whole notebook's pairwise-training step takes as long as its single slowest model (~40 minutes), not the sum of all three (~75 minutes serial). **Expect Step 3 below to run for up to ~40 minutes** — the multiclass baseline afterward trains on 26x fewer rows and takes a few minutes; the vector search baseline needs no training at all.
+**GOTCHA (verified) driving the scope here:** even after cutting to 3 approaches at 768-dim embeddings and training natively via SQL (rather than BigFrames) on a 1/3 product sample (~332K product × node pairs, keeping the 2,304-feature `conadiff` matrix within BigQuery ML's single-worker `ARRAY<FLOAT64>` memory limit), each pairwise `BOOSTED_TREE_CLASSIFIER` took **17–34 minutes** — a real, substantial cost, though more than 16x faster than the original's worst case. All 3 are submitted **concurrently** (verified live: BigQuery trains distinctly-named models in true parallel), so the whole notebook's pairwise-training step takes as long as its single slowest model (~35 minutes), not the sum of all three (~85 minutes serial). **Expect Step 3 below to run for up to ~35 minutes** — the multiclass baseline afterward trains on ~26K rows and takes ~10 minutes; the vector search baseline needs no training at all.
 
 ---
 ## Setup
@@ -67,7 +67,7 @@ print(f'Dataset {PROJECT_ID}.{DATASET_ID} ready')
 ---
 ## Step 1 — Embed products and hierarchy nodes with `AI.EMBED`
 
-`AI.EMBED` is a scalar function — no `CREATE MODEL`, no connection, for text input. `gemini-embedding-001` supports up to 3072 dimensions; `model_params => JSON '{"outputDimensionality": 256}'` truncates to 256 (Matryoshka-style), keeping the downstream feature tables and training cost manageable.
+`AI.EMBED` is a scalar function — no `CREATE MODEL`, no connection, for text input. `gemini-embedding-2` defaults to 3,072 dimensions; `model_params => JSON '{"outputDimensionality": 768}'` truncates to 768 (Matryoshka-style), keeping the downstream feature tables and training cost manageable.
 
 ### Products
 
@@ -80,8 +80,8 @@ SELECT
   id, name, department,
   department || ': ' || category AS category,
   cost, retail_price, brand,
-  (AI.EMBED(content => name, endpoint => 'gemini-embedding-001',
-            model_params => JSON '{{"outputDimensionality": 256}}')).result AS name_embedding
+  (AI.EMBED(content => name, endpoint => 'gemini-embedding-2',
+            model_params => JSON '{{"outputDimensionality": 768}}')).result AS name_embedding
 FROM `bigquery-public-data.thelook_ecommerce.products`
 WHERE name IS NOT NULL
 """
@@ -110,12 +110,12 @@ category_nodes AS (
   SELECT DISTINCT category AS hierarchy_node, 'category' AS hierarchy_level, department AS hierarchy_node_parent
   FROM `{PROJECT_ID}.{DATASET_ID}.embed_class_products`
 )
-SELECT *, (AI.EMBED(content => hierarchy_node, endpoint => 'gemini-embedding-001',
-                     model_params => JSON '{{"outputDimensionality": 256}}')).result AS hierarchy_node_embedding
+SELECT *, (AI.EMBED(content => hierarchy_node, endpoint => 'gemini-embedding-2',
+                     model_params => JSON '{{"outputDimensionality": 768}}')).result AS hierarchy_node_embedding
 FROM department_nodes
 UNION ALL
-SELECT *, (AI.EMBED(content => hierarchy_node, endpoint => 'gemini-embedding-001',
-                     model_params => JSON '{{"outputDimensionality": 256}}')).result
+SELECT *, (AI.EMBED(content => hierarchy_node, endpoint => 'gemini-embedding-2',
+                     model_params => JSON '{{"outputDimensionality": 768}}')).result
 FROM category_nodes
 """
 client.query(query).result()
@@ -134,8 +134,8 @@ client.query(query).to_dataframe()
 Split products 90/10, stratified by `category` (native SQL — no need for the local pandas/numpy workaround the original notebook used, a BigFrames limitation at the time). Then cross-join each split against every hierarchy node: `label = 1` when the node is that product's true department or category, else `0`.
 
 Two feature constructions are computed once, up front, so every model below can just select the columns it needs:
-- `concat_embedding` — the product and node embeddings concatenated into one 512-dim vector (`ARRAY_CONCAT`)
-- `adiff_embedding` — the elementwise absolute difference between the two 256-dim embeddings (via `UNNEST ... WITH OFFSET` + `JOIN` on position — BigQuery has no native elementwise array arithmetic)
+- `concat_embedding` — the product and node embeddings concatenated into one 1,536-dim vector (`ARRAY_CONCAT`)
+- `adiff_embedding` — the elementwise absolute difference between the two 768-dim embeddings (via `UNNEST ... WITH OFFSET` + `JOIN` on position — BigQuery has no native elementwise array arithmetic)
 
 Both stay as `ARRAY<FLOAT64>` columns passed directly to `CREATE MODEL` below — confirmed live that `BOOSTED_TREE_CLASSIFIER` accepts array-typed features without needing them unnested into individual columns first.
 
@@ -199,24 +199,25 @@ client.query(query).to_dataframe()
 ---
 ## Step 3 — Train 3 pairwise classifiers: different feature constructions
 
-- **`adiff`** — absolute difference only (256 features): cheapest, simplest.
-- **`conadiff`** — concatenated + absolute difference (768 features): richer embedding-only signal.
+- **`adiff`** — absolute difference only (768 features): cheapest, simplest.
+- **`conadiff`** — concatenated + absolute difference (2,304 features): richer embedding-only signal.
 - **`conadiff_weighted`** — same features as `conadiff`, plus `auto_class_weights = TRUE`: the (product, node) label is heavily imbalanced (~2.6% positive), so this tests whether correcting for that — rather than adding more features — is the better lever.
 
-All three trained with otherwise-default `BOOSTED_TREE_CLASSIFIER` hyperparameters (no attempt to replicate the original's deep/forested configurations, which is what drove its multi-hour training times). Submitted concurrently — **this cell takes up to ~40 minutes.**
+Because `conadiff` at 768-dim embeddings expands to 2,304 features per row (3× the 256-dim feature width), all three pairwise models train on a deterministic 1/3 product sample (`MOD(ABS(FARM_FINGERPRINT(CAST(id AS STRING))), 3) = 0`, ~332K product × node pairs, ~765M feature values for `conadiff`) so that `ARRAY<FLOAT64>` LibSVM loading fits within BigQuery ML's single-worker memory limit while keeping all three pairwise variants on an identical training set. Submitted concurrently — **this cell takes up to ~35 minutes.**
 
 ```python
+train_filter = "WHERE MOD(ABS(FARM_FINGERPRINT(CAST(id AS STRING))), 3) = 0"
 model_configs = {
     'embed_class_model_adiff': (
-        f'SELECT adiff_embedding, label FROM `{PROJECT_ID}.{DATASET_ID}.embed_class_train`',
+        f'SELECT adiff_embedding, label FROM `{PROJECT_ID}.{DATASET_ID}.embed_class_train` {train_filter}',
         {}
     ),
     'embed_class_model_conadiff': (
-        f'SELECT concat_embedding, adiff_embedding, label FROM `{PROJECT_ID}.{DATASET_ID}.embed_class_train`',
+        f'SELECT concat_embedding, adiff_embedding, label FROM `{PROJECT_ID}.{DATASET_ID}.embed_class_train` {train_filter}',
         {}
     ),
     'embed_class_model_conadiff_weighted': (
-        f'SELECT concat_embedding, adiff_embedding, label FROM `{PROJECT_ID}.{DATASET_ID}.embed_class_train`',
+        f'SELECT concat_embedding, adiff_embedding, label FROM `{PROJECT_ID}.{DATASET_ID}.embed_class_train` {train_filter}',
         {'auto_class_weights': 'TRUE'}
     ),
 }
@@ -386,10 +387,10 @@ all_resolved['embed_class_baseline_multiclass'] = multiclass_baseline_df
 all_resolved['embed_class_baseline_vector_search'] = vector_search_df
 
 training_cost = {
-    'embed_class_model_adiff': '~1M-row cross-join, ~19 min',
-    'embed_class_model_conadiff': '~1M-row cross-join, ~40 min',
-    'embed_class_model_conadiff_weighted': '~1M-row cross-join, ~40 min',
-    'embed_class_baseline_multiclass': '~26K rows, a few minutes',
+    'embed_class_model_adiff': '~332K-row cross-join (1/3 sample), ~17 min',
+    'embed_class_model_conadiff': '~332K-row cross-join (1/3 sample), ~34 min',
+    'embed_class_model_conadiff_weighted': '~332K-row cross-join (1/3 sample), ~34 min',
+    'embed_class_baseline_multiclass': '~26K rows, ~10 min',
     'embed_class_baseline_vector_search': 'no training at all',
 }
 
@@ -428,10 +429,10 @@ plt.show()
 ---
 ## Interpretation
 
-**The headline finding: the pairwise binary-relevance approach — the entire premise of the original notebook this workflow modernizes — is not the best tool for this specific hierarchy, on either accuracy or cost.** The direct multiclass baseline reaches roughly **70% category accuracy** while training on a table **~38x smaller** (no cross-join with hierarchy nodes) in a few minutes rather than tens of minutes. The pairwise approaches, even at their best (`conadiff_weighted`, ~46% category accuracy), don't come close — and even the **zero-training** `VECTOR_SEARCH` baseline (~53% category accuracy, verified without needing a vector index at this data size) beats every pairwise variant.
+**The headline finding: the pairwise binary-relevance approach — the entire premise of the original notebook this workflow modernizes — is not the best tool for this specific hierarchy, on either accuracy or cost.** The direct multiclass baseline reaches roughly **78% category accuracy** while training on a table **~38x smaller than the full cross-join** (no cross-join with hierarchy nodes) in ~10 minutes rather than tens of minutes. The pairwise approaches, even at their best (`conadiff_weighted`, ~65% category accuracy), don't come close — and even the **zero-training** `VECTOR_SEARCH` baseline (~68% category accuracy, verified without needing a vector index at this data size) beats every pairwise variant.
 
-**Within the pairwise family, the ranking is informative on its own:** `adiff` (absolute-difference-only) is clearly weakest. Adding the concatenated embeddings (`conadiff`) helps substantially. Correcting for the real ~2.6% positive-label imbalance via `auto_class_weights=TRUE` (`conadiff_weighted`) helps *again*, on top of that — trading precision for recall and improving `ML.EVALUATE`'s ROC-AUC — confirming that for this pairwise framing, addressing class imbalance is a more effective lever than the metadata features the original notebook added instead.
+**Within the pairwise family, the ranking is informative on its own:** `adiff` (absolute-difference-only, ~51% category accuracy) is clearly weakest. Adding the concatenated embeddings (`conadiff`, ~60% category accuracy) helps substantially. Correcting for the real ~2.6% positive-label imbalance via `auto_class_weights=TRUE` (`conadiff_weighted`, ~65% category accuracy) helps *again*, on top of that — trading precision for recall and improving `ML.EVALUATE`'s ROC-AUC — confirming that for this pairwise framing, addressing class imbalance is a more effective lever than the metadata features the original notebook added instead.
 
 **Why does the "obviously simpler" approach win so decisively here?** The pairwise framing's real advantage — not needing to retrain when a new hierarchy node is added — is wasted on a small, static, 2-level hierarchy with only 38 total nodes. Its real cost — a training set that grows as `O(products × nodes)`, and a classifier that has to learn "does X belong with Y" as a general relation rather than directly learning the 36 categories' decision boundaries — is fully paid regardless. For a hierarchy that's genuinely large or changes often (thousands of leaf nodes, new categories added weekly), that tradeoff could flip; for this one, it doesn't. **The practical lesson: try the direct/simple framing and a zero-training baseline first, and only reach for the pairwise pattern when the hierarchy's scale or dynamism actually demands it** — reflected here in `all_comparison`'s `training_cost` column sitting right next to its accuracy numbers, not as an afterthought.
 
-Category-level accuracy tops out around 70% (not higher) even for the winning approach — this reflects genuine task difficulty (36 similar retail categories, several of them adjacent by nature — e.g. `Pants` vs. `Jeans` vs. `Shorts` — classified from a short product name alone, no images or descriptions).
+Category-level accuracy tops out around 78% (not higher) even for the winning approach — this reflects genuine task difficulty (36 similar retail categories, several of them adjacent by nature — e.g. `Pants` vs. `Jeans` vs. `Shorts` — classified from a short product name alone, no images or descriptions).

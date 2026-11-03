@@ -121,7 +121,7 @@ client.query(query).to_dataframe()
 query = """
 SELECT
   review,
-  AI.COUNT_TOKENS(review, endpoint => 'gemini-2.5-pro').result AS num_tokens
+  AI.COUNT_TOKENS(review, endpoint => 'gemini-4-argon').result AS num_tokens
 FROM `bigquery-public-data.imdb.reviews`
 LIMIT 5
 """

@@ -69,7 +69,7 @@ FROM UNNEST([
 -- =============================================================================
 SELECT
   statement,
-  AI.IF(CONCAT(statement, ' is factually accurate'), endpoint => 'gemini-2.5-flash') AS is_accurate
+  AI.IF(CONCAT(statement, ' is factually accurate'), endpoint => 'gemini-3.8-flash') AS is_accurate
 FROM UNNEST([
   'The Earth orbits the Sun.',
   'Water boils at 50 degrees Celsius.',

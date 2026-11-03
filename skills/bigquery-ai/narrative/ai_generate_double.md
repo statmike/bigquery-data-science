@@ -118,7 +118,7 @@ SELECT
   text,
   (AI.GENERATE_DOUBLE(
     CONCAT('Rate the reading difficulty on a scale of 1.0 to 10.0: ', text),
-    endpoint => 'gemini-2.5-flash',
+    endpoint => 'gemini-3.8-flash',
     model_params => JSON '{"generation_config": {"temperature": 0}}'
   )).result AS difficulty
 FROM UNNEST([

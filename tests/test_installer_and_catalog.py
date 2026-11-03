@@ -492,7 +492,7 @@ def test_mcp_server_jsonrpc_protocol_and_tools() -> None:
         (
             61,
             "review_bigquery_sql",
-            {"sql": "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.5-flash')"},
+            {"sql": "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.8-flash')"},
         ),
     ):
         call_resp = handle_message(
@@ -600,7 +600,10 @@ def test_cli_user_and_maintainer_subcommands_end_to_end(tmp_path: Path) -> None:
     assert main(["search", "xyznonexistenttoken999888"]) == 0
     assert main(["triage", "forecast daily demand"]) == 0
     assert main(["validate", "skills", "--all"]) == 0
-    if (Path("skills") / "bigquery-ai" / "syntax" / "aichunk_document.md").is_file():
+    if (
+        main(["check-narratives", "skills", "--repo-root", "."]) == 0
+        and main(["manifest", "skills", "--check"]) == 0
+    ):
         skills_target = "skills"
     else:
         import shutil
@@ -757,7 +760,7 @@ def test_mcp_resources_and_prompts_protocol() -> None:
 
 def test_review_sql_detects_all_empirical_guardrails(tmp_path: Path) -> None:
     clean_sql = (
-        "SELECT AI.GENERATE('Summarize', endpoint => 'gemini-3.5-flash') FROM my_dataset.my_table"
+        "SELECT AI.GENERATE('Summarize', endpoint => 'gemini-3.8-flash') FROM my_dataset.my_table"
     )
     clean_res = review_sql(clean_sql)
     assert clean_res.ok is True
@@ -859,7 +862,7 @@ def test_adk_toolset_wrappers() -> None:
     assert len(hits) == 2
     wt = adk_get_walkthrough("ai_agg")
     assert wt["found"] is True
-    rev = adk_review("SELECT AI.GENERATE('hi', endpoint => 'gemini-3.5-flash')")
+    rev = adk_review("SELECT AI.GENERATE('hi', endpoint => 'gemini-3.8-flash')")
     assert rev["ok"] is True
 
 
@@ -888,6 +891,7 @@ def test_catalog_triage_lookup_and_walkthrough_v0110_functions(
 
     emb_triage = triage_task("embed documents for RAG with AI.EMBED")
     emb_text = emb_triage.format_text()
+    assert "gemini-embedding-2" in emb_text
     assert "embeddinggemma-300m" in emb_text
     assert "AI.CHUNK_DOCUMENT" in emb_text
 
@@ -984,7 +988,7 @@ def test_review_sql_v0110_translate_chunk_document_and_tabfm_rules() -> None:
 
     mixed_gen_trans = (
         "SELECT AI.TRANSLATE(body, 'es'), "
-        "AI.GENERATE(body, connection_id => 'us.conn', endpoint => 'gemini-3.5-flash') "
+        "AI.GENERATE(body, connection_id => 'us.conn', endpoint => 'gemini-3.8-flash') "
         "FROM docs"
     )
     assert review_sql(mixed_gen_trans).findings == []
@@ -1011,7 +1015,7 @@ def test_review_sql_v0110_translate_chunk_document_and_tabfm_rules() -> None:
     assert (
         review_sql(
             "SELECT gen.result, tr.result FROM ("
-            "SELECT AI.GENERATE(p, endpoint => 'gemini-3.5-flash') AS gen, "
+            "SELECT AI.GENERATE(p, endpoint => 'gemini-3.8-flash') AS gen, "
             "AI.TRANSLATE(p, 'es', return_details => TRUE) AS tr FROM t) "
             "WHERE gen.status = '' AND tr.status = 'OK'"
         ).findings
@@ -1093,6 +1097,57 @@ def test_review_sql_v0110_translate_chunk_document_and_tabfm_rules() -> None:
     assert deprecated_ep.ok is False
     ep_finding = next(f for f in deprecated_ep.findings if f.rule == "DEPRECATED_MODEL_ENDPOINT")
     assert "gemini-3.1-flash-lite" in ep_finding.remediation
+    assert "gemini-3.8-flash" in ep_finding.remediation
+
+    unlisted_ep = review_sql("SELECT AI.GENERATE('hi', endpoint => 'gemini-1.5-pro-002')")
+    assert unlisted_ep.ok is False
+    unlisted_finding = next(
+        f for f in unlisted_ep.findings if f.rule == "DEPRECATED_MODEL_ENDPOINT"
+    )
+    assert "gemini-3.8-flash" in unlisted_finding.remediation
+    assert "gemini-4-argon" in unlisted_finding.remediation
+    assert "gemini-embedding-2" in unlisted_finding.remediation
+
+    unpinned_gen = review_sql("SELECT AI.GENERATE('hi')")
+    unpinned_finding = next(f for f in unpinned_gen.findings if f.rule == "UNPINNED_AI_ENDPOINT")
+    assert "gemini-3.8-flash" in unpinned_finding.remediation
+    assert "gemini-4-argon" in unpinned_finding.remediation
+
+    # gemini-embedding-2 rejects task_type and title (inline and via CREATE MODEL handle)
+    emb2_task_type = review_sql(
+        "SELECT AI.EMBED(body, connection_id => 'us.conn', "
+        "endpoint => 'gemini-embedding-2', task_type => 'RETRIEVAL_DOCUMENT') FROM docs"
+    )
+    assert emb2_task_type.ok is True
+    assert emb2_task_type.error_count == 0
+    assert emb2_task_type.warning_count == 1
+    assert emb2_task_type.findings[0].code == "GEMINI_EMBEDDING_2_UNSUPPORTED_ARGS"
+
+    emb2_title = review_sql(
+        "SELECT AI.EMBED(body, connection_id => 'us.conn', "
+        "endpoint => 'gemini-embedding-2', title => 'Doc 1') FROM docs"
+    )
+    assert any(f.rule == "GEMINI_EMBEDDING_2_UNSUPPORTED_ARGS" for f in emb2_title.findings)
+
+    emb2_handle_struct = review_sql(
+        "CREATE OR REPLACE MODEL `p.d.emb_m` REMOTE WITH CONNECTION `p.us.c` "
+        "OPTIONS (endpoint = 'gemini-embedding-2');\n"
+        "SELECT * FROM AI.GENERATE_EMBEDDING(MODEL `p.d.emb_m`, TABLE docs, "
+        "STRUCT('RETRIEVAL_DOCUMENT' AS task_type));"
+    )
+    assert any(f.rule == "GEMINI_EMBEDDING_2_UNSUPPORTED_ARGS" for f in emb2_handle_struct.findings)
+
+    # Multi-statement script where stmt 1 uses gemini-embedding-2 cleanly and stmt 2 uses
+    # task_type with gemini-embedding-001 (plus selecting column 'title') is clean
+    emb2_multi_clean = review_sql(
+        "SELECT title, AI.EMBED(body, connection_id => 'us.conn', "
+        "endpoint => 'gemini-embedding-2', "
+        "model_params => JSON '{\"outputDimensionality\": 768}') FROM docs;\n"
+        "SELECT AI.EMBED(body, connection_id => 'us.conn', "
+        "endpoint => 'gemini-embedding-001', task_type => 'RETRIEVAL_DOCUMENT', "
+        "title => 'Doc Title') FROM docs;"
+    )
+    assert emb2_multi_clean.findings == []
 
     for fn_expr in (
         "SELECT * FROM AI.CHUNK_DOCUMENT(OBJ.GET_ACCESS_URL(ref, 'r'))",
@@ -1164,16 +1219,16 @@ def test_live_skills_v0110_chunk_translate_and_newly_ga_functions() -> None:
 
     ga_sql = """
     SELECT
-      AI.COUNT_TOKENS('hello world', endpoint => 'gemini-2.5-flash') AS tok,
+      AI.COUNT_TOKENS('hello world', endpoint => 'gemini-3.8-flash') AS tok,
       AI.IF(('Is positive?', review), connection_id => 'us.conn') AS is_pos,
       AI.SCORE(('Rate clarity 1-5', review), connection_id => 'us.conn') AS clarity,
       AI.CLASSIFY(review, categories => ['billing', 'tech'], connection_id => 'us.conn') AS cat,
       AI.EMBED(
-        content => review, connection_id => 'us.conn', endpoint => 'text-embedding-005'
+        content => review, connection_id => 'us.conn', endpoint => 'gemini-embedding-2'
       ) AS emb,
       AI.SIMILARITY(
         content1 => 'a', content2 => 'b',
-        connection_id => 'us.conn', endpoint => 'text-embedding-005'
+        connection_id => 'us.conn', endpoint => 'gemini-embedding-2'
       ) AS sim
     FROM my_dataset.reviews;
     """

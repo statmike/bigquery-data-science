@@ -22,7 +22,7 @@ A practical workflow for data quality improvement: given a table of business rec
 
 Set your project and location, authenticate, and create a shared dataset.
 
-> `AI.GENERATE` with Google Search grounding doesn't require a connection or model — it uses end-user credentials and defaults to `gemini-2.5-flash`. `AI.PREDICT` likewise needs no connection, no model object, and no `CREATE MODEL` step: it runs the pre-trained TabFM tabular foundation model on end-user credentials. See the `setup` (Setup Reference) for details.
+> `AI.GENERATE` with Google Search grounding doesn't require a connection or model — it uses end-user credentials and defaults to `gemini-3.5-flash-lite`. `AI.PREDICT` likewise needs no connection, no model object, and no `CREATE MODEL` step: it runs the pre-trained TabFM tabular foundation model on end-user credentials. See the `setup` (Setup Reference) for details.
 
 ```python
 import os

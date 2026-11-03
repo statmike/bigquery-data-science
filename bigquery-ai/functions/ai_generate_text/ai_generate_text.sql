@@ -77,7 +77,7 @@ SELECT result
 FROM AI.GENERATE_TEXT(
   MODEL `PROJECT_ID.DATASET.gemini_flash`,
   (SELECT 'What is the sum of all prime numbers less than 20?' AS prompt),
-  STRUCT(JSON '{"generation_config": {"thinking_config": {"thinking_budget": 1024}}}' AS model_params)
+  STRUCT(JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}' AS model_params)
 );
 
 

@@ -27,8 +27,8 @@ All other inputs are the same as AI.GENERATE_EMBEDDING. Additionally, when using
 | `ml_generate_embedding_start_sec` | INT64 | Video only (NULL for images) |
 | `ml_generate_embedding_end_sec` | INT64 | Video only (NULL for images) |
 
-**Supported models / Limitations / Locations / Provisioned throughput:** Same as AI.GENERATE_EMBEDDING. Note: `gemini-embedding-001` has a default output dimensionality of 3072 (vs 768 for `text-embedding-005`). `gemini-embedding-2` (GA) is also supported for multimodal, same as AI.GENERATE_EMBEDDING.
+**Supported models / Limitations / Locations / Provisioned throughput:** Same as AI.GENERATE_EMBEDDING. Note: `gemini-embedding-2` and `gemini-embedding-001` have a default output dimensionality of 3072 (vs 768 for `text-embedding-005`). `gemini-embedding-2` (GA) is supported for unified text and multimodal embeddings, same as AI.GENERATE_EMBEDDING.
 
-**BigFrames API:** No direct `ML.GENERATE_EMBEDDING` wrapper. BigFrames routes through `AI.GENERATE_EMBEDDING` instead. Use `bbq.ai.generate_embedding()` or `TextEmbeddingGenerator`/`MultimodalEmbeddingGenerator` classes.
+**BigFrames API:** No direct `ML.GENERATE_EMBEDDING` wrapper. BigFrames routes through `AI.GENERATE_EMBEDDING` instead. Use `bbq.ai.generate_embedding()` (or `bbq.ai.embed()` for scalar calls; note `TextEmbeddingGenerator`/`MultimodalEmbeddingGenerator` in `bigframes 2.51.0` have hardcoded legacy endpoint allowlists).
 
 ---

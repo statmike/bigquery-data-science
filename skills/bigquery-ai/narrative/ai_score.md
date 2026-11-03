@@ -156,7 +156,7 @@ SELECT
   text,
   AI.SCORE(
     CONCAT('Rate the reading difficulty of this text on a scale of 1 to 10, where 1 is elementary and 10 is PhD level: ', text),
-    endpoint => 'gemini-2.5-flash'
+    endpoint => 'gemini-3.8-flash'
   ) AS reading_level
 FROM UNNEST([
   'The cat sat on the mat.',

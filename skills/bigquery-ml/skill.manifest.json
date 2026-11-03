@@ -6,8 +6,8 @@
     "feature_store.md": "functions/feature_store/feature_store.ipynb",
     "feature_store_workflow.md": "workflows/feature_store/feature_store.ipynb"
   },
-  "generated_date": "2026-11-02",
-  "source_commit": "107c721",
+  "generated_date": "2026-11-03",
+  "source_commit": "5baa7a5",
   "reference_files": [
     "classification.md",
     "model-management.md",

@@ -152,9 +152,9 @@ See the [Unstructured Data Infrastructure](reference/unstructured-data-infrastru
 
 Reach for it when a query carries **both** descriptive words and an exact token — but know what it buys, because `top_k` gates it twice. First the pool: BigQuery hands the lexical leg only the top `10 * top_k` rows by semantic rank, and a row deeper than that gets no lexical rank at all, however perfectly it matches. Inside the pool the lexical leg ranks the *entire* candidate pool — BM25 matches take lexical ranks `1..m` and the remaining pooled rows fall back to their semantic order behind them — so no pooled row forfeits a term. Then the score: `distance = 1 - ( 1/(60 + rank_vector) + 1/(61 + rank_lexical) )`, where 60 is the canonical RRF constant and the lexical leg behaves as though its ranks start at 2 — the same arithmetic as writing its base as 61 — and a lexical match is worth promotion to lexical rank 1, or `1/62` ≈ `0.016` of score, which has to beat the row holding the last slot. Effective reach is the smaller of the two, `min(score gate, 10 * top_k)`: at `top_k` of 10 a matched row can come from semantic rank 23, at 30 from 110, at 50 from 468 — and from `top_k` of 51 up the pool is what binds, so 640 at 64, 1,000 at 100, 3,000 at 300. Hybrid re-ranks and widens recall in proportion to `top_k`, never unboundedly: to retrieve a row at semantic rank `R` by exact token, size `top_k` to *at least* `R/10` — that is a floor, not a recipe. Below a few hundred ranks deep the score gate is the one that binds, and it asks for more: a row at semantic rank 100 needs `top_k` = 29, not 10. Read the real number off the reach table. If an opaque identifier is *all* the user typed, use `WHERE sku = @sku` instead — a predicate cannot be outranked by a fusion score, and it has no pool. See [Hybrid Search](reference/embedding-generation-and-semantic-search.md#hybrid-search-capability) for the measured formula, the full reach table, and the vector-index DDL rules.
 
-**Embedding task types:** The `task_type` parameter tells the embedding model how the text will be used, which changes the resulting vector.
+**Embedding task types:** The `task_type` parameter tells task-typed text embedding models (`gemini-embedding-001`, `text-embedding-005`, `text-multilingual-embedding-002`) how the text will be used, which changes the resulting vector. Note that **`gemini-embedding-2` uses unified task-agnostic training and rejects `task_type` and `title`** (`400 Bad Request: task_type/title is not supported for gemini-embedding-2 model`) — omit both when calling `endpoint => 'gemini-embedding-2'`.
 
-**Asymmetric** — embed documents and queries with different task types:
+**Asymmetric** — embed documents and queries with different task types (`gemini-embedding-001` / `text-embedding-005` / `text-multilingual-embedding-002`):
 
 | Use Case | Embed Documents With | Embed Queries With |
 |----------|---------------------|-------------------|
@@ -171,7 +171,7 @@ Reach for it when a query carries **both** descriptive words and an exact token 
 | Grouping by category | `CLASSIFICATION` |
 | Organizing into clusters | `CLUSTERING` |
 
-When unsure, default to `RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY`. See the [`AI.EMBED` notebook](functions/ai_embed/ai_embed.ipynb) for details.
+When using a task-typed model and unsure, default to `RETRIEVAL_DOCUMENT` / `RETRIEVAL_QUERY`. See the [`AI.EMBED` notebook](functions/ai_embed/ai_embed.ipynb) for details.
 
 ### Document Processing — Extract structured data and chunk documents
 

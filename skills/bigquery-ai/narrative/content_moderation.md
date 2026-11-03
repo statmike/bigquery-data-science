@@ -96,7 +96,7 @@ print(f'Connection {CONNECTION_ID} ready (SA: {sa_display})')
 client.query(f'''
 CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.gemini_flash`
   REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
-  OPTIONS (endpoint = \'gemini-2.5-flash\')
+  OPTIONS (endpoint = 'gemini-3.8-flash')
 ''').result()
 print('Model gemini_flash ready')
 ```

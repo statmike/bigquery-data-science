@@ -1,7 +1,7 @@
 -- AI.GENERATE_TABLE — Progressive SQL Examples
 -- ==============================================
 -- Table-valued function that generates structured output from a user-defined schema.
--- Requires a remote Gemini model (CREATE MODEL) and an output_schema.
+-- Requires a remote Gemini model (CREATE MODEL ... OPTIONS (endpoint = 'gemini-3.8-flash')) and an output_schema.
 --
 -- Returns: input columns + schema columns + full_response, status
 -- Multimodal: Supports documents, images, and video via ObjectRef (see examples 7-8)

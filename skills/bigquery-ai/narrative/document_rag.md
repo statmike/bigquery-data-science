@@ -5,16 +5,16 @@
 A complete document-based Retrieval-Augmented Generation (RAG) pipeline built entirely in BigQuery SQL:
 
 1. **Chunk** real PDFs into layout-aware sections with `AI.CHUNK_DOCUMENT`
-2. **Embed** document chunks with `AI.EMBED` (`text-embedding-005`)
+2. **Embed** document chunks with `AI.EMBED` (`gemini-embedding-2`)
 3. **Search** for relevant chunks with `VECTOR_SEARCH`
-4. **Answer** questions with `AI.GENERATE` (`gemini-2.5-flash`), grounded in retrieved chunks with page and chunk citations
+4. **Answer** questions with `AI.GENERATE` (`gemini-3.8-flash`), grounded in retrieved chunks with page and chunk citations
 
 **What this demonstrates:**
 - Building an end-to-end PDF RAG pipeline in BigQuery SQL with zero manual Document AI processor setup
 - Layout-aware chunking (`chunk_size => 250`) across 20 single-page invoices and a multi-page policy document, preserving `chunk_id`, `start_page`, and `end_page` provenance
 - Enforcing `AI.CHUNK_DOCUMENT`'s three-way `status` contract (`WHERE status = ''`) before embedding
 - Comparing Object Table input against inline `OBJ.MAKE_REF` and GCS URI wildcard chunking
-- Asymmetric embedding (`RETRIEVAL_DOCUMENT` vs `RETRIEVAL_QUERY`) and page-cited grounded generation vs ungrounded direct generation
+- Unified task-agnostic 3,072-dimensional embeddings (`gemini-embedding-2`, no `task_type` needed) and page-cited grounded generation vs ungrounded direct generation
 
 **Functions used:** `functions/ai_chunk_document` (`AI.CHUNK_DOCUMENT`) | `functions/ai_embed` (`AI.EMBED`) | `functions/vector_search` (`VECTOR_SEARCH`) | `functions/ai_generate` (`AI.GENERATE`)
 
@@ -391,7 +391,7 @@ df
 ---
 ## Step 2 — Embed chunks with AI.EMBED
 
-Generate `768`-dimensional vectors for every persisted chunk using `text-embedding-005` with `task_type => 'RETRIEVAL_DOCUMENT'`. Pairing `RETRIEVAL_DOCUMENT` at index time with `RETRIEVAL_QUERY` at search time aligns short user questions with longer document passages (asymmetric semantic search).
+Generate `3,072`-dimensional vectors for every persisted chunk using `gemini-embedding-2`. Because `gemini-embedding-2` produces unified, task-agnostic embeddings across queries and documents, `task_type` is omitted at both index and search time.
 
 ```python
 query = f"""
@@ -404,8 +404,7 @@ SELECT
   content,
   (AI.EMBED(
     content => content,
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_DOCUMENT'
+    endpoint => 'gemini-embedding-2'
   )).result AS embedding
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_docrag_chunks`
 WHERE content IS NOT NULL AND LENGTH(TRIM(content)) > 0
@@ -424,9 +423,9 @@ print(f'All {verify.iloc[0]["chunks"]} chunks embedded ({verify.iloc[0]["dims"]}
 ## Step 3 — Retrieve and generate (RAG)
 
 Run the full RAG loop in a single SQL statement:
-1. Embed the user question with `task_type => 'RETRIEVAL_QUERY'` (`text-embedding-005`)
+1. Embed the user question with `gemini-embedding-2`
 2. Retrieve the top-`k` closest chunks with `VECTOR_SEARCH(..., distance_type => 'COSINE')`, carrying `uri`, `chunk_id`, `start_page`, and `end_page`
-3. Format each chunk header with its document name, chunk number, and page span (`[doc | chunk N | pages S-E]`) and pass the assembled context to `AI.GENERATE` (`endpoint => 'gemini-2.5-flash'`) so the answer cites exact page provenance
+3. Format each chunk header with its document name, chunk number, and page span (`[doc | chunk N | pages S-E]`) and pass the assembled context to `AI.GENERATE` (`endpoint => 'gemini-3.8-flash'`) so the answer cites exact page provenance
 
 ```python
 user_question = 'What is the total amount due on the invoice from Nexus Innovations Group?'
@@ -445,8 +444,7 @@ WITH retrieved AS (
     'embedding',
     query_value => (AI.EMBED(
       content => '{user_question}',
-      endpoint => 'text-embedding-005',
-      task_type => 'RETRIEVAL_QUERY'
+      endpoint => 'gemini-embedding-2'
     )).result,
     top_k => 3,
     distance_type => 'COSINE'
@@ -473,7 +471,7 @@ SELECT (AI.GENERATE(
     'Document chunks:\\n', c.docs,
     '\\n\\nUser question: {user_question}'
   ),
-  endpoint => 'gemini-2.5-flash'
+  endpoint => 'gemini-3.8-flash'
 )).result AS answer
 FROM context c
 """
@@ -500,8 +498,7 @@ FROM VECTOR_SEARCH(
   'embedding',
   query_value => (AI.EMBED(
     content => '{user_question}',
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_QUERY'
+    endpoint => 'gemini-embedding-2'
   )).result,
   top_k => 3,
   distance_type => 'COSINE'
@@ -543,8 +540,7 @@ retrieved AS (
        question,
        (AI.EMBED(
          content => question,
-         endpoint => 'text-embedding-005',
-         task_type => 'RETRIEVAL_QUERY'
+         endpoint => 'gemini-embedding-2'
        )).result AS embedding
      FROM questions),
     top_k => 4,
@@ -579,7 +575,7 @@ SELECT
       'Chunks:\\n', context,
       '\\n\\nQuestion: ', user_question
     ),
-    endpoint => 'gemini-2.5-flash'
+    endpoint => 'gemini-3.8-flash'
   )).result AS answer
 FROM context_per_question
 ORDER BY question_id
@@ -593,7 +589,7 @@ for _, row in df.iterrows():
 ---
 ## Step 4 — RAG vs direct generation
 
-Compare the exact same question answered **without** retrieved chunks vs **with** `AI.CHUNK_DOCUMENT` + `VECTOR_SEARCH` context on `gemini-2.5-flash`. Without retrieved evidence, the model cannot know private invoice totals or reference numbers; with RAG, every amount is anchored to a specific PDF chunk and page range.
+Compare the exact same question answered **without** retrieved chunks vs **with** `AI.CHUNK_DOCUMENT` + `VECTOR_SEARCH` context on `gemini-3.8-flash`. Without retrieved evidence, the model cannot know private invoice totals or reference numbers; with RAG, every amount is anchored to a specific PDF chunk and page range.
 
 ```python
 comparison_question = 'What is the total amount due on the invoice from Nexus Innovations Group, and whose sign-off does our AP policy require for the larger Nexus invoice?'
@@ -605,7 +601,7 @@ WITH no_rag AS (
       'Answer this question. If you do not have access to the private documents, say so clearly. ',
       'Question: {comparison_question}'
     ),
-    endpoint => 'gemini-2.5-flash'
+    endpoint => 'gemini-3.8-flash'
   )).result AS answer
 ),
 rag_context AS (
@@ -624,8 +620,7 @@ rag_context AS (
     'embedding',
     query_value => (AI.EMBED(
       content => '{comparison_question}',
-      endpoint => 'text-embedding-005',
-      task_type => 'RETRIEVAL_QUERY'
+      endpoint => 'gemini-embedding-2'
     )).result,
     top_k => 5,
     distance_type => 'COSINE'
@@ -639,7 +634,7 @@ with_rag AS (
       'Document chunks:\\n', docs,
       '\\n\\nQuestion: {comparison_question}'
     ),
-    endpoint => 'gemini-2.5-flash'
+    endpoint => 'gemini-3.8-flash'
   )).result AS answer
   FROM rag_context
 )
@@ -654,7 +649,7 @@ for _, row in df.iterrows():
     print(f'{row["answer"]}\n')
 ```
 
-**Without RAG**, `gemini-2.5-flash` rightly declines because private vendor invoices and internal AP approval policies do not exist in pretraining weights. **With Document RAG**, a single SQL query combines facts across multiple PDFs — retrieving both Nexus Innovations Group invoices (`invoice_003.pdf` and `invoice_001.pdf`) and the relevant approval-threshold chunk from `ap_vendor_policy.pdf` — and cites the exact `chunk_id` and `start_page`–`end_page` for each claim.
+**Without RAG**, `gemini-3.8-flash` rightly declines because private vendor invoices and internal AP approval policies do not exist in pretraining weights. **With Document RAG**, a single SQL query combines facts across multiple PDFs — retrieving both Nexus Innovations Group invoices (`invoice_003.pdf` and `invoice_001.pdf`) and the relevant approval-threshold chunk from `ap_vendor_policy.pdf` — and cites the exact `chunk_id` and `start_page`–`end_page` for each claim.
 
 ### Choosing a document QA pattern in BigQuery
 

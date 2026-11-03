@@ -40,10 +40,10 @@ Contents: [Options](#options) · [Choosing among them](#choosing-among-them) · 
 
 ## Gotchas verified in this repo
 
-- `multimodalembedding@001` accepts images only (JPEG, PNG, BMP, GIF) — **not PDFs**, in AI.EMBED, AI.GENERATE_EMBEDDING, and AI.SIMILARITY alike. Render PDFs to images (e.g. `pdftoppm`) first, or switch to `gemini-embedding-2` (GA 2026-10-05), which does support PDFs (plus audio/video, and a STRUCT mixing text with files) and is served from multi-regional endpoints only — the short name resolves to `us`, `eu` or `global` by region, like the Gemini 3.x models. It rejects `task_type` and `title` outright.
-- `multimodalembedding@001` does **not** return the `statistics` output column — queries that `SELECT statistics` against it will error. Only the text embedding models return `statistics` (token_count/truncated); `gemini-embedding-2` does not either — its output is `STRUCT<result, status>` (measured 2026-10-09).
-- Output dimensionality is model-specific and must be respected: `text-embedding-005` and `text-multilingual-embedding-002` max out at 768; `gemini-embedding-001`/`gemini-embedding-2` go up to 3072 (and a `dimension` request of 256 through `AI.EMBED` still came back as 3072 on `gemini-embedding-2` — verify before relying on reduced dimensions); `multimodalembedding@001` only accepts the discrete values 128, 256, 512, or 1408 (default 1408) via `output_dimensionality`/`dimension` — arbitrary values are not allowed for the multimodal model.
-- **`AI.EMBED` and `AI.SIMILARITY` are GA** when called with `endpoint => ...` (`'text-embedding-005'`, `'gemini-embedding-001'`, `'gemini-embedding-2'`, `'multimodalembedding@001'`); only the built-in `model => 'embeddinggemma-300m'` option remains in **Preview** (runs entirely inside BigQuery using slots — no Vertex AI charges, no `connection_id`, fixed at 768 dimensions / 2048 tokens, and mutually exclusive with `endpoint`, `title`, `model_params`, and `connection_id`). Both functions also ship in `bigframes >= 2.51.0` via `bigframes.bigquery.ai.embed()` and `bigframes.bigquery.ai.similarity()`.
+- **`gemini-embedding-2` (GA) is the primary unified text + multimodal embedding model** (text, PDF, JPEG/PNG, audio, video, or a `STRUCT` mixing them in a single semantic space; `8,192` token context; multi-regional `us`/`eu`/`global` endpoints). It uses unified task-agnostic training and **rejects `task_type` and `title` outright** (`400 Bad Request: task_type/title is not supported for gemini-embedding-2 model`). Legacy `multimodalembedding@001` accepts images/video only (JPEG, PNG, BMP, GIF — **not PDFs**).
+- Neither `gemini-embedding-2` nor `multimodalembedding@001` returns the `statistics` output column — queries that `SELECT statistics` against either will error. Only the text-only embedding models (`gemini-embedding-001`, `text-embedding-005`, `text-multilingual-embedding-002`) return `statistics` (`token_count`/`truncated`); `gemini-embedding-2`'s output is `STRUCT<result, status>` (measured 2026-10-09).
+- **Output dimensionality and `CREATE VECTOR INDEX <= 2,000` ceiling:** `gemini-embedding-2` and `gemini-embedding-001` default to **`3,072` dimensions**, whereas `CREATE VECTOR INDEX` rejects vectors `> 2,000` dimensions (`Invalid value: CREATE VECTOR INDEX only supports column with dimension <= 2000, but was 3072`). On `AI.EMBED` and `AI.SIMILARITY`, pass camelCase `model_params => JSON '{"outputDimensionality": 768}'` (MRL truncation to `768`/`512`/`256`/`128`, verified live to return `768` dims); on `AI.GENERATE_EMBEDDING`, pass `STRUCT(768 AS output_dimensionality)`. Note that passing `"dimension"` or snake_case `"output_dimensionality"` inside `model_params` JSON to `gemini-embedding-2` is **silently ignored** and returns `3,072` dimensions (`"dimension"` is the legacy `multimodalembedding@001`-only key for discrete `128`/`256`/`512`/`1408` values).
+- **`AI.EMBED` and `AI.SIMILARITY` are GA** when called with `endpoint => ...` (`'gemini-embedding-2'`, `'gemini-embedding-001'`, `'text-embedding-005'`, `'multimodalembedding@001'`); only the built-in `model => 'embeddinggemma-300m'` option remains in **Preview** (runs entirely inside BigQuery using slots — no Vertex AI charges, no `connection_id`, fixed at 768 dimensions / 2048 tokens, and mutually exclusive with `endpoint`, `title`, `model_params`, and `connection_id`). Both functions also ship in `bigframes >= 2.51.0` via `bigframes.bigquery.ai.embed()` (`bbq.ai.embed`) and `bigframes.bigquery.ai.similarity()` (`bbq.ai.similarity`); prefer `bbq.ai.embed` / `bbq.ai.generate_embedding` over `bigframes.ml.llm.TextEmbeddingGenerator` / `MultimodalEmbeddingGenerator`, which in `bigframes 2.51.0` hardcode legacy endpoint allowlists and do not include `gemini-embedding-2`.
 - VECTOR_SEARCH requires embeddings to be **materialized in a real table** first (an `ARRAY<FLOAT64>` column, or STRING with autonomous embedding generation) — you cannot point it at a view, and you should not filter the embedding column itself in the base table query, since that can defeat index usage.
 - Object tables used with remote models for multimodal embedding generation require a **BigQuery reservation**; the inline `OBJ.MAKE_REF(uri, connection)` pattern avoids that requirement entirely and is the preferred approach for one-off multimodal calls. **`OBJ.GET_ACCESS_URL` is not part of it** — the `ObjectRef` goes straight into the `content` argument (verified 2026-09-15); `OBJ.FETCH_METADATA` is only needed if you want the content type or size.
 - Distance metric default differs by function family: VECTOR_SEARCH and AI.SEARCH both default to `EUCLIDEAN`, not `COSINE` — if you're benchmarking against AI.SIMILARITY's cosine output, you must explicitly pass `distance_type => 'COSINE'`.
@@ -96,7 +96,7 @@ Verified gotchas:
 - **If an opaque identifier is the entire query and you want certainty, use `WHERE sku = @sku`** — a predicate cannot be outranked by a fusion score, and it has no candidate pool, so it is not sensitive to `top_k` at all. Hybrid can find the row too, but only at a `top_k` of at least a tenth of its semantic rank and often well above that floor — check the reach table for the rank you care about — and it spends a full search to do what a filter does exactly. Hybrid earns its keep on queries carrying descriptive words *and* an identifier.
 - To build a vector index that accelerates the lexical leg, every column in `lexical_search_columns` **must also appear in `STORING(...)`** (else `Lexical search column x must be in the list of stored columns`), and a lexical column **may not also be the index key** (else `Column x found multiple times`).
 - **An AI.SEARCH base table can never have a hybrid vector index.** Autonomous embedding generation produces a `STRUCT<result, status>` column, and a vector index key must be `ARRAY<FLOAT64>`. Consequence: `mode => 'AUTO'` silently resolves to semantic-only on such a table, so name `'HYBRID'` explicitly. Demonstrating both autonomous embeddings and a vector index requires two tables.
-- **Two separate vector-index size gates.** `CREATE VECTOR INDEX` is rejected outright below **5,000 rows** (`Total rows 30 is smaller than min allowed 5000 for CREATE VECTOR INDEX query with the IVF index type` — verified for both `IVF` and `TREE_AH`, and *not* stated in Google's vector-index docs). Separately, **population** is asynchronous and does not start until the base table exceeds roughly **10 MB**; below that the index reports `coverage_percentage` 0 / `BASE_TABLE_TOO_SMALL` and queries silently fall back to brute force. A demo table must clear both bars.
+- **Two separate vector-index size gates (plus the 2,000-dimension ceiling).** `CREATE VECTOR INDEX` is rejected outright below **5,000 rows** (`Total rows 30 is smaller than min allowed 5000 for CREATE VECTOR INDEX query with the IVF index type` — verified for both `IVF` and `TREE_AH`, and *not* stated in Google's vector-index docs) and above **2,000 dimensions** (pass `outputDimensionality: 768` for `gemini-embedding-2` / `gemini-embedding-001`). Separately, **population** is asynchronous and does not start until the base table exceeds roughly **10 MB**; below that the index reports `coverage_percentage` 0 / `BASE_TABLE_TOO_SMALL` and queries silently fall back to brute force. A demo table must clear both bars.
 - **A search index is a different object with a far larger gate — 10 GiB.** `CREATE SEARCH INDEX` (which powers `SEARCH()`, not `VECTOR_SEARCH`) *succeeds* on a small table and then never populates: `index_status` `TEMPORARILY DISABLED`, `coverage_percentage` 0, `disable_time` equal to `creation_time`, and `disable_reason` naming the threshold `10737418240` bytes. Nothing at demonstration scale clears it, so for keyword matching reach for `lexical_search_columns` on a vector index instead. Note also that `SEARCH_INDEXES.ddl` is normalized rather than a verbatim echo — a statement written with `OPTIONS (analyzer = 'LOG_ANALYZER')` is recorded as `OPTIONS (data_types = ['STRING'])`, with the analyzer in its own column.
 
 ## Managing an index — reading state is free, altering is not
@@ -112,15 +112,15 @@ Creating an index and managing one need different things from the project. Creat
 ## Canonical snippet
 
 ```sql
--- 1. Generate and materialize embeddings for a corpus of text
+-- 1. Generate and materialize 768-dim gemini-embedding-2 vectors (<= 2,000 dims for CREATE VECTOR INDEX; omit task_type/title)
 CREATE OR REPLACE TABLE `PROJECT_ID.DATASET.doc_embeddings` AS
 SELECT
   doc_id,
   content,
   AI.EMBED(
     content => content,
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_DOCUMENT'
+    endpoint => 'gemini-embedding-2',
+    model_params => JSON '{"outputDimensionality": 768}'
   ).result AS embedding
 FROM `PROJECT_ID.DATASET.documents`;
 
@@ -138,8 +138,8 @@ FROM VECTOR_SEARCH(
       'find pricing details' AS query_text,
       AI.EMBED(
         content => 'find pricing details',
-        endpoint => 'text-embedding-005',
-        task_type => 'RETRIEVAL_QUERY'
+        endpoint => 'gemini-embedding-2',
+        model_params => JSON '{"outputDimensionality": 768}'
       ).result AS embedding
   ),
   query_column_to_search => 'embedding',

@@ -238,7 +238,7 @@ print(df.iloc[0]['incident_analysis'])
 
 ### 6. Specifying an endpoint
 
-Override the default model with any Gemini model that doesn't require thinking budget.
+Override the default model with a specific Gemini model endpoint such as `'gemini-3.8-flash'` (note: Gemini 3.x and 4.x models configure reasoning via `thinking_level` in `thinking_config`, whereas legacy Gemini 2.5 models used `thinking_budget`).
 
 ```python
 query = """
@@ -246,7 +246,7 @@ SELECT
   AI.AGG(
     review,
     'What do customers like and dislike? Be concise.',
-    endpoint => 'gemini-2.5-flash'
+    endpoint => 'gemini-3.8-flash'
   ) AS summary
 FROM UNNEST([
   'Fast delivery but the box was crushed.',

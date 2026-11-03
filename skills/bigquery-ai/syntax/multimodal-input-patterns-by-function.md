@@ -93,15 +93,15 @@ FROM `project.dataset.docs`;
 
 ### Shape 4: `content` Parameter (Embedding and similarity functions)
 
-Embedding and similarity functions take the reference as the content argument rather than in a prompt. Requires a multimodal embedding endpoint (e.g., `multimodalembedding@001` or `gemini-embedding-2`).
+Embedding and similarity functions take the reference as the content argument rather than in a prompt. Requires a multimodal embedding endpoint (`gemini-embedding-2`).
 
 **Functions:** `AI.EMBED`, `AI.GENERATE_EMBEDDING`, `ML.GENERATE_EMBEDDING`, `AI.SIMILARITY`
 
 ```sql
--- AI.EMBED with inline ObjectRef
+-- AI.EMBED with inline ObjectRef (gemini-embedding-2 handles image, PDF, audio, video, and text)
 SELECT AI.EMBED(
   OBJ.MAKE_REF('gs://bucket/image.jpg', 'PROJECT.REGION.CONNECTION'),
-  endpoint => 'multimodalembedding@001',
+  endpoint => 'gemini-embedding-2',
   connection_id => 'PROJECT.REGION.CONNECTION'
 ).result AS embedding;
 
@@ -109,7 +109,7 @@ SELECT AI.EMBED(
 SELECT AI.SIMILARITY(
   OBJ.MAKE_REF('gs://bucket/img1.jpg', 'PROJECT.REGION.CONNECTION'),
   OBJ.MAKE_REF('gs://bucket/img2.jpg', 'PROJECT.REGION.CONNECTION'),
-  endpoint => 'multimodalembedding@001',
+  endpoint => 'gemini-embedding-2',
   connection_id => 'PROJECT.REGION.CONNECTION'
 ) AS similarity;
 ```

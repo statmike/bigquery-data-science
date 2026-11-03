@@ -133,11 +133,11 @@ articles
 ---
 ## Approach 1: Manual — AI.EMBED + VECTOR_SEARCH
 
-The manual approach gives you full control: you choose the embedding model, task type, distance metric, and can pre-filter the search space.
+The manual approach gives you full control: you choose the embedding model, dimensionality, distance metric, and can pre-filter the search space.
 
 ### Step 2a — Embed the knowledge base
 
-Create embeddings for all articles using `AI.EMBED` with `RETRIEVAL_DOCUMENT` task type (the document side of asymmetric retrieval).
+Create 3,072-dimensional embeddings for all articles using `AI.EMBED` with `gemini-embedding-2` (unified task-agnostic embeddings — no `task_type` needed).
 
 ```python
 query = f'''
@@ -146,8 +146,7 @@ SELECT
   id, product, title, content,
   (AI.EMBED(
     content => content,
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_DOCUMENT'
+    endpoint => 'gemini-embedding-2'
   )).result AS embedding
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_search_articles`
 '''
@@ -165,7 +164,7 @@ verify
 
 ### Step 3a — Search with VECTOR_SEARCH
 
-Search the embedded knowledge base. Note the asymmetric pattern: queries use `RETRIEVAL_QUERY` task type to match the `RETRIEVAL_DOCUMENT` embeddings.
+Search the embedded knowledge base by embedding the query with `gemini-embedding-2` and passing the vector to `VECTOR_SEARCH`.
 
 ```python
 # Single query search
@@ -176,8 +175,7 @@ FROM VECTOR_SEARCH(
   'embedding',
   query_value => (AI.EMBED(
     content => 'How do I load CSV files into a data warehouse?',
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_QUERY'
+    endpoint => 'gemini-embedding-2'
   )).result,
   top_k => 3,
   distance_type => 'COSINE'
@@ -198,8 +196,7 @@ FROM VECTOR_SEARCH(
   'embedding',
   query_value => (AI.EMBED(
     content => 'security and permissions',
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_QUERY'
+    endpoint => 'gemini-embedding-2'
   )).result,
   top_k => 3,
   distance_type => 'COSINE'
@@ -224,8 +221,7 @@ FROM VECTOR_SEARCH(
   'embedding',
   (SELECT
      question,
-     (AI.EMBED(content => question, endpoint => 'text-embedding-005',
-               task_type => 'RETRIEVAL_QUERY')).result AS embedding
+     (AI.EMBED(content => question, endpoint => 'gemini-embedding-2')).result AS embedding
    FROM UNNEST([
      'How do I set up event-driven processing?',
      'What are the storage tiers available?',
@@ -260,7 +256,7 @@ CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_search_auto` (
     GENERATED ALWAYS AS (
       AI.EMBED(content,
         connection_id => '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}',
-        endpoint => 'text-embedding-005')
+        endpoint => 'gemini-embedding-2')
     ) STORED OPTIONS (asynchronous = TRUE)
 )
 '''
@@ -347,8 +343,7 @@ FROM VECTOR_SEARCH(
   'embedding',
   query_value => (AI.EMBED(
     content => 'How do I schedule a nightly job that moves files between storage tiers?',
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_QUERY'
+    endpoint => 'gemini-embedding-2'
   )).result,
   top_k => 10,
   distance_type => 'COSINE'
@@ -377,8 +372,7 @@ FROM VECTOR_SEARCH(
   'embedding',
   query_value => (AI.EMBED(
     content => 'How do I schedule a nightly job that moves files between storage tiers?',
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_QUERY'
+    endpoint => 'gemini-embedding-2'
   )).result,
   lexical_search_columns => ['title', 'content'],
   lexical_search_query_value => 'Cloud Scheduler',

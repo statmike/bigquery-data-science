@@ -96,7 +96,7 @@ print(f'Connection {CONNECTION_ID} ready (SA: {sa_display})')
 client.query(f'''
 CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.gemini_flash`
   REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
-  OPTIONS (endpoint = 'gemini-2.5-flash')
+  OPTIONS (endpoint = 'gemini-3.8-flash')
 ''').result()
 print('Model gemini_flash ready')
 ```
@@ -404,8 +404,7 @@ SELECT
   resolution,
   (AI.EMBED(
     content => ticket_description,
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_DOCUMENT'
+    endpoint => 'gemini-embedding-2'
   )).result AS embedding
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_log_scored`
 '''
@@ -424,7 +423,7 @@ embedded.head()
 
 The incident being triaged is *users cannot authenticate after switching to a new device*, and its log carries error code `IDP-7761`. Called with only `query_value`, `VECTOR_SEARCH` ranks tickets by embedding distance, so access tickets about logins and new devices dominate.
 
-`AI.EMBED` builds the query vector inline, with `task_type => 'RETRIEVAL_QUERY'` to pair correctly with the `RETRIEVAL_DOCUMENT` vectors already stored.
+`AI.EMBED` builds the query vector inline using `gemini-embedding-2` (unified task-agnostic embeddings — no `task_type` needed).
 
 A second call with `top_k => 30` ranks the entire corpus, so the cell can print exactly where the one ticket carrying the code lands. That position is the number the rest of this section turns on.
 
@@ -435,8 +434,7 @@ TOP_K = 12               # out of 30 tickets
 
 QUERY_VECTOR = f'''(AI.EMBED(
     content => '{INCIDENT_TEXT}',
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_QUERY'
+    endpoint => 'gemini-embedding-2'
   )).result'''
 
 query = f'''
@@ -610,8 +608,7 @@ query = f'''
 WITH incident AS (
   SELECT (AI.EMBED(
     content => '{INCIDENT_TEXT}',
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_QUERY'
+    endpoint => 'gemini-embedding-2'
   )).result AS query_vector
 ),
 semantic AS (

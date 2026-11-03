@@ -255,7 +255,7 @@ FROM (
         )
       ),
       connection_id => 'your-gcp-project-id.US.bq_ai_functions',
-      endpoint => 'gemini-2.5-flash',
+      endpoint => 'gemini-3.8-flash',
       output_schema => 'vendor STRING, invoice_number STRING, total_due FLOAT64, summary STRING'
     ) AS extracted
 );

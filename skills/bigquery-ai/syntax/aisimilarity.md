@@ -42,11 +42,11 @@ AI.SIMILARITY(
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
-| `content1` | STRING, ObjectRef, or ObjectRefRuntime | Required | First value to compare. An `ObjectRef` is enough — no signing step. For `gemini-embedding-2`: can be a STRUCT (text, images, audio, video, PDFs). |
+| `content1` | STRING, ObjectRef, or ObjectRefRuntime | Required | First value to compare. An `ObjectRef` is enough — no signing step. For `gemini-embedding-2`: can be a STRING, an `ObjectRef`, or a STRUCT (text, images, audio, video, PDFs). |
 | `content2` | STRING, ObjectRef, or ObjectRefRuntime | Required | Second value to compare. Same types as `content1`. |
-| `endpoint` | STRING | Required (unless `model` specified) | Embedding model endpoint (e.g., `text-embedding-005`, `multimodalembedding@001`, `gemini-embedding-2`). |
+| `endpoint` | STRING | Required (unless `model` specified) | Embedding model endpoint (e.g., `gemini-embedding-2`, `gemini-embedding-001`, `text-embedding-005`, `multimodalembedding@001`). |
 | `model` | STRING | Optional (Preview) | Built-in text embedding model. Only supported value: `embeddinggemma-300m`. When specified, cannot use `endpoint`, `model_params`, or `connection_id`. No Vertex AI charges. |
-| `model_params` | JSON literal | Optional | For text: any parameters object fields including `outputDimensionality`. For multimodal: only `dimension`. |
+| `model_params` | JSON literal | Optional | For `gemini-embedding-2`, `gemini-embedding-001`, and `text-embedding-005`: camelCase `JSON '{"outputDimensionality": 768}'`. For `multimodalembedding@001`: `JSON '{"dimension": 512}'`. |
 | `connection_id` | STRING | Optional for text; Required for multimodal | Connection in format `PROJECT_ID.LOCATION.CONNECTION_ID`. |
 
 **Outputs:** Returns FLOAT64 (cosine similarity). NULL on error.

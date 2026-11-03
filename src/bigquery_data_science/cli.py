@@ -51,6 +51,8 @@ from bigquery_data_science.tooling.pinned_models import (
     check_pinned_models,
     find_allow_file,
     load_allow_list,
+    load_deprecated_models,
+    load_legacy_models,
 )
 from bigquery_data_science.tooling.reference_structure import check_reference
 from bigquery_data_science.tooling.run_notebook import (
@@ -346,7 +348,14 @@ def _cmd_check_pinned_models(args: argparse.Namespace) -> int:
             repo_root / "skills" / "pinned-models.json"
         )
     allowed = load_allow_list(allow_file, subproject, repo_root)
-    res = check_pinned_models(subproject, allowed)
+    deprecated = load_deprecated_models(allow_file) if allow_file.is_file() else {}
+    legacy_models = load_legacy_models(allow_file) if allow_file.is_file() else {}
+    res = check_pinned_models(
+        subproject,
+        allowed,
+        deprecated=deprecated,
+        legacy_models=legacy_models,
+    )
     status = "OK" if res.ok else "FAIL"
     print(f"[{status}] {subproject.name} ({len(res.pins)} model pins checked)")
     for pin in res.unlisted:
@@ -578,6 +587,8 @@ def _cmd_sweep(args: argparse.Namespace) -> int:
 
     print("5. Checking domain reference structure, link policy, and pinned models...")
     allow_file = find_allow_file(skills_root) or (skills_root / "pinned-models.json")
+    deprecated = load_deprecated_models(allow_file) if allow_file.is_file() else {}
+    legacy_models = load_legacy_models(allow_file) if allow_file.is_file() else {}
     for proj_path in project_paths:
         ref_res = check_reference(proj_path)
         if not ref_res.ok:
@@ -601,7 +612,12 @@ def _cmd_sweep(args: argparse.Namespace) -> int:
 
         if allow_file.is_file():
             allowed = load_allow_list(allow_file, proj_path, repo_root)
-            pin_res = check_pinned_models(proj_path, allowed)
+            pin_res = check_pinned_models(
+                proj_path,
+                allowed,
+                deprecated=deprecated,
+                legacy_models=legacy_models,
+            )
             if not pin_res.ok:
                 for pin in pin_res.unlisted:
                     print(
@@ -611,6 +627,24 @@ def _cmd_sweep(args: argparse.Namespace) -> int:
                 failed = True
             else:
                 print(f"  [OK] {proj_path.name} pinned models ({len(pin_res.pins)} checked)")
+
+    if allow_file.is_file() and skills_root.is_dir():
+        skills_allowed = load_allow_list(allow_file, skills_root, repo_root)
+        skills_pin_res = check_pinned_models(
+            skills_root,
+            skills_allowed,
+            deprecated=deprecated,
+            legacy_models=legacy_models,
+        )
+        if not skills_pin_res.ok:
+            for pin in skills_pin_res.unlisted:
+                print(
+                    f"  UNLISTED (skills): {pin.format(skills_root)}",
+                    file=sys.stderr,
+                )
+            failed = True
+        else:
+            print(f"  [OK] skills pinned models ({len(skills_pin_res.pins)} checked)")
 
     sync_headers_script = repo_root / "architectures" / "headers" / "sync_headers.py"
     if sync_headers_script.is_file():

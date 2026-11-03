@@ -5,15 +5,15 @@
 An end-to-end document analysis pipeline that composes AI functions with multimodal embeddings:
 
 1. **Render** invoice and receipt PDFs to PNG images and upload to GCS
-2. **Embed** all documents with `AI.EMBED` using `multimodalembedding@001`
+2. **Embed** all documents with `AI.EMBED` using `gemini-embedding-2`
 3. **Find similar pairs** via cosine distance on embeddings (SQL)
 4. **Cross-modal matching** — compare text descriptions to document images with `AI.SIMILARITY`
 5. **Describe** the most similar document pair with `AI.GENERATE`
 
 **What this demonstrates:**
-- Multimodal embeddings: creating document image vectors with `multimodalembedding@001`
+- Multimodal embeddings: creating document image vectors with `gemini-embedding-2` (3,072 dimensions)
 - Document-to-document similarity via embedding distance — same-type documents cluster together
-- Cross-modal text-to-image similarity — text and images share a vector space
+- Cross-modal text-to-image similarity — text and images share a unified vector space
 - Visual description with multimodal `AI.GENERATE`
 - The inline ObjectRef pattern: `OBJ.MAKE_REF(uri, connection)`, passed straight to the function
 
@@ -95,7 +95,7 @@ print(f'Connection {CONNECTION_ID} ready (SA: {sa})')
 ---
 ## Step 1 — Render documents and upload to GCS
 
-Render invoice and receipt PDFs from this project's `data/documents` (document set) to PNG images using `pdftoppm`, then upload to GCS. The `multimodalembedding@001` endpoint supports images (not PDFs), so this rendering step is required.
+Render invoice and receipt PDFs from this project's `data/documents` (document set) to PNG images using `pdftoppm`, then upload to GCS so we can compare rendered document images directly (`gemini-embedding-2` also supports native PDF inputs up to 6 pages, as well as PNG/JPEG images).
 
 ```python
 import shutil, subprocess
@@ -146,7 +146,7 @@ print(f'Rendered and uploaded {len(docs)} document images to gs://{BUCKET}/{pref
 ---
 ## Step 2 — Embed documents with AI.EMBED
 
-Create document image embeddings using `multimodalembedding@001` via an inline `OBJ.MAKE_REF`. Each image gets a 1408-dimension vector. Save results to a table for similarity computation.
+Create document image embeddings using `gemini-embedding-2` via an inline `OBJ.MAKE_REF`. Each image gets a 3,072-dimension vector. Save results to a table for similarity computation.
 
 ```python
 query = f"""
@@ -158,7 +158,7 @@ SELECT
       CONCAT('gs://{BUCKET}/bq_ai_functions/multimodal_analysis/', doc_name),
       '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}'
     ),
-    endpoint => 'multimodalembedding@001',
+    endpoint => 'gemini-embedding-2',
     connection_id => '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}'
   )).result AS embedding
 FROM UNNEST([
@@ -216,7 +216,7 @@ SELECT
       CONCAT('gs://{BUCKET}/bq_ai_functions/multimodal_analysis/', doc_name),
       '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}'
     ),
-    endpoint => 'multimodalembedding@001',
+    endpoint => 'gemini-embedding-2',
     connection_id => '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}'
   ), 4) AS similarity
 FROM

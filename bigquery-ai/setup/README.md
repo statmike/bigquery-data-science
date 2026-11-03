@@ -235,7 +235,7 @@ Connections are referenced as `PROJECT_ID.LOCATION.CONNECTION_NAME`:
 -- In CREATE MODEL
 CREATE MODEL `project.dataset.my_model`
   REMOTE WITH CONNECTION `project.us.my_connection`
-  OPTIONS (endpoint = 'gemini-2.5-flash');
+  OPTIONS (endpoint = 'gemini-3.8-flash');
 
 -- In scalar functions (optional)
 SELECT AI.GENERATE(
@@ -277,21 +277,21 @@ You do **not** need a remote model for:
 ```sql
 CREATE OR REPLACE MODEL `PROJECT_ID.DATASET.gemini_model`
   REMOTE WITH CONNECTION `PROJECT_ID.LOCATION.CONNECTION_NAME`
-  OPTIONS (endpoint = 'gemini-2.5-flash');
+  OPTIONS (endpoint = 'gemini-3.8-flash'); -- or 'gemini-4-argon' for frontier reasoning
 ```
 
-**For text embedding models:**
+**For text and multimodal embedding models (`gemini-embedding-2` handles text, image, audio, video, and PDF in a unified space):**
 ```sql
 CREATE OR REPLACE MODEL `PROJECT_ID.DATASET.embedding_model`
   REMOTE WITH CONNECTION `PROJECT_ID.LOCATION.CONNECTION_NAME`
-  OPTIONS (endpoint = 'text-embedding-005');
+  OPTIONS (endpoint = 'gemini-embedding-2'); -- or 'gemini-embedding-001', 'text-embedding-005', 'multimodalembedding@001'
 ```
 
-**For multimodal embedding models:**
+**For text-only task-typed embedding models (`gemini-embedding-001`):**
 ```sql
-CREATE OR REPLACE MODEL `PROJECT_ID.DATASET.multimodal_embedding_model`
+CREATE OR REPLACE MODEL `PROJECT_ID.DATASET.text_embedding_model`
   REMOTE WITH CONNECTION `PROJECT_ID.LOCATION.CONNECTION_NAME`
-  OPTIONS (endpoint = 'multimodalembedding@001');
+  OPTIONS (endpoint = 'gemini-embedding-001');
 ```
 
 **For Claude models:**
@@ -329,20 +329,20 @@ The remote model and the data it processes must be in the same region or multi-r
 
 ### What is an endpoint?
 
-An endpoint identifies which AI model to use. For Gemini models, you can specify just the model name (e.g., `gemini-2.5-flash`) and BigQuery auto-resolves the full endpoint URL on the Gemini Enterprise Agent Platform (formerly Vertex AI). The default when you omit the endpoint is `gemini-3.5-flash-lite` — see [Choosing a Gemini Model Endpoint](../RESOURCES.md#choosing-a-gemini-model-endpoint).
+An endpoint identifies which AI model to use. For Gemini models, you can specify just the model name (e.g., `gemini-3.8-flash` or `gemini-4-argon`) and BigQuery auto-resolves the full endpoint URL on the Gemini Enterprise Agent Platform (formerly Vertex AI). The default when you omit the endpoint is `gemini-3.5-flash-lite` — see [Choosing a Gemini Model Endpoint](../RESOURCES.md#choosing-a-gemini-model-endpoint).
 
 ### Where endpoints are specified
 
 | Context | Where | Example |
 |---------|-------|---------|
-| Scalar functions (AI.GENERATE, etc.) | `endpoint` parameter | `endpoint => 'gemini-2.5-flash'` |
-| Remote models | `endpoint` option in CREATE MODEL | `endpoint = 'gemini-2.5-flash'` |
-| Embedding scalars (AI.EMBED, AI.SIMILARITY) | `endpoint` parameter | `endpoint => 'text-embedding-005'` |
+| Scalar functions (AI.GENERATE, etc.) | `endpoint` parameter | `endpoint => 'gemini-3.8-flash'` |
+| Remote models | `endpoint` option in CREATE MODEL | `endpoint = 'gemini-3.8-flash'` |
+| Embedding scalars (AI.EMBED, AI.SIMILARITY) | `endpoint` parameter | `endpoint => 'gemini-embedding-2'` |
 
 ### Model version pinning
 
-- For embedding models, you **must** include the model version: `text-embedding-005`, not `text-embedding`.
-- For Gemini models in scalar functions, you can use short names: `gemini-2.5-flash`.
+- For embedding models, you **must** include the model version: `gemini-embedding-2` (or `gemini-embedding-001`), not `gemini-embedding`.
+- For Gemini models in scalar functions, you can use short names: `gemini-3.8-flash` or `gemini-4-argon`.
 - When no endpoint is specified, `AI.GENERATE` (and its typed variants and `AI.COUNT_TOKENS`) defaults to `gemini-3.5-flash-lite`; managed functions (`AI.IF`, `AI.SCORE`, `AI.CLASSIFY`, `AI.AGG`) auto-select a model optimized for cost-to-quality tradeoff.
 
 ### Global endpoints
@@ -559,12 +559,13 @@ Autonomous embedding generation automatically creates and maintains embeddings f
 CREATE OR REPLACE TABLE `PROJECT_ID.DATASET.my_table` (
   id INT64,
   text_content STRING,
-  -- Generated column that auto-embeds text_content
+  -- Generated column that auto-embeds text_content (768 dims for CREATE VECTOR INDEX <= 2,000 limit)
   text_embedding ARRAY<FLOAT64>
     GENERATED ALWAYS AS (
       AI.EMBED(
         content => text_content,
-        endpoint => 'text-embedding-005'
+        endpoint => 'gemini-embedding-2',
+        model_params => JSON '{"outputDimensionality": 768}'
       ).result
     ) STORED
     OPTIONS (asynchronous = TRUE)
@@ -582,7 +583,7 @@ CREATE VECTOR INDEX my_index
   );
 ```
 
-> **Two size gates apply.** `CREATE VECTOR INDEX` is rejected outright below **5,000 rows**, and once created, population does not begin until the base table exceeds roughly **10 MB**. Below that the index sits at `coverage_percentage` 0 and queries silently fall back to brute force. See [Managing an index](#managing-an-index).
+> **Size and dimension gates apply.** `CREATE VECTOR INDEX` is rejected outright below **5,000 rows** or when vectors exceed **2,000 dimensions** (`gemini-embedding-2` and `gemini-embedding-001` default to `3,072` dimensions, so pass camelCase `model_params => JSON '{"outputDimensionality": 768}'` on `AI.EMBED` or `STRUCT(768 AS output_dimensionality)` on `AI.GENERATE_EMBEDDING` whenever indexing). Once created, population does not begin until the base table exceeds roughly **10 MB**; below that the index sits at `coverage_percentage` 0 and queries silently fall back to brute force. See [Managing an index](#managing-an-index).
 
 3. **Use AI.SEARCH** to query:
 

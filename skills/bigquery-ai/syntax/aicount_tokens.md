@@ -20,7 +20,7 @@ AI.COUNT_TOKENS(
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `INPUT` | STRING | Required | -- | The input text prompt for which to count tokens. |
-| `endpoint` | STRING literal (named parameter) | Optional | The default model used by `AI.GENERATE` | Name of the generative AI model whose tokenization rules to use (e.g. `'gemini-2.5-pro'`). |
+| `endpoint` | STRING literal (named parameter) | Optional | The default model used by `AI.GENERATE` | Name of the generative AI model whose tokenization rules to use (e.g. `'gemini-3.8-flash'` or `'gemini-4-argon'`). |
 
 **Outputs:** Returns a `STRUCT` with:
 

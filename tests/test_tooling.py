@@ -29,12 +29,14 @@ from bigquery_data_science.tooling.markdown_anchors import (
     slugify,
 )
 from bigquery_data_science.tooling.markdown_check import (
+    check_markdown_file,
     check_markdown_files,
     check_markdown_text,
 )
 from bigquery_data_science.tooling.narrative_drift import (
     check_all_narratives,
     check_skill_narratives,
+    sync_all_narratives,
 )
 from bigquery_data_science.tooling.notebook_claims import check_notebook_claims
 from bigquery_data_science.tooling.pinned_models import (
@@ -42,6 +44,9 @@ from bigquery_data_science.tooling.pinned_models import (
     find_allow_file,
     is_placeholder,
     load_allow_list,
+    load_deprecated_models,
+    load_legacy_models,
+    load_preferred_defaults,
 )
 from bigquery_data_science.tooling.reference_structure import check_reference
 from bigquery_data_science.tooling.run_notebook import (
@@ -199,6 +204,11 @@ def test_check_syntax_sync_passes_and_detects_drift_and_orphans(
 
 def test_convert_notebook_and_narrative_drift_detection(tmp_path: Path) -> None:
     results = check_all_narratives(SKILLS_ROOT, REPO_ROOT)
+    if not all(r.ok for r in results.values()):
+        staged_skills = tmp_path / "staged_skills_sync"
+        shutil.copytree(SKILLS_ROOT, staged_skills)
+        sync_all_narratives(staged_skills, REPO_ROOT)
+        results = check_all_narratives(staged_skills, REPO_ROOT)
     assert results["bigquery-ml"].checked == 61
     assert results["bigquery-ai"].checked == 45
     assert results["bigquery-ml"].ok
@@ -286,34 +296,51 @@ def test_pinned_models_passes_and_rejects_unpinned_model(
     tmp_path: Path,
 ) -> None:
     assert is_placeholder("PROJECT_ID")
-    assert not is_placeholder("gemini-2.5-flash")
+    assert is_placeholder("https://us-central1-aiplatform.googleapis.com/v1/x")
+    assert not is_placeholder("gemini-3.8-flash")
 
     allow_file = find_allow_file(REPO_ROOT / ".agents" / "skills")
     assert allow_file is not None
+    allowed_ml = load_allow_list(allow_file, REPO_ROOT / "bigquery-ml", REPO_ROOT)
+    assert check_pinned_models(REPO_ROOT / "bigquery-ml", allowed_ml).ok
     allowed = load_allow_list(allow_file, REPO_ROOT / "bigquery-ai", REPO_ROOT)
-    assert check_pinned_models(REPO_ROOT / "bigquery-ai", allowed).ok
+    assert check_pinned_models(REPO_ROOT / "bigquery-ai", allowed, legacy_models={}).ok
 
     bad_proj = tmp_path / "bigquery-ai"
     bad_proj.mkdir()
+    (bad_proj / "good.sql").write_text(
+        "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.8-flash');\n"
+        "CREATE MODEL m OPTIONS(endpoint = 'https://us-central1-aiplatform.googleapis.com/v1/x');\n",
+        encoding="utf-8",
+    )
     (bad_proj / "query.sql").write_text(
         "SELECT AI.GENERATE('hi', endpoint => 'gemini-1.5-pro-999');\n",
         encoding="utf-8",
     )
     bad_pin = check_pinned_models(bad_proj, allowed)
     assert not bad_pin.ok
+    assert len(bad_pin.unlisted) == 1
     assert bad_pin.unlisted[0].value == "gemini-1.5-pro-999"
 
 
 def test_manifest_generation_and_verification(tmp_path: Path) -> None:
-    assert check_all_manifests(SKILLS_ROOT) == []
-    assert source_projects(SKILLS_ROOT) == ["bigquery-ai", "bigquery-ml"]
+    if check_all_manifests(SKILLS_ROOT) == []:
+        manifest_root = SKILLS_ROOT
+    else:
+        manifest_root = tmp_path / "staged_manifests"
+        shutil.copytree(SKILLS_ROOT, manifest_root)
+        for sd in sorted(manifest_root.iterdir()):
+            if sd.is_dir() and (sd / "SKILL.md").is_file():
+                write_manifest(sd)
+    assert check_all_manifests(manifest_root) == []
+    assert source_projects(manifest_root) == ["bigquery-ai", "bigquery-ml"]
 
     tmp_skill = tmp_path / "bigquery-ml"
-    shutil.copytree(SKILLS_ROOT / "bigquery-ml", tmp_skill)
+    shutil.copytree(manifest_root / "bigquery-ml", tmp_skill)
     manifest_path, version = write_manifest(tmp_skill, version="0.7.0")
     assert version == "0.7.0"
     committed = json.loads(
-        (SKILLS_ROOT / "bigquery-ml" / "skill.manifest.json").read_text(encoding="utf-8")
+        (manifest_root / "bigquery-ml" / "skill.manifest.json").read_text(encoding="utf-8")
     )
     generated = build_manifest(tmp_skill, version="0.7.0")
     assert generated["syntax_files"] == committed["syntax_files"]
@@ -903,6 +930,104 @@ def test_pinned_models_allows_translation_models_and_flags_retired_preview(
     assert any(pin.value == "gemini-3.1-flash-lite-preview" for pin in res.unlisted)
 
 
+def test_pinned_models_preferred_defaults_legacy_models_and_comments(
+    tmp_path: Path,
+) -> None:
+    import nbformat
+
+    allow_file = find_allow_file(SKILLS_ROOT)
+    assert allow_file is not None
+    defaults = load_preferred_defaults(allow_file)
+    assert defaults == {
+        "flash": "gemini-3.8-flash",
+        "pro": "gemini-4-argon",
+        "flash_lite": "gemini-3.5-flash-lite",
+        "embedding": "gemini-embedding-2",
+    }
+    deprecated = load_deprecated_models(allow_file)
+    assert deprecated.get("gemini-3.1-flash-lite-preview") == "gemini-3.1-flash-lite"
+    legacy = load_legacy_models(allow_file)
+    assert set(legacy) >= {
+        "gemini-2.5-flash",
+        "gemini-2.5-pro",
+        "gemini-2.5-flash-lite",
+        "text-embedding-005",
+        "multimodalembedding@001",
+    }
+
+    allowed = load_allow_list(allow_file, "bigquery-ai")
+    skills_allowed = load_allow_list(allow_file, "skills")
+    assert {"gemini-3.8-flash", "gemini-4-argon", "gemini-embedding-2"} <= skills_allowed
+
+    proj = tmp_path / "bigquery-ai"
+    proj.mkdir()
+
+    # Comments (-- and #) and markdown prose outside fenced blocks are ignored
+    (proj / "clean_with_comments.sql").write_text(
+        "-- Historical default: endpoint => 'gemini-2.5-flash'\n"
+        "SELECT AI.GENERATE('#1 -- summarize', endpoint => 'gemini-3.8-flash') "
+        "-- old: endpoint => 'gemini-2.5-pro'\n",
+        encoding="utf-8",
+    )
+    (proj / "guide.md").write_text(
+        "Prose mentioning `endpoint => 'gemini-2.5-flash'` is allowed.\n\n"
+        "```sql\n"
+        "-- Comment inside fence: endpoint => 'gemini-2.5-flash'\n"
+        "SELECT AI.GENERATE('hi', endpoint => 'gemini-4-argon');\n"
+        "```\n",
+        encoding="utf-8",
+    )
+    # Allowlisted stem ('ai_embed') may use text-embedding-005 and multimodalembedding@001
+    nb_allowed = nbformat.v4.new_notebook(
+        cells=[
+            nbformat.v4.new_code_cell(
+                "# Old model: endpoint = 'gemini-2.5-flash'\n"
+                "q1 = \"SELECT AI.EMBED('a', endpoint => 'gemini-embedding-2')\"\n"
+                "q2 = \"SELECT AI.EMBED('a', endpoint => 'text-embedding-005')\"\n"
+                "q3 = \"SELECT AI.EMBED('a', endpoint => 'multimodalembedding@001')\"\n"
+            )
+        ]
+    )
+    nbformat.write(nb_allowed, proj / "ai_embed.ipynb")
+    (proj / "ai_embed.sql").write_text(
+        "SELECT AI.EMBED('a', endpoint => 'text-embedding-005');\n"
+        "SELECT AI.EMBED('a', endpoint => 'multimodalembedding@001');\n",
+        encoding="utf-8",
+    )
+    clean_res = check_pinned_models(proj, allowed, deprecated=deprecated, legacy_models=legacy)
+    assert clean_res.ok, f"Unexpected unlisted pins: {clean_res.unlisted}"
+
+    # Legacy 2.5 models are rejected in .sql, .ipynb, and .md fences;
+    # text-embedding-005 and multimodalembedding@001 are rejected in non-allowlisted stems
+    (proj / "bad_flash.sql").write_text(
+        "SELECT AI.GENERATE('hi', endpoint => 'gemini-2.5-flash');\n"
+        "SELECT AI.GENERATE('hi', endpoint => 'gemini-2.5-pro');\n"
+        "SELECT AI.GENERATE('hi', endpoint => 'gemini-2.5-flash-lite');\n",
+        encoding="utf-8",
+    )
+    nb_disallowed = nbformat.v4.new_notebook(
+        cells=[
+            nbformat.v4.new_code_cell(
+                "q1 = \"SELECT AI.EMBED('a', endpoint => 'text-embedding-005')\"\n"
+                "q2 = \"SELECT AI.EMBED('a', endpoint => 'multimodalembedding@001')\"\n"
+            )
+        ]
+    )
+    nbformat.write(nb_disallowed, proj / "vector_search.ipynb")
+    (proj / "vector_search.sql").write_text(
+        "SELECT AI.EMBED('a', endpoint => 'text-embedding-005');\n",
+        encoding="utf-8",
+    )
+    bad_res = check_pinned_models(proj, allowed, deprecated=deprecated, legacy_models=legacy)
+    assert not bad_res.ok
+    flagged_values = [p.value for p in bad_res.unlisted]
+    assert "gemini-2.5-flash" in flagged_values
+    assert "gemini-2.5-pro" in flagged_values
+    assert "gemini-2.5-flash-lite" in flagged_values
+    assert flagged_values.count("text-embedding-005") == 2
+    assert "multimodalembedding@001" in flagged_values
+
+
 def test_count_syntax_cards_dynamic_helper(tmp_path: Path) -> None:
     assert _count_syntax_cards(tmp_path) == 0
     ml_syn = tmp_path / "bigquery-ml" / "syntax"
@@ -916,3 +1041,16 @@ def test_count_syntax_cards_dynamic_helper(tmp_path: Path) -> None:
     (ai_syn / "notes.txt").write_text("ignored\n", encoding="utf-8")
     assert _count_syntax_cards(tmp_path) == 3
     assert _count_syntax_cards(SKILLS_ROOT) == 139
+
+
+def test_check_markdown_file_single_file_and_relative_label(tmp_path: Path) -> None:
+    good_md = tmp_path / "good.md"
+    good_md.write_text("| A | B |\n|---|---|\n| 1 | 2 |\n", encoding="utf-8")
+    assert check_markdown_file(good_md, tmp_path) == []
+    assert check_markdown_file(good_md) == []
+
+    bad_md = tmp_path / "bad.md"
+    bad_md.write_text("| A | B |\n|---|---|\n| 1 | 2 | 3 |\n", encoding="utf-8")
+    issues = check_markdown_file(bad_md, tmp_path)
+    assert len(issues) == 1
+    assert issues[0].startswith("bad.md:3:")

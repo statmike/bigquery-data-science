@@ -128,7 +128,7 @@ uvx bigquery-data-science lookup ML.ENTITY_FEATURES_AT_TIME
 uvx bigquery-data-science search "point-in-time feature leakage"
 
 # 5. Statically audit a BigQuery SQL query or .sql file for prerequisites & gotchas:
-uvx bigquery-data-science review-sql "SELECT AI.GENERATE('Summarize', endpoint => 'gemini-3.5-flash')"
+uvx bigquery-data-science review-sql "SELECT AI.GENERATE('Summarize', endpoint => 'gemini-3.8-flash')"
 
 # 6. Add --json to any catalog command (list, lookup, search, triage, review-sql) for automation:
 uvx bigquery-data-science lookup AI.AGG --json

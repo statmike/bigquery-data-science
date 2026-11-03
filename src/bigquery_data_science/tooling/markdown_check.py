@@ -160,6 +160,19 @@ def check_markdown_text(text: str, label: str) -> list[str]:
     return issues
 
 
+def check_markdown_file(md_path: Path, repo_root: Path | None = None) -> list[str]:
+    """Check a single Markdown file for fences, GFM tables, and Mermaid layout."""
+    resolved_path = md_path.resolve()
+    if repo_root is not None:
+        try:
+            label = str(resolved_path.relative_to(repo_root.resolve()))
+        except ValueError:
+            label = str(md_path)
+    else:
+        label = str(md_path)
+    return check_markdown_text(resolved_path.read_text(encoding="utf-8"), label)
+
+
 def check_markdown_files(repo_root: Path) -> list[str]:
     """Scan all tracked/domain `.md` files and `.ipynb` markdown cells under `repo_root`."""
     resolved_root = repo_root.resolve()
@@ -171,8 +184,7 @@ def check_markdown_files(repo_root: Path) -> list[str]:
             for part in (".venv", ".git", ".agents", ".claude", "node_modules")
         ):
             continue
-        rel = str(md_path.relative_to(resolved_root))
-        issues.extend(check_markdown_text(md_path.read_text(encoding="utf-8"), rel))
+        issues.extend(check_markdown_file(md_path, resolved_root))
 
     for nb_path in sorted(resolved_root.rglob("*.ipynb")):
         if any(part in nb_path.parts for part in (".venv", ".git", "node_modules")):

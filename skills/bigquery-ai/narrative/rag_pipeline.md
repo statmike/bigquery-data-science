@@ -12,7 +12,7 @@ A complete Retrieval-Augmented Generation (RAG) pipeline built entirely in BigQu
 
 **What this demonstrates:**
 - Building a full RAG system without leaving BigQuery
-- Asymmetric embedding pattern (RETRIEVAL_DOCUMENT / RETRIEVAL_QUERY)
+- Unified task-agnostic 3,072-dimensional embeddings (`gemini-embedding-2`, no `task_type` needed)
 - Composing search results into grounded prompts
 - Measuring what a lexical leg changes about the retrieved context — and how far that change can reach
 - Choosing between batch retrieval (many questions at once) and hybrid retrieval (one question, exact-token promotion)
@@ -95,7 +95,7 @@ print(f'Connection {CONNECTION_ID} ready (SA: {sa})')
 client.query(f'''
 CREATE OR REPLACE MODEL `{PROJECT_ID}.{DATASET_ID}.gemini_flash`
   REMOTE WITH CONNECTION `{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}`
-  OPTIONS (endpoint = 'gemini-2.5-flash')
+  OPTIONS (endpoint = 'gemini-3.8-flash')
 ''').result()
 print('Model gemini_flash ready')
 ```
@@ -168,7 +168,7 @@ kb[['category', 'question']]
 ---
 ## Step 2 — Embed the knowledge base with AI.EMBED
 
-Create embeddings for each FAQ answer using `RETRIEVAL_DOCUMENT` task type. We embed the concatenation of question + answer for richer context.
+Create 3,072-dimensional embeddings for each FAQ entry using `gemini-embedding-2` (unified task-agnostic embeddings — no `task_type` needed). We embed the concatenation of question + answer for richer context.
 
 ```python
 query = f'''
@@ -177,8 +177,7 @@ SELECT
   question, answer, category,
   (AI.EMBED(
     content => CONCAT(question, ' ', answer),
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_DOCUMENT'
+    endpoint => 'gemini-embedding-2'
   )).result AS embedding
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_rag_knowledge`
 '''
@@ -211,8 +210,7 @@ WITH retrieved AS (
     'embedding',
     query_value => (AI.EMBED(
       content => '{user_question}',
-      endpoint => 'text-embedding-005',
-      task_type => 'RETRIEVAL_QUERY'
+      endpoint => 'gemini-embedding-2'
     )).result,
     top_k => 3,
     distance_type => 'COSINE'
@@ -256,8 +254,7 @@ FROM VECTOR_SEARCH(
   'embedding',
   query_value => (AI.EMBED(
     content => '{user_question}',
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_QUERY'
+    endpoint => 'gemini-embedding-2'
   )).result,
   top_k => 3,
   distance_type => 'COSINE'
@@ -291,8 +288,7 @@ retrieved AS (
     TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_rag_embedded`,
     'embedding',
     (SELECT question,
-       (AI.EMBED(content => question, endpoint => 'text-embedding-005',
-                 task_type => 'RETRIEVAL_QUERY')).result AS embedding
+       (AI.EMBED(content => question, endpoint => 'gemini-embedding-2')).result AS embedding
      FROM questions),
     top_k => 2,
     distance_type => 'COSINE'
@@ -358,8 +354,7 @@ FROM VECTOR_SEARCH(
   'embedding',
   query_value => (AI.EMBED(
     content => '{hybrid_question}',
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_QUERY'
+    endpoint => 'gemini-embedding-2'
   )).result,
   top_k => -1,
   distance_type => 'COSINE'
@@ -392,8 +387,7 @@ FROM VECTOR_SEARCH(
   'embedding',
   query_value => (AI.EMBED(
     content => '{hybrid_question}',
-    endpoint => 'text-embedding-005',
-    task_type => 'RETRIEVAL_QUERY'
+    endpoint => 'gemini-embedding-2'
   )).result,
   top_k => -1,
   distance_type => 'COSINE',

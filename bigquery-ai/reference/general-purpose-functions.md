@@ -88,7 +88,7 @@ AI.GENERATE(
 |-----------|------|----------|---------|-------------|
 | `prompt` (positional, must be first) | STRING or STRUCT | Required | -- | The prompt to send to the model. Can be a STRING value or a STRUCT containing one or more fields of type STRING, ARRAY\<STRING\>, ObjectRef, or ARRAY\<ObjectRef\>. STRUCT fields are concatenated in order (like CONCAT), so the field *names* carry no meaning. At most one video object is allowed. |
 | `endpoint` | STRING | Optional | `gemini-3.5-flash-lite` | The model endpoint on the Gemini Enterprise Agent Platform (formerly Vertex AI). Specify any GA or preview Gemini model by name (BigQuery auto-resolves the full endpoint). Can also specify a full global endpoint URL. The default is measured, not inferred -- see [Choosing a Gemini Model Endpoint](../RESOURCES.md#choosing-a-gemini-model-endpoint). |
-| `model_params` | JSON literal | Optional | -- | Additional parameters conforming to the `generateContent` request body format. Can set any field except `contents`. Supports `thinking_config` (use `thinking_budget` for Gemini 2.5 models, `thinking_level` for Gemini 3.0+), `cachedContent`, `tools` (e.g., `googleSearch` — requires Gemini 2.0+, `googleMaps`), `generation_config`, etc. |
+| `model_params` | JSON literal | Optional | -- | Additional parameters conforming to the `generateContent` request body format. Can set any field except `contents`. Supports `thinking_config` (use `thinking_budget` for Gemini 2.5 models, `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`) for Gemini 3.0+ including `gemini-3.8-flash` and `gemini-4-argon`), `cachedContent`, `tools` (e.g., `googleSearch` — requires Gemini 2.0+, `googleMaps`), `generation_config`, etc. |
 | `output_schema` | STRING | Optional | -- | Schema for structured output as comma-separated fields. Each field has a name, data type, and optional `OPTIONS(description = '...')`. Supported types: `STRING`, `INT64`, `FLOAT64`, `BOOL`, `ARRAY`, `STRUCT`. When specified, replaces the `result` field in output with custom schema fields. |
 | `connection_id` | STRING | Optional | End-user credentials | Connection for model communication, in format `[PROJECT_ID].LOCATION.CONNECTION_ID`. |
 | `request_type` | STRING | Optional | `UNSPECIFIED` | Quota type. Values: `SHARED` (DSQ only), `DEDICATED` (Provisioned Throughput only, error if unavailable), `UNSPECIFIED` (default -- uses Provisioned Throughput first if purchased, overflows to DSQ). |
@@ -109,7 +109,7 @@ Returns a STRUCT with:
 | `full_response` | JSON | Full response from `projects.locations.endpoints.generateContent`. |
 | `status` | STRING | API response status. Empty if successful. |
 
-**Supported models:** Any GA or preview Gemini model; the reference page lists `gemini-4-argon` and the Gemini 3.x family. Default: `gemini-3.5-flash-lite`. Can use global endpoint for cross-region processing.
+**Supported models:** Any GA or preview Gemini model; pinned examples standardize on `gemini-3.8-flash` (latest GA Flash) and `gemini-4-argon` (latest GA Pro / frontier reasoning model, replacing `gemini-2.5-pro`), alongside the Gemini 3.x family. Default when omitted: `gemini-3.5-flash-lite`. Can use global endpoint for cross-region processing.
 
 **Best practices:**
 - Function incurs Vertex AI charges each time it is called. Track costs accordingly.
@@ -121,13 +121,13 @@ Returns a STRUCT with:
 - Global endpoint does not allow controlling or knowing the data processing region.
 - Gemini 2.5 models incur thinking charges; budget can be set for Flash/Flash-Lite but not Pro.
 - Google Search grounding requires Gemini 2.0 or later models.
-- For Gemini 3.0+, use `thinking_level` (`LOW`, `MEDIUM`, `HIGH`) in `thinking_config` instead of `thinking_budget`.
+- For Gemini 3.0+ (`gemini-3.8-flash` and `gemini-4-argon`), use `thinking_level` (`LOW`, `MEDIUM`, `HIGH`) in `thinking_config` instead of `thinking_budget`.
 
 **Locations:** All regions that support Gemini models, plus US and EU multi-regions.
 
 **Provisioned throughput:** Supported via `request_type` parameter. Must purchase Provisioned Throughput quota matching the same Gemini model and region. For US multi-region: select `us-central1` region when purchasing. For EU multi-region: select `europe-west4` region when purchasing.
 
-**BigFrames API:** `bigframes.bigquery.ai.generate()` — Scalar function returning a Series of structs. Supports `output_schema` as `Mapping[str, str]`. Prompt is a tuple of string literals and Series: `bbq.ai.generate(("Summarize: ", df["text"]), output_schema={"summary": "STRING"})`. Access result via `.struct.field("result")`.
+**BigFrames API:** `bigframes.bigquery.ai.generate()` — Scalar function returning a Series of structs. Supports `output_schema` as `Mapping[str, str]`. Prompt is a tuple of string literals and Series: `bbq.ai.generate(("Summarize: ", df["text"]), output_schema={"summary": "STRING"})`. Access result via `.struct.field("result")`. Prefer `bbq.ai.generate` / `bbq.ai.generate_text` over `bigframes.ml.llm.GeminiTextGenerator`, which in `bigframes 2.51.0` hardcodes a client-side `_GEMINI_ENDPOINTS` allowlist (`gemini-1.5-*`, `gemini-2.0-*`, `gemini-2.5-*`) and emits an `UnknownModelWarning` for `gemini-3.8-flash` or `gemini-4-argon` even though `CREATE MODEL` succeeds.
 
 ### Reusable column aliases for unpacking `AI.*` outputs
 
@@ -148,7 +148,7 @@ SELECT
   review_id,
   AI.GENERATE(
     ('Extract sentiment and 1-sentence summary: ', review_text),
-    endpoint => 'gemini-2.5-flash',
+    endpoint => 'gemini-3.8-flash',
     output_schema => 'sentiment STRING, summary STRING'
   ) AS ai_gen,
   ai_gen.sentiment,
@@ -342,7 +342,7 @@ All models return the input table columns plus:
 
 **Provisioned throughput:** Supported via `request_type` parameter; must pre-purchase matching quota.
 
-**BigFrames API:** `bigframes.bigquery.ai.generate_text(model, data)` — TVF wrapper that takes a model name string and DataFrame/Series. Also available as `bigframes.ml.llm.GeminiTextGenerator` (sklearn-style: create model, then `.predict()`). GeminiTextGenerator also supports `.fit()` for fine-tuning and `.score()` for evaluation. For Claude models: `bigframes.ml.llm.Claude3TextGenerator`.
+**BigFrames API:** `bigframes.bigquery.ai.generate_text(model, data)` — TVF wrapper that takes a model name string and DataFrame/Series. Also available as `bigframes.ml.llm.GeminiTextGenerator` (sklearn-style: create model, then `.predict()`), though in `bigframes 2.51.0` `GeminiTextGenerator` hardcodes a client-side `_GEMINI_ENDPOINTS` allowlist (`gemini-1.5-*`, `gemini-2.0-*`, `gemini-2.5-*`) and emits an `UnknownModelWarning` for `gemini-3.8-flash` or `gemini-4-argon` even though `CREATE MODEL` succeeds; prefer `bbq.ai.generate` / `bbq.ai.generate_text`. `GeminiTextGenerator` also supports `.fit()` for fine-tuning and `.score()` for evaluation. For Claude models: `bigframes.ml.llm.Claude3TextGenerator`.
 
 ---
 
@@ -627,7 +627,7 @@ AI.COUNT_TOKENS(
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `INPUT` | STRING | Required | -- | The input text prompt for which to count tokens. |
-| `endpoint` | STRING literal (named parameter) | Optional | The default model used by `AI.GENERATE` | Name of the generative AI model whose tokenization rules to use (e.g. `'gemini-2.5-pro'`). |
+| `endpoint` | STRING literal (named parameter) | Optional | The default model used by `AI.GENERATE` | Name of the generative AI model whose tokenization rules to use (e.g. `'gemini-3.8-flash'` or `'gemini-4-argon'`). |
 
 **Outputs:** Returns a `STRUCT` with:
 
