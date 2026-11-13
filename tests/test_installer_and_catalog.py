@@ -1095,9 +1095,9 @@ def test_review_sql_v0110_translate_chunk_document_and_tabfm_rules() -> None:
         f for f in legacy_tvf_res.findings if f.rule == "LEGACY_PARSE_DOCUMENT_TVF"
     )
     assert legacy_finding.severity == "ERROR"
-    assert legacy_finding.remediation.index(
-        "AI.CHUNK_DOCUMENT"
-    ) < legacy_finding.remediation.index("ML.PROCESS_DOCUMENT")
+    assert legacy_finding.remediation.index("AI.CHUNK_DOCUMENT") < legacy_finding.remediation.index(
+        "ML.PROCESS_DOCUMENT"
+    )
 
     legacy_ep_res = review_sql(
         "SELECT AI.PARSE_DOCUMENT("
@@ -1126,7 +1126,7 @@ def test_review_sql_v0110_translate_chunk_document_and_tabfm_rules() -> None:
 
     clean_parse_chunk = review_sql(
         "SELECT * FROM AI.CHUNK_DOCUMENT(("
-        "SELECT AI.PARSE_DOCUMENT(ref, options => JSON '{\"schema\": \"raw-docai\"}') "
+        'SELECT AI.PARSE_DOCUMENT(ref, options => JSON \'{"schema": "raw-docai"}\') '
         "AS parsed_document FROM docs)) WHERE status = ''"
     )
     assert clean_parse_chunk.ok is True
@@ -1135,24 +1135,24 @@ def test_review_sql_v0110_translate_chunk_document_and_tabfm_rules() -> None:
     # 4) gemini-4-hydrogen and gemini-4-carbon with thinking_budget or thinking_level: "XHIGH"
     g4_hydrogen_budget = review_sql(
         "SELECT AI.GENERATE('hi', endpoint => 'gemini-4-hydrogen', "
-        "model_params => JSON '{\"generation_config\": "
-        "{\"thinking_config\": {\"thinking_budget\": 1024}}}')"
+        'model_params => JSON \'{"generation_config": '
+        '{"thinking_config": {"thinking_budget": 1024}}}\')'
     )
     assert g4_hydrogen_budget.ok is True
     assert any(f.rule == "GEMINI_4_THINKING_BUDGET" for f in g4_hydrogen_budget.findings)
 
     g4_carbon_xhigh = review_sql(
         "SELECT AI.GENERATE('hi', endpoint => 'gemini-4-carbon', "
-        "model_params => JSON '{\"generation_config\": "
-        "{\"thinking_config\": {\"thinking_level\": \"XHIGH\"}}}')"
+        'model_params => JSON \'{"generation_config": '
+        '{"thinking_config": {"thinking_level": "XHIGH"}}}\')'
     )
     assert g4_carbon_xhigh.ok is True
     assert any(f.rule == "GEMINI_4_THINKING_BUDGET" for f in g4_carbon_xhigh.findings)
 
     g4_argon_clean = review_sql(
         "SELECT AI.GENERATE('hi', endpoint => 'gemini-4-argon', "
-        "model_params => JSON '{\"generation_config\": "
-        "{\"thinking_config\": {\"thinking_level\": \"HIGH\"}}}')"
+        'model_params => JSON \'{"generation_config": '
+        '{"thinking_config": {"thinking_level": "HIGH"}}}\')'
     )
     assert g4_argon_clean.ok is True
     assert g4_argon_clean.findings == []

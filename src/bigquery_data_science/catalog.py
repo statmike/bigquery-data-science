@@ -136,7 +136,7 @@ _FALLBACK_GOTCHAS: Mapping[str, tuple[str, ...]] = MappingProxyType(
                 "(`layout-v1` vs `raw-docai`)**: Default `layout-v1` returns flat reading-order "
                 "blocks (`title`, `heading`, `text`, `table` HTML, `list_item`, `image`, "
                 "`page_header`, `page_footer`) with 1-indexed `page_number` and normalized "
-                "`bbox`; `options => JSON '{\"schema\": \"raw-docai\"}'` returns the nested "
+                '`bbox`; `options => JSON \'{"schema": "raw-docai"}\'` returns the nested '
                 "Document AI layout tree required to chain `parsed_document` into "
                 "`AI.CHUNK_DOCUMENT`."
             ),
@@ -193,7 +193,7 @@ _FALLBACK_SYNTAX: Mapping[str, tuple[str, str]] = MappingProxyType(
                 "AI.PARSE_DOCUMENT(\n"
                 "  [document => ] DOCUMENT\n"
                 "  [, connection_id => 'CONNECTION_ID']\n"
-                "  [, options => JSON '{\"schema\": \"layout-v1\" | \"raw-docai\"}']\n"
+                '  [, options => JSON \'{"schema": "layout-v1" | "raw-docai"}\']\n'
                 ") -> JSON\n"
                 "```\n"
                 "- **Type:** Scalar function (returns `JSON`) — GA."
@@ -1177,7 +1177,7 @@ def triage_task(
                 "For document RAG, chunk files first with GA `AI.CHUNK_DOCUMENT` "
                 "(auto-provisioned `bq-created-layout-parser`, no `CREATE MODEL`), "
                 "or parse once with `AI.PARSE_DOCUMENT(..., options => "
-                "JSON '{\"schema\": \"raw-docai\"}')` "
+                'JSON \'{"schema": "raw-docai"}\')` '
                 "and pass `parsed_document` into `AI.CHUNK_DOCUMENT` to tune `chunk_size`."
             ),
             prerequisites=(
@@ -1238,7 +1238,7 @@ def triage_task(
             head_to_head=(
                 "Use GA scalar `AI.PARSE_DOCUMENT` for zero-DDL layout block extraction "
                 "(`layout-v1` reading-order blocks with HTML tables and `bbox`, or "
-                "`options => JSON '{\"schema\": \"raw-docai\"}'` aliased `AS parsed_document` "
+                '`options => JSON \'{"schema": "raw-docai"}\'` aliased `AS parsed_document` '
                 "to parse once and chunk many times with `AI.CHUNK_DOCUMENT`), GA "
                 "`AI.CHUNK_DOCUMENT` for direct layout-aware RAG chunking, and "
                 "`ML.PROCESS_DOCUMENT` for specialized Invoice/Form/Custom Document AI "
@@ -2030,7 +2030,7 @@ def review_sql(
                     ),
                     remediation=(
                         "Call scalar `AI.PARSE_DOCUMENT(document [, connection_id => '...'] "
-                        "[, options => JSON '{\"schema\": \"layout-v1\" | \"raw-docai\"}'])` "
+                        '[, options => JSON \'{"schema": "layout-v1" | "raw-docai"}\'])` '
                         "in `SELECT`, use `FROM AI.CHUNK_DOCUMENT(...)` for layout-aware "
                         "RAG chunking, or use `ML.PROCESS_DOCUMENT` for specialized "
                         "Document AI processors."
@@ -2207,9 +2207,9 @@ def review_sql(
                             "with HTTP 400."
                         ),
                         remediation=(
-                            "Use `model_params => JSON '{\"generation_config\": "
-                            "{\"thinking_config\": {\"thinking_level\": \"LOW\" | "
-                            "\"MEDIUM\" | \"HIGH\"}}}'` on Gemini 4 endpoints."
+                            'Use `model_params => JSON \'{"generation_config": '
+                            '{"thinking_config": {"thinking_level": "LOW" | '
+                            '"MEDIUM" | "HIGH"}}}\'` on Gemini 4 endpoints.'
                         ),
                     )
                 )
@@ -2227,12 +2227,12 @@ def review_sql(
                     rule="PARSE_DOCUMENT_CHUNK_SCHEMA",
                     message=(
                         "Chaining `AI.PARSE_DOCUMENT` into `AI.CHUNK_DOCUMENT` without "
-                        "`options => JSON '{\"schema\": \"raw-docai\"}'` uses the default "
+                        '`options => JSON \'{"schema": "raw-docai"}\'` uses the default '
                         "`layout-v1` schema, which `AI.CHUNK_DOCUMENT` rejects per row "
                         "(`INVALID_ARGUMENT: Unsupported document schema: layout-v1`)."
                     ),
                     remediation=(
-                        "Pass `options => JSON '{\"schema\": \"raw-docai\"}'` to "
+                        'Pass `options => JSON \'{"schema": "raw-docai"}\'` to '
                         "`AI.PARSE_DOCUMENT(...)` and alias the column `AS parsed_document` "
                         "when feeding `AI.CHUNK_DOCUMENT`."
                     ),
@@ -2470,8 +2470,7 @@ def review_sql(
 
     if "AI.CHUNK_DOCUMENT" in detected:
         chunk_calls = [
-            _top_level_call_args(c)
-            for c in _iter_function_call_args(masked, "AI.CHUNK_DOCUMENT")
+            _top_level_call_args(c) for c in _iter_function_call_args(masked, "AI.CHUNK_DOCUMENT")
         ]
         for call_args in chunk_calls:
             if _OPTIONS_ARG_RE.search(call_args):
