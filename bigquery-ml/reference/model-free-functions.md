@@ -247,7 +247,7 @@ ML.HASH_BUCKETIZE(string_expression, hash_bucket_size)
 
 ---
 
-**Family note:** All three are exportable feature-preprocessing functions when used in the `TRANSFORM` clause, so the transformation is reapplied automatically during `ML.PREDICT` and accompanies exported / Vertex-registered models. `ML.BUCKETIZE` and `ML.HASH_BUCKETIZE` are scalar; `ML.QUANTILE_BUCKETIZE` is analytic and requires an empty `OVER()` clause. See the [Manual feature preprocessing](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-preprocessing-functions) reference.
+**Family note:** All three are exportable feature-preprocessing functions when used in the `TRANSFORM` clause, so the transformation is reapplied automatically during `ML.PREDICT` and accompanies exported / Vertex-registered models. `ML.BUCKETIZE` and `ML.HASH_BUCKETIZE` are scalar; `ML.QUANTILE_BUCKETIZE` is analytic and requires an empty `OVER()` clause. See the [Manual feature preprocessing](https://cloud.google.com/bigquery/docs/manual-preprocessing) reference.
 
 
 ---
@@ -260,7 +260,7 @@ ML.HASH_BUCKETIZE(string_expression, hash_bucket_size)
   - Multi-hot encode array columns (tags, skus, multi-select fields) where a row has many categories.
   - Label-encode high-cardinality categoricals into a single compact integer column (ordinal — only appropriate where order is meaningful or for tree models).
   - Cap vocabulary explosion with `top_k` / `frequency_threshold`; the same fitted vocabulary is reused at prediction time when called inside `TRANSFORM`.
-- **documentation:** [ML.ONE_HOT_ENCODER](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-one-hot-encoder) · [ML.MULTI_HOT_ENCODER](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-multi-hot-encoder) · [ML.LABEL_ENCODER](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-label-encoder) · [Preprocessing functions overview](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-preprocessing-functions)
+- **documentation:** [ML.ONE_HOT_ENCODER](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-one-hot-encoder) · [ML.MULTI_HOT_ENCODER](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-multi-hot-encoder) · [ML.LABEL_ENCODER](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-label-encoder) · [Preprocessing functions overview](https://cloud.google.com/bigquery/docs/manual-preprocessing)
 - **Type:** Analytic (window) scalar functions — must be used with `OVER()`. Not table-valued; not aggregate.
 - **Applies to models:** Any model type that supports **manual preprocessing**, used either as a standalone query transform or inside the `TRANSFORM` clause of `CREATE MODEL`. (When used in `TRANSFORM`, the fitted vocabulary + `top_k`/`frequency_threshold`/`drop` choices are stored with the model and auto-applied during `ML.PREDICT`/`ML.EVALUATE`.) Exportable with the model via [TRANSFORM-function export](https://cloud.google.com/bigquery/docs/exporting-models#export-transform-functions). No connection required.
 - **Status:** GA.

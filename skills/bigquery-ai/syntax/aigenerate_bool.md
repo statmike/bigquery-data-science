@@ -23,8 +23,8 @@ AI.GENERATE_BOOL(
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` (positional, must be first) | STRING or STRUCT | Required | -- | Same semantics as AI.GENERATE: STRING or STRUCT with STRING/ARRAY\<STRING\>/ObjectRef/ARRAY\<ObjectRef\> fields. At most one video. |
-| `endpoint` | STRING | Optional | `gemini-3.5-flash-lite` | Any GA or preview Gemini model. BigQuery auto-resolves the full endpoint from model name -- see [Choosing a Gemini Model Endpoint](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/RESOURCES.md#choosing-a-gemini-model-endpoint) for the 3.x multi-regional restriction. |
-| `model_params` | JSON literal | Optional | -- | Conforms to generateContent request body (all fields except `contents`). Supports thinking_config, etc. |
+| `endpoint` | STRING | Optional | `gemini-3.5-flash-lite` | Any GA or preview Gemini model (`'gemini-3.8-flash'`, `'gemini-4-argon'`, `'gemini-4-carbon'`, `'gemini-4-hydrogen'`, `'gemini-3.5-flash-lite'`). BigQuery auto-resolves the full endpoint from model name -- see [Choosing a Gemini Model Endpoint](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/RESOURCES.md#choosing-a-gemini-model-endpoint). |
+| `model_params` | JSON literal | Optional | -- | Conforms to generateContent request body (all fields except `contents`). Supports `thinking_config` (`thinking_level` in `"LOW"`, `"MEDIUM"`, `"HIGH"` on Gemini 3.x and Gemini 4; `"MINIMAL"`, `"XHIGH"`, and `thinking_budget` are rejected with HTTP 400; `temperature`/`top_p`/`top_k` are ignored on Gemini 4), etc. |
 | `connection_id` | STRING | Optional | End-user credentials | Format: `[PROJECT_ID].LOCATION.CONNECTION_ID` |
 | `request_type` | STRING | Optional | UNSPECIFIED | `SHARED`, `DEDICATED`, `UNSPECIFIED` |
 
@@ -38,11 +38,11 @@ Returns a STRUCT per row:
 | `full_response` | JSON | Full response from `projects.locations.endpoints.generateContent`. |
 | `status` | STRING | API response status (empty = success). |
 
-**Supported models:** Any GA or preview Gemini model. Default: `gemini-3.5-flash-lite`.
+**Supported models:** Any GA or preview Gemini model (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, `gemini-3.5-flash-lite`). Default: `gemini-3.5-flash-lite`.
 
 **Best practices:** Incurs Vertex AI charges each call. Materialize data to a table before calling with LIMIT to minimize charges.
 
-**Limitations:** Preview feature (Pre-GA Offerings Terms apply). Video limited to 2 minutes. At most one video object per prompt. Gemini 2.5 thinking charges apply. For Gemini 3.0+, use `thinking_level` in `thinking_config` instead of `thinking_budget`.
+**Limitations:** Preview feature (Pre-GA Offerings Terms apply). Video limited to 2 minutes. At most one video object per prompt. Gemini 2.5 thinking charges apply. For Gemini 3.0+ and Gemini 4 (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`), use `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`) in `thinking_config` instead of `thinking_budget` (`"MINIMAL"`, `"XHIGH"`, and `thinking_budget` are rejected with HTTP 400, and custom `temperature`/`top_p`/`top_k` are ignored on Gemini 4).
 
 **Locations:** All regions supporting Gemini models, plus US and EU multi-regions.
 

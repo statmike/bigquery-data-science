@@ -110,7 +110,7 @@ print(f'Enabled now:     {", ".join(missing) or "none"}')
 
 ### The connection and its service account
 
-The connection's service account — not your user account — is what calls the Cloud Natural Language API. `ML.UNDERSTAND_TEXT` itself needs two grants at the project level, both named on [this function's setup page](https://cloud.google.com/bigquery/docs/analyze-text). A third belongs to the `AI.GENERATE_DOUBLE` comparison later on, not to this function:
+The connection's service account — not your user account — is what calls the Cloud Natural Language API. `ML.UNDERSTAND_TEXT` itself needs two grants at the project level, both named on [this function's reference page](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-understand-text). A third belongs to the `AI.GENERATE_DOUBLE` comparison later on, not to this function:
 
 | Role | Why |
 |---|---|

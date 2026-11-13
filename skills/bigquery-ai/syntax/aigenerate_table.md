@@ -32,8 +32,8 @@ AI.GENERATE_TABLE(
 | `TABLE` / `QUERY_STATEMENT` | Table/Query | Required (one of) | -- | -- | Input data. Must produce a `prompt` column. |
 | `output_schema` | STRING | Required | -- | -- | Schema as comma-separated fields with name, type, optional `OPTIONS(description='...')`. Supported types: `STRING`, `INT64`, `FLOAT64`, `BOOL`, `ARRAY`, `STRUCT`. |
 | `max_output_tokens` | INT64 | Optional | Model-determined | [1, 8192] | Max tokens in response |
-| `top_p` | FLOAT64 | Optional | Model-determined | [0.0, 1.0] | Nucleus sampling |
-| `temperature` | FLOAT64 | Optional | Model-determined | [0.0, 2.0] | Randomness control |
+| `top_p` | FLOAT64 | Optional | Model-determined | [0.0, 1.0] | Nucleus sampling (ignored by Gemini 4 models `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) |
+| `temperature` | FLOAT64 | Optional | Model-determined | [0.0, 2.0] | Randomness control (ignored by Gemini 4 models `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) |
 | `stop_sequences` | ARRAY\<STRING\> | Optional | Empty array | -- | Strings to exclude |
 | `safety_settings` | ARRAY\<STRUCT\<STRING AS category, STRING AS threshold\>\> | Optional | BLOCK_MEDIUM_AND_ABOVE | -- | Content safety thresholds |
 | `request_type` | STRING | Optional | UNSPECIFIED | SHARED, DEDICATED, UNSPECIFIED | Provisioned Throughput quota control |
@@ -49,11 +49,11 @@ Prompt input can be a STRING value or a STRUCT value with STRING, ARRAY\<STRING\
 | `full_response` | JSON | Response from `projects.locations.endpoints.generateContent` |
 | `status` | STRING | API response status (empty = success) |
 
-**Supported models:** Remote models over any GA or preview Gemini models (via CREATE MODEL).
+**Supported models:** Remote models over any GA or preview Gemini models (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, `gemini-3.5-flash-lite`) via `CREATE MODEL`.
 
 **Best practices:** To minimize Vertex AI charges, write query results to a table and then reference that table. Model and input table must be in the same region.
 
-**Limitations:** Model and input table must be in the same region. Resource exhausted errors possible. Video limited to 2 minutes. Gemini 2.5 models incur thinking charges.
+**Limitations:** Model and input table must be in the same region. Resource exhausted errors possible. Video limited to 2 minutes. Gemini 2.5 models incur thinking charges; Gemini 4 models (`gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) ignore custom sampling parameters (`temperature`, `top_p`).
 
 **Locations:** Must run in the same region or multi-region as the remote model. Supported Gemini regions plus US and EU multi-regions.
 

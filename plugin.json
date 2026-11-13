@@ -1,7 +1,7 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "bigquery-data-science",
-  "version": "0.11.0",
+  "version": "0.12.0",
   "description": "BigQuery ML, BigQuery AI, BigQuery MLOps, and 4-Lens Agent Skills for SQL and Python data science on Google Cloud: multi-skill task routing, prerequisite matrix, surgical syntax cards, and 106 live-verified walkthroughs.",
   "author": {
     "name": "Mike Henderson",

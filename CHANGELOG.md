@@ -5,6 +5,20 @@ All notable changes to `bigquery-data-science` are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] - 2026-11-13
+
+### Added
+- **GA Scalar `AI.PARSE_DOCUMENT` (`31/31` Active BigQuery AI Functions, `0` Retired Functions):**
+  - Rewrote and live-executed **`bigquery-ai/functions/ai_parse_document/`** (`.ipynb` + `.sql` + Lens 3 `aiparse_document.md` + Lens 4 narrative) for the relaunched GA scalar `AI.PARSE_DOCUMENT` function (`2026-11-02`, `bigqueryml-syntax-ai-parse-document`).
+  - Covers all 4 input shapes (`'gs://...'` URI with End-User Credentials or `connection_id`, `OBJ.MAKE_REF`, `FROM OBJ.LIST('gs://.../*.pdf')`, and Object Table `ref`), both output schemas (`layout-v1` default flat reading-order blocks with HTML `<table>` strings and normalized `[min_y, min_x, max_y, max_x]` bounding boxes vs `raw-docai` nested Document AI layout tree), multi-format extraction (`.pdf`, `.html`, `.docx`, `.xlsx`), per-row `$.errors` handling (`INVALID_ARGUMENT` / `NOT_FOUND` vs SQL `NULL`), and 4-way selection criteria (`AI.PARSE_DOCUMENT` vs `AI.CHUNK_DOCUMENT` vs `AI.GENERATE` vs `ML.PROCESS_DOCUMENT`).
+- **`AI.CHUNK_DOCUMENT` 4th Input Shape (`parsed_document` JSON — "Parse Once, Chunk Many Times"):**
+  - Updated **`bigquery-ai/functions/ai_chunk_document/`** (`.ipynb` + `.sql` + `aichunk_document.md` + narrative), **`bigquery-ai/workflows/document_rag/`** (`.ipynb` + narrative), and `document-processing.md` with Shape D: passing a table or `(SELECT ..., AI.PARSE_DOCUMENT(ref, options => JSON '{"schema": "raw-docai"}') AS parsed_document FROM ...)` subquery directly to `AI.CHUNK_DOCUMENT` to re-chunk materialized `raw-docai` output at multiple `chunk_size` values (`150`, `250`, `500` tokens) without re-calling Document AI, plus the empirical gotcha that passing default `layout-v1` JSON returns per-row `INVALID_ARGUMENT: Unsupported document schema: layout-v1`.
+- **GA `gemini-4-hydrogen` (`2026-11-12`) & `gemini-4-carbon` (`2026-11-10`) Support:**
+  - Added `"gemini-4-hydrogen"` and `"gemini-4-carbon"` to `skills/pinned-models.json` (`allowed_models` across all 9 Gemini text/multimodal functions while keeping `gemini-3.8-flash` and `gemini-4-argon` as default cost-efficient endpoints), `bigquery-ai/reference/general-purpose-functions.md`, `bigquery-ai/RESOURCES.md`, and live-executed `ai_generate` and `ai_count_tokens` notebooks and `.sql` companions (including `thinking_level` `"LOW"` / `"MEDIUM"` / `"HIGH"` validation and ignored `temperature` / `top_p` / `top_k` sampling parameters on Gemini 4).
+- **New `review-sql` Diagnostics & `bigquery-mlops` Operational Updates:**
+  - Added `LEGACY_PARSE_DOCUMENT_TVF` (catches legacy `FROM AI.PARSE_DOCUMENT(TABLE ...)` or `endpoint =>` syntax), `PARSE_DOCUMENT_CHUNK_SCHEMA` (catches chaining `AI.PARSE_DOCUMENT` into `AI.CHUNK_DOCUMENT` without `options => JSON '{"schema": "raw-docai"}'`), and expanded `GEMINI_4_THINKING_BUDGET` across `gemini-4-argon`, `gemini-4-carbon`, and `gemini-4-hydrogen` in `src/bigquery_data_science/catalog.py`.
+  - Documented BQML custom Organization Policies (`2026-11-06`, Preview), BigQuery Pipelines & Dataform workflow/action concurrency limits (`2026-11-09`, GA), and automatic Dataplex Universal Catalog / Knowledge Catalog table-level lineage (`2026-11-12`, GA) in `skills/bigquery-mlops/`, and updated 8 renamed upstream documentation URLs across `bigquery-ai/` and `bigquery-ml/`.
+
 ## [0.11.0] - 2026-11-02
 
 ### Added

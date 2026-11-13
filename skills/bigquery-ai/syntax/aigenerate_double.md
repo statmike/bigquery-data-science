@@ -30,11 +30,11 @@ Returns a STRUCT per row:
 | `full_response` | JSON | Full response from generateContent. |
 | `status` | STRING | API response status (empty = success). |
 
-**Supported models:** Any GA or preview Gemini model. Default: `gemini-3.5-flash-lite`.
+**Supported models:** Any GA or preview Gemini model (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, `gemini-3.5-flash-lite`). Default: `gemini-3.5-flash-lite`.
 
 **Best practices:** Same as AI.GENERATE_BOOL.
 
-**Limitations:** Same as AI.GENERATE_BOOL (Preview, video limits, thinking charges).
+**Limitations:** Same as AI.GENERATE_BOOL (Preview, video limits, `thinking_level` `"LOW"`/`"MEDIUM"`/`"HIGH"` on Gemini 3.x and Gemini 4, `MINIMAL`/`XHIGH`/`thinking_budget` rejected with HTTP 400, `temperature`/`top_p`/`top_k` ignored on Gemini 4).
 
 **Locations:** All Gemini-supporting regions plus US and EU multi-regions.
 

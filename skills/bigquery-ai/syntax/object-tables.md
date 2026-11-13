@@ -4,7 +4,7 @@
 
 - **Description:** Read-only external tables over unstructured data objects in Cloud Storage. Each row corresponds to a Cloud Storage object, with columns for object metadata. Object tables use access delegation via a Cloud resource connection — users need access to the table, not direct access to Cloud Storage.
 - **Use cases:** Indexing Cloud Storage objects for AI function processing, document analysis pipelines, image/video/audio inference, joining unstructured data results with structured BigQuery data.
-- [introduction](https://cloud.google.com/bigquery/docs/object-table-introduction) · [create](https://cloud.google.com/bigquery/docs/object-table-create) · [DDL reference](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_external_table_statement)
+- [introduction](https://cloud.google.com/bigquery/docs/object-table-introduction) · [create](https://docs.cloud.google.com/bigquery/docs/object-tables) · [DDL reference](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_external_table_statement)
 
 **CREATE syntax:**
 ```sql
@@ -88,7 +88,8 @@ Signed URLs expire after 6 hours. Row-level access policies restrict which URLs 
 - Connection must be in the same region as the dataset.
 
 **AI function integration:** every one of these reads the `ref` column as-is — an `ObjectRef` — with no signing step in between.
-- `AI.CHUNK_DOCUMENT` — zero-DDL layout-aware document chunking (`TABLE object_table` or `(SELECT ... ref ...)` subquery).
+- `AI.CHUNK_DOCUMENT` — zero-DDL layout-aware document chunking (`TABLE object_table`, `(SELECT ... ref ...)` subquery, or `(SELECT ... parsed_document ...)` subquery).
+- `AI.PARSE_DOCUMENT` — zero-DDL structured layout parsing (`SELECT AI.PARSE_DOCUMENT(ref) ...`), returning `layout-v1` reading-order blocks or `raw-docai` layout tree JSON (including Google Drive files passed as `ObjectRef`).
 - `ML.PROCESS_DOCUMENT` — document extraction via Document AI processors.
 - `AI.GENERATE_TEXT` / `AI.GENERATE` — text generation from object data: `STRUCT(text AS prompt, [ref] AS object_refs)`.
 - `AI.GENERATE_EMBEDDING` — embeddings from image/video data: a `content` column of `ObjectRef`.

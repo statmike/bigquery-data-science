@@ -117,8 +117,6 @@ def check_sql_companions(
             for finding in rev.findings:
                 if finding.severity != "ERROR":
                     continue
-                if finding.rule == "RETIRED_FUNCTION" and sql_path.stem == "ai_parse_document":
-                    continue
                 errors.append(f"{rel_sql}: [{finding.rule}] {finding.message}")
 
             # Compare against paired .ipynb if present (P4.2)

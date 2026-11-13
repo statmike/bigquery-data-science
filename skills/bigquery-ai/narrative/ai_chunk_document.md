@@ -7,12 +7,25 @@
 **When to use it:**
 - You are preparing PDFs, HTML pages, Word docs, slide decks, or spreadsheets for `functions/ai_embed` (`AI.EMBED`) + `functions/vector_search` (`VECTOR_SEARCH`) / `functions/ai_search` (`AI.SEARCH`)
 - You want typed `chunk_id`, `start_page`, `end_page`, `content`, and `status` columns straight out of a table-valued function instead of unpacking nested Document AI JSON
+- You want to **parse once and chunk many times** by passing a `parsed_document` `JSON` column from `functions/ai_parse_document` (`AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}')`) into `AI.CHUNK_DOCUMENT` at multiple `chunk_size` settings
 - You want zero model or processor lifecycle management (`CREATE MODEL` is not required)
 
 **Alternatives:**
+- `functions/ai_parse_document` (`AI.PARSE_DOCUMENT`) — GA scalar partner function that uses the same auto-provisioned Layout Parser to return structured `JSON` (`layout-v1` reading-order blocks with bounding boxes & HTML `<table>` strings, or `raw-docai` layout trees that chain directly into `AI.CHUNK_DOCUMENT` via a `parsed_document` column)
 - `functions/ml_process_document` (`ML.PROCESS_DOCUMENT`) — Pre-trained specialized Document AI processors (Invoice Parser, Expense Parser, Form Parser) via `CREATE MODEL ... REMOTE WITH CONNECTION ... OPTIONS(REMOTE_SERVICE_TYPE = 'CLOUD_AI_DOCUMENT_V1')` when you need normalized domain entities (`total_amount`, `due_date`, `line_items`) rather than text chunks
 - `functions/ai_generate` (`AI.GENERATE`) / `functions/ai_generate_table` (`AI.GENERATE_TABLE`) — Pass `ObjectRef` documents directly to Gemini when you want a single-pass summary, Q&A answer, or custom `output_schema` extraction over a whole document without chunking first
-- `functions/ai_parse_document` (`AI.PARSE_DOCUMENT`) *(retired 2026-06-01)* — Preview predecessor superseded by GA `AI.CHUNK_DOCUMENT`
+
+### Choosing & Co-Using `AI.CHUNK_DOCUMENT` and `AI.PARSE_DOCUMENT`
+
+Both functions share BigQuery's auto-provisioned `bq-created-layout-parser` processor (`$0` idle fee; PDF, HTML, DOCX, PPTX, XLSX, XLSM up to 130 pages), so you can use either one standalone or chain them together:
+
+| Dimension | `AI.CHUNK_DOCUMENT` Alone (TVF) | `functions/ai_parse_document` (`AI.PARSE_DOCUMENT`) Alone (Scalar `-> JSON`) | Both Together (`AI.PARSE_DOCUMENT` → `AI.CHUNK_DOCUMENT`) |
+|---|---|---|---|
+| **SQL Call & Schema** | `FROM AI.CHUNK_DOCUMENT(source, chunk_size => N)` | `SELECT AI.PARSE_DOCUMENT(doc)` (`"layout-v1"`, default) | Stage 1: `AI.PARSE_DOCUMENT(doc, options => JSON '{"schema": "raw-docai"}') AS parsed_document`<br>Stage 2: `FROM AI.CHUNK_DOCUMENT(TABLE parsed, chunk_size => N)` |
+| **Row Cardinality** | **1 document in → $N$ chunk rows out** (`chunk_id`, `start_page`, `end_page`, `content`, `status`) | **1 document in → 1 `JSON` value out** (`{metadata, blocks, errors}`) | Stage 1 stores 1 `JSON` row per document; Stage 2 expands into $N$ chunk rows per `chunk_size` |
+| **Structural Detail** | Token-bounded text sections (`1..2000` tokens, default `1000`) with ancestor headings prepended | Element-level blocks (`title`, `heading`, `text`, `table`, `list_item`, `image`), HTML `<table>` strings, and normalized `[min_y, min_x, max_y, max_x]` `bbox` | Full Document AI layout tree cached in BigQuery so `AI.CHUNK_DOCUMENT` can re-slice without calling Document AI again |
+| **Success Filter** | `WHERE status = ''` | `JSON_QUERY(doc, '$.errors') IS NULL AND doc IS NOT NULL` | Stage 1: `JSON_QUERY(parsed_document, '$.errors') IS NULL`; Stage 2: `WHERE status = ''` |
+| **Best For** | One-step RAG chunking when a single `chunk_size` is already chosen | Extracting HTML tables, filtering specific block types (`WHERE type = 'table'`), or inspecting page coordinates | **"Parse Once, Chunk Many Times"** — tuning `chunk_size` (e.g. `150` vs `250` vs `500`) or feeding multiple RAG pipelines while paying for Document AI parsing only once |
 
 **Featured in:** `workflows/document_rag` (Document RAG)
 
@@ -369,7 +382,7 @@ AI.CHUNK_DOCUMENT(
 
 | Argument | Type | Default | Notes |
 |---|---|---|---|
-| First positional input | `'gs://...'` URI/wildcard, `TABLE object_table`, or `(SELECT ... AS ref)` | *(required)* | URI literals and Object Tables emit **13 columns** (5 chunk + 8 object metadata); `(query_statement)` emits **`5 + passthrough` columns** |
+| First positional input | `'gs://...'` URI/wildcard, `TABLE object_table`, or `(SELECT ... AS ref \| parsed_document)` | *(required)* | URI literals and Object Tables emit **13 columns** (5 chunk + 8 object metadata); `(query_statement)` and `parsed_document` tables emit **`5 + passthrough` columns** |
 | `connection_id` | `STRING` | Caller EUC (or Object Table connection) | Format `'LOCATION.CONNECTION_ID'` or `'PROJECT_ID.LOCATION.CONNECTION_ID'` |
 | `chunk_size` | `INT64` | `1000` | Target chunk size in **tokens**, bounded to **`1..2000`**. Top-level named `INT64` argument — **not** an `options => JSON` string |
 
@@ -455,13 +468,15 @@ ORDER BY chunk_id
 client.query(detail_query).to_dataframe()
 ```
 
-### Example 3: All 3 input shapes — and the output-column trap on subqueries
+### Example 3: All 4 input shapes — URI wildcard, Object Table, `ObjectRef` subquery, and `parsed_document` chaining
 
-`AI.CHUNK_DOCUMENT` accepts three input shapes as its first argument, and two live behaviors differ from what a quick read of the reference page suggests:
+`AI.CHUNK_DOCUMENT` accepts **four** input shapes as its first argument:
 
 1. **Shape A — `'gs://...'` URI or wildcard literal (`13` output columns):** Uses EUC by default, **and also accepts `connection_id => ...`** (the reference page says URI literals must use EUC, but delegated connections work on URI literals and wildcards too).
 2. **Shape B — `TABLE object_table` (`13` output columns):** Reads an Object Table using its attached connection automatically.
 3. **Shape C — `(SELECT ... AS ref ...)` subquery (`5 + passthrough` columns ONLY):** Accepts any query producing an `ObjectRef` column named `ref` (from `OBJ.MAKE_REF` or `OBJ.LIST`). **Watch the output schema:** unlike Shapes A and B, Shape C **does not emit a top-level `uri`, `size`, or `content_type` column** unless your subquery explicitly selects them! Instead, it preserves your subquery's passthrough columns (such as `doc_id` and `doc_category`) alongside `ref`, so you read the URI via `ref.uri`.
+4. **Shape D — `TABLE` or `(SELECT ... AS parsed_document ...)` subquery (`5 + passthrough` columns — "Parse Once, Chunk Many Times"):** Accepts a `JSON` column named **`parsed_document`** returned by `functions/ai_parse_document` (`AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}')`). This lets you run Document AI's Layout Parser once, persist or pass the `raw-docai` JSON, and chunk it at multiple `chunk_size` granularities in BigQuery without re-invoking Document AI!
+   - **Gotcha (`raw-docai` required):** Passing the default `layout-v1` schema from `AI.PARSE_DOCUMENT` into `AI.CHUNK_DOCUMENT` returns a per-row failure (`status = 'INVALID_ARGUMENT: Unsupported document schema: layout-v1'`, `content = NULL`).
 
 ```python
 conn_arg = f'{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}'
@@ -524,9 +539,45 @@ FROM AI.CHUNK_DOCUMENT(
 )
 """).to_dataframe()
 
+# Shape D: Subquery with `parsed_document` JSON from AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}')
+df_shape_d = client.query(f"""
+SELECT *
+FROM AI.CHUNK_DOCUMENT(
+  (
+    SELECT
+      'DOC-RUNBOOK' AS doc_id,
+      AI.PARSE_DOCUMENT(
+        OBJ.MAKE_REF('gs://{BUCKET}/{GCS_PREFIX}/docs/handbook_multipage.pdf', '{conn_arg}'),
+        options => JSON '{{"schema": "raw-docai"}}'
+      ) AS parsed_document
+  ),
+  chunk_size => 400
+)
+WHERE status = ''
+ORDER BY chunk_id
+""").to_dataframe()
+
+# Shape D gotcha probe: passing default `layout-v1` output into AI.CHUNK_DOCUMENT
+df_shape_d_gotcha = client.query(f"""
+SELECT doc_id, chunk_id, content, status
+FROM AI.CHUNK_DOCUMENT(
+  (
+    SELECT
+      'DOC-INV-001' AS doc_id,
+      AI.PARSE_DOCUMENT(
+        OBJ.MAKE_REF('gs://{BUCKET}/{GCS_PREFIX}/docs/invoice_001.pdf', '{conn_arg}')
+        -- default options => JSON '{{"schema": "layout-v1"}}'
+      ) AS parsed_document
+  ),
+  chunk_size => 400
+)
+""").to_dataframe()
+
 print(f'Shape A (URI wildcard + connection_id): {len(df_shape_a)} rows, {len(df_shape_a.columns)} cols -> top-level "uri" in cols: {"uri" in df_shape_a.columns}')
 print(f'Shape B (TABLE object_table):           {len(df_shape_b)} rows, {len(df_shape_b.columns)} cols -> top-level "uri" in cols: {"uri" in df_shape_b.columns}')
 print(f'Shape C (OBJ.MAKE_REF subquery):        {len(df_shape_c_raw.columns)} cols -> {list(df_shape_c_raw.columns)}')
+print(f'Shape D (parsed_document raw-docai):    {len(df_shape_d)} rows, {len(df_shape_d.columns)} cols -> {list(df_shape_d.columns)}')
+print(f'Shape D gotcha (layout-v1 -> status):   {df_shape_d_gotcha["status"].iloc[0]!r}')
 df_shape_c
 ```
 
@@ -644,11 +695,12 @@ print(f'Run 2: {len(run_2)} chunks | sha256[:16] = {h2}')
 print(f'Bit-for-bit identical across uncached runs: {run_1.equals(run_2)}')
 ```
 
-### Example 6: Side-by-side — `AI.CHUNK_DOCUMENT` vs `AI.GENERATE` vs `ML.PROCESS_DOCUMENT`
+### Example 6: Side-by-side — `AI.CHUNK_DOCUMENT` vs `AI.PARSE_DOCUMENT` vs `AI.GENERATE` vs `ML.PROCESS_DOCUMENT`
 
-BigQuery provides three distinct ways to work with documents in Cloud Storage. Here we run `AI.CHUNK_DOCUMENT` and multimodal `AI.GENERATE` (`endpoint => 'gemini-3.8-flash'`) on the exact same synthetic invoice (`invoice_001.pdf`), and compare both against `functions/ml_process_document` (`ML.PROCESS_DOCUMENT`):
+BigQuery provides four complementary ways to work with documents in Cloud Storage. Here we run `AI.CHUNK_DOCUMENT` and multimodal `AI.GENERATE` (`endpoint => 'gemini-3.8-flash'`) on the exact same synthetic invoice (`invoice_001.pdf`), and compare them against `functions/ai_parse_document` (`AI.PARSE_DOCUMENT`) and `functions/ml_process_document` (`ML.PROCESS_DOCUMENT`):
 
-- **`AI.CHUNK_DOCUMENT`** extracts deterministic, page-tracked Markdown text & tables ready to embed and index.
+- **`AI.CHUNK_DOCUMENT`** (TVF) extracts deterministic, page-tracked Markdown text & tables ready to embed and index.
+- **`AI.PARSE_DOCUMENT`** (scalar) uses the same auto-provisioned Layout Parser to return element-level `layout-v1` JSON blocks (with `[min_y, min_x, max_y, max_x]` bounding boxes and HTML `<table>` strings) or `raw-docai` layout trees that chain directly into `AI.CHUNK_DOCUMENT`.
 - **`AI.GENERATE` (with `output_schema`)** reads the `ObjectRef` directly with Gemini in a single pass to synthesize or extract custom typed fields (`vendor`, `invoice_number`, `total_due`, `summary`) without creating chunks.
 - **`ML.PROCESS_DOCUMENT`** requires creating a Document AI processor (`INVOICE_PROCESSOR`, `EXPENSE_PROCESSOR`, `FORM_PARSER_PROCESSOR`) and a `CREATE MODEL ... REMOTE_SERVICE_TYPE = 'CLOUD_AI_DOCUMENT_V1'` handle, returning domain-specific normalized fields and confidence scores (`ml_process_document_result` JSON).
 
@@ -701,14 +753,15 @@ display(df_gemini_inv)
 
 ### Which one should you reach for?
 
-| Dimension | `AI.CHUNK_DOCUMENT` | `AI.GENERATE` / `AI.GENERATE_TABLE` | `ML.PROCESS_DOCUMENT` |
-|---|---|---|---|
-| **Setup required** | Zero DDL (auto-creates `bq-created-layout-parser`) | Zero DDL (pass `ObjectRef` directly) | Manual Document AI processor + `CREATE MODEL ... REMOTE` |
-| **Output shape** | Typed rows: `chunk_id`, `start_page`, `end_page`, `content`, `status` | Custom `STRING` or `STRUCT` (`output_schema`) | Processor-specific columns + `ml_process_document_result` `JSON` |
-| **Determinism** | Deterministic across runs | Generative (LLM variability) | Deterministic per processor version |
-| **Supported formats** | PDF, HTML, DOCX, PPTX, XLSX, XLSM | PDF, images, audio, video, text | Processor-dependent (PDF, TIFF, GIF, JPEG, PNG, etc.) |
-| **Pricing model** | Document AI Layout Parser (`$10` / `1,000` pages; `$0` idle) | Vertex AI Gemini input + output tokens | Document AI per-page processor rate (`$0` idle) |
-| **Best fit** | **Document RAG & hybrid search** (`AI.EMBED` + `VECTOR_SEARCH` / `AI.SEARCH`) | **Whole-document Q&A, summarization, or custom schema extraction** | **Standardized financial/form pipelines** (Invoices, Receipts, W-2s, IDs) |
+| Dimension | `AI.CHUNK_DOCUMENT` | `AI.PARSE_DOCUMENT` | `AI.GENERATE` / `AI.GENERATE_TABLE` | `ML.PROCESS_DOCUMENT` |
+|---|---|---|---|---|
+| **Function type** | Table-valued function (`FROM AI.CHUNK_DOCUMENT(...)`) | Scalar (`-> JSON`) | Scalar (`-> STRUCT`) / TVF | Table-valued function (`FROM ML.PROCESS_DOCUMENT(...)`) |
+| **Setup required** | Zero DDL (auto-creates `bq-created-layout-parser`) | Zero DDL (reuses `bq-created-layout-parser`) | Zero DDL (pass `ObjectRef` directly) | Manual Document AI processor + `CREATE MODEL ... REMOTE` |
+| **Output shape** | Typed rows: `chunk_id`, `start_page`, `end_page`, `content`, `status` | `JSON` (`layout-v1` blocks with HTML `<table>` & `bbox`, or `raw-docai` tree) | Custom `STRING` or `STRUCT` (`output_schema`) | Processor-specific columns + `ml_process_document_result` `JSON` |
+| **Determinism** | Deterministic across runs | Deterministic across runs | Generative (LLM variability) | Deterministic per processor version |
+| **Supported formats** | PDF (<=500 pages), HTML, DOCX, PPTX, XLSX, XLSM | PDF (<=130 pages), HTML, DOCX, PPTX, XLSX, XLSM | PDF, images, audio, video, text | Processor-dependent (PDF, TIFF, GIF, JPEG, PNG, etc.) |
+| **Pricing model** | Document AI Layout Parser (`$10` / `1,000` pages; `$0` for `parsed_document` input) | Document AI Layout Parser (`$10` / `1,000` pages; `$0` idle) | Vertex AI Gemini input + output tokens | Document AI per-page processor rate (`$0` idle) |
+| **Best fit** | **Document RAG & hybrid search** (`AI.EMBED` + `VECTOR_SEARCH` / `AI.SEARCH`) | **Element-level layout & table extraction**, bounding boxes, or **parse-once / chunk-many** (`raw-docai`) | **Whole-document Q&A, summarization, or custom schema extraction** | **Standardized financial/form pipelines** (Invoices, Receipts, W-2s, IDs) |
 
 ---
 ## Examples — `%%bigquery` Magics

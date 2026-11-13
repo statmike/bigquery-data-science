@@ -18,7 +18,7 @@
 
 **Multimodal:** Supports document, image, and video input via `reference/unstructured-data-infrastructure.md#objectref-and-objectrefruntime-schema-reference` (ObjectRef). Pass a STRUCT prompt with `ObjectRef` fields to analyze unstructured data from Cloud Storage.
 
-**Thinking:** Supports extended reasoning via `model_params` — use `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"` on Gemini 3.x and 4.x models; legacy Gemini 2.5 models used `thinking_budget`) to control reasoning depth.
+**Thinking:** Supports extended reasoning via `model_params` — use `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"` on Gemini 3.x and Gemini 4 models `gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, and `gemini-4-hydrogen`; legacy Gemini 2.5 models used `thinking_budget`) to control reasoning depth.
 
 **Featured in:** `workflows/content_analysis` (Content Analysis Pipeline) | `workflows/data_enrichment` (Data Enrichment) | `workflows/rag_pipeline` (RAG Pipeline) | `workflows/document_intelligence` (Document Intelligence) | `workflows/content_moderation` (Content Moderation) | `workflows/multimodal_analysis` (Multimodal Analysis) | `workflows/document_rag` (Document RAG Pipeline) | `workflows/metric_diagnostics` (Metric Diagnostics) | `workflows/tabular_prediction` (Zero-Shot Tabular Prediction)
 
@@ -29,7 +29,7 @@
 
 Set your project and location, authenticate, and create a temporary dataset for this notebook.
 
-> `AI.GENERATE` doesn't require a connection or model — it uses end-user credentials and defaults to `gemini-3.5-flash-lite` (pin `endpoint => 'gemini-3.8-flash'` or `endpoint => 'gemini-4-argon'` for reproducible production behavior). The [multimodal examples](#examples--multimodal-with-objectref) later in this notebook add a connection for GCS access. See the `setup` (Setup Reference) for details.
+> `AI.GENERATE` doesn't require a connection or model — it uses end-user credentials and defaults to `gemini-3.5-flash-lite` (pin `endpoint => 'gemini-3.8-flash'`, `'gemini-4-argon'`, `'gemini-4-carbon'`, or `'gemini-4-hydrogen'` for reproducible production behavior). The [multimodal examples](#examples--multimodal-with-objectref) later in this notebook add a connection for GCS access. See the `setup` (Setup Reference) for details.
 
 ```python
 import os
@@ -176,18 +176,38 @@ if 'usageMetadata' in full:
 
 ### 4. Specifying an endpoint
 
-Override the default model (`gemini-3.5-flash-lite`) with any Gemini model, such as `'gemini-3.8-flash'` or the frontier reasoning tier `'gemini-4-argon'`.
+Override the default model (`gemini-3.5-flash-lite`) with any current GA Gemini 3.x or Gemini 4 model:
+- `'gemini-3.8-flash'` — Preferred Flash default (`$0.75 / $3.75` per 1M input/output tokens through Dec 31, 2026; supports custom `temperature`)
+- `'gemini-4-argon'` — Preferred Pro / frontier reasoning default (`$2.00 / $10.00` through Nov 30, 2026; `$4.00 / $20.00` Dec 1+)
+- `'gemini-4-carbon'` (GA `2026-11-10`) — Frontier / Pro reasoning model alongside `gemini-4-argon` (`$2.00 / $10.00` through Nov 30, 2026; `$4.00 / $20.00` Dec 1+)
+- `'gemini-4-hydrogen'` (GA `2026-11-12`) — Gemini 4 speed & efficiency model for everyday coding, agentic workflows, multimodal analysis, and tool use (`$1.50 / $7.50` per 1M input/output tokens; `65,536` max output tokens per segment)
 
 ```python
 query = """
 SELECT
-  (AI.GENERATE(
-    'Write a haiku about data warehouses.',
-    endpoint => 'gemini-4-argon'
-  )).result AS haiku
+  endpoint,
+  JSON_VALUE(resp.full_response, '$.model_version') AS model_version,
+  resp.result AS haiku
+FROM UNNEST([
+  STRUCT(
+    'gemini-3.8-flash' AS endpoint,
+    AI.GENERATE('Write a haiku about data warehouses.', endpoint => 'gemini-3.8-flash') AS resp
+  ),
+  STRUCT(
+    'gemini-4-argon',
+    AI.GENERATE('Write a haiku about data warehouses.', endpoint => 'gemini-4-argon')
+  ),
+  STRUCT(
+    'gemini-4-carbon',
+    AI.GENERATE('Write a haiku about data warehouses.', endpoint => 'gemini-4-carbon')
+  ),
+  STRUCT(
+    'gemini-4-hydrogen',
+    AI.GENERATE('Write a haiku about data warehouses.', endpoint => 'gemini-4-hydrogen')
+  )
+])
 """
-df = client.query(query).to_dataframe()
-print(df.iloc[0]['haiku'])
+client.query(query).to_dataframe()
 ```
 
 ### 5. Structured output with `output_schema`
@@ -252,13 +272,16 @@ client.query(query).to_dataframe()
 
 ### 7. Controlling generation with `model_params`
 
-`model_params` accepts any field from the [Gemini `generateContent` request body](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/gemini#request_body) (except `contents`). Common uses: temperature, top_p, max_output_tokens.
+`model_params` accepts any field from the [Gemini `generateContent` request body](https://cloud.google.com/vertex-ai/generative-ai/docs/model-reference/gemini#request_body) (except `contents`). Common uses: `temperature`, `top_p`, `max_output_tokens`.
+
+> **Gemini 4 sampling note:** All three Gemini 4 models (`gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) ignore custom sampling parameters (`temperature`, `top_p`, `top_k`). Pin `endpoint => 'gemini-3.8-flash'` when custom `temperature` control is required.
 
 ```python
 query = """
 SELECT
   (AI.GENERATE(
     'Invent a creative name for a new coffee shop. Just the name, nothing else.',
+    endpoint => 'gemini-3.8-flash',
     model_params => JSON '{"generation_config": {"temperature": 1.5, "max_output_tokens": 50}}'
   )).result AS creative_name
 """
@@ -268,19 +291,58 @@ print(df.iloc[0]['creative_name'])
 
 ### 8. Thinking configuration (`thinking_level`)
 
-Gemini 3.x and 4.x models (`gemini-3.8-flash`, `gemini-4-argon`) support extended internal reasoning before responding. Configure `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`) in `thinking_config` to balance reasoning depth and latency (note: legacy Gemini 2.5 models used an integer `thinking_budget` in tokens).
+Gemini 3.x (`gemini-3.8-flash`) and Gemini 4 (`gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) models support extended internal reasoning before responding:
+- **Unified context & sampling:** All three Gemini 4 models share a unified `1,048,576`-token input+output context window, ignore custom sampling parameters (`temperature`, `top_p`, `top_k`), and configure reasoning via `thinking_config.thinking_level` instead of `thinking_budget`.
+- **Supported `thinking_level` values in BigQuery SQL `model_params`:** `"LOW"`, `"MEDIUM"` (default), and `"HIGH"` are accepted on all three Gemini 4 models (`gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`).
+- **Empirical validation behavior (`"XHIGH"` / `"MINIMAL"` / `thinking_budget`):** Even though the Vertex AI Gemini 4 Hydrogen model card lists `"XHIGH"`, BigQuery's SQL `model_params` `GenerateContent` proto validator currently rejects both `"MINIMAL"` and `"XHIGH"` (as well as `thinking_budget`) at query analysis time (`400 The model_params is invalid and does not conform to the GenerateContent request body`).
 
 ```python
 query = """
 SELECT
-  (AI.GENERATE(
-    'What is the sum of all prime numbers less than 50?',
-    endpoint => 'gemini-4-argon',
-    model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}'
-  )).result AS answer
+  endpoint,
+  thinking_level,
+  INT64(JSON_QUERY(resp.full_response, '$.usage_metadata.thoughts_token_count')) AS thoughts_tokens,
+  resp.result AS answer
+FROM UNNEST([
+  STRUCT(
+    'gemini-4-argon' AS endpoint,
+    'LOW' AS thinking_level,
+    AI.GENERATE(
+      'What is the sum of all prime numbers less than 50?',
+      endpoint => 'gemini-4-argon',
+      model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}'
+    ) AS resp
+  ),
+  STRUCT(
+    'gemini-4-carbon',
+    'LOW',
+    AI.GENERATE(
+      'What is the sum of all prime numbers less than 50?',
+      endpoint => 'gemini-4-carbon',
+      model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}'
+    )
+  ),
+  STRUCT(
+    'gemini-4-hydrogen',
+    'LOW',
+    AI.GENERATE(
+      'What is the sum of all prime numbers less than 50?',
+      endpoint => 'gemini-4-hydrogen',
+      model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}'
+    )
+  ),
+  STRUCT(
+    'gemini-4-hydrogen',
+    'HIGH',
+    AI.GENERATE(
+      'What is the sum of all prime numbers less than 50?',
+      endpoint => 'gemini-4-hydrogen',
+      model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "HIGH"}}}'
+    )
+  )
+])
 """
-df = client.query(query).to_dataframe()
-print(df.iloc[0]['answer'])
+client.query(query).to_dataframe()
 ```
 
 ### 9. Grounding with Google Search
@@ -688,7 +750,7 @@ df_products[['product', 'category', 'price', 'features']].to_pandas()
 
 ### Specifying an endpoint
 
-`bbq.ai.generate` passes `'gemini-3.8-flash'` and `'gemini-4-argon'` directly to BigQuery SQL with zero client-side warnings (unlike the legacy `bigframes.ml.llm.GeminiTextGenerator` estimator in `bigframes 2.51.0`, which validates against a hardcoded `_GEMINI_ENDPOINTS` tuple up to `'gemini-3.5-flash'`).
+`bbq.ai.generate` passes `'gemini-3.8-flash'`, `'gemini-4-argon'`, `'gemini-4-carbon'`, and `'gemini-4-hydrogen'` directly to BigQuery SQL with zero client-side warnings (unlike the legacy `bigframes.ml.llm.GeminiTextGenerator` estimator in `bigframes 2.51.0`, which validates against a hardcoded `_GEMINI_ENDPOINTS` tuple up to `'gemini-3.5-flash'`).
 
 ```python
 df = bpd.DataFrame({'prompt': ['Write a haiku about data warehouses.']})

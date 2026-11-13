@@ -772,7 +772,7 @@ def test_review_sql_detects_all_empirical_guardrails(tmp_path: Path) -> None:
     CREATE OR REPLACE MODEL `my_ds.bst`
     OPTIONS(model_type = 'BOOSTED_TREE_CLASSIFIER') AS
     SELECT
-      AI.PARSE_DOCUMENT(doc),
+      AI.PARSE_DOCUMENT(TABLE doc),
       AI.GENERATE(OBJ.GET_ACCESS_URL(ref, 'r')),
       AI.GENERATE('text', endpoint => 'gemini-1.5-pro')
     FROM HYBRID_SEARCH(TABLE my_ds.idx, 'query')
@@ -785,7 +785,7 @@ def test_review_sql_detects_all_empirical_guardrails(tmp_path: Path) -> None:
     bad_res = review_sql(bad_sql)
     assert bad_res.ok is False
     rules = {f.rule for f in bad_res.findings}
-    assert "RETIRED_FUNCTION" in rules
+    assert "LEGACY_PARSE_DOCUMENT_TVF" in rules
     assert "NONEXISTENT_HYBRID_TVF" in rules
     assert "DEPRECATED_MODEL_ENDPOINT" in rules
     assert "UNPINNED_FORECAST_MODEL" in rules
@@ -804,7 +804,8 @@ def test_review_sql_detects_all_empirical_guardrails(tmp_path: Path) -> None:
     sql_file.write_text(clean_sql, encoding="utf-8")
     assert main(["review-sql", str(sql_file)]) == 0
     assert main(["review-sql", str(sql_file), "--json"]) == 0
-    assert main(["review-sql", "SELECT AI.PARSE_DOCUMENT(x)"]) == 1
+    assert main(["review-sql", "SELECT AI.PARSE_DOCUMENT('gs://bucket/doc.pdf')"]) == 0
+    assert main(["review-sql", "SELECT * FROM AI.PARSE_DOCUMENT(TABLE x)"]) == 1
 
 
 def test_cli_json_flags_and_install_mcp(
@@ -908,6 +909,9 @@ def test_catalog_triage_lookup_and_walkthrough_v0110_functions(
         ("chunk_document", "AI.CHUNK_DOCUMENT"),
         ("document_chunking", "AI.CHUNK_DOCUMENT"),
         ("aichunk_document", "AI.CHUNK_DOCUMENT"),
+        ("AI.PARSE_DOCUMENT", "AI.PARSE_DOCUMENT"),
+        ("parse_document", "AI.PARSE_DOCUMENT"),
+        ("aiparse_document", "AI.PARSE_DOCUMENT"),
         ("AI.TRANSLATE", "AI.TRANSLATE"),
         ("translate", "AI.TRANSLATE"),
         ("aitranslate", "AI.TRANSLATE"),
@@ -1084,12 +1088,74 @@ def test_review_sql_v0110_translate_chunk_document_and_tabfm_rules() -> None:
     )
     assert any(f.rule == "AI_CHUNK_DOCUMENT_STATUS_FILTER" for f in warn_chunk_null.findings)
 
-    retired_res = review_sql("SELECT * FROM AI.PARSE_DOCUMENT(TABLE docs)")
-    assert retired_res.ok is False
-    retired_finding = next(f for f in retired_res.findings if f.rule == "RETIRED_FUNCTION")
-    assert retired_finding.remediation.index(
+    # 1) Legacy FROM AI.PARSE_DOCUMENT(TABLE ...) or endpoint => triggers LEGACY_PARSE_DOCUMENT_TVF
+    legacy_tvf_res = review_sql("SELECT * FROM AI.PARSE_DOCUMENT(TABLE docs)")
+    assert legacy_tvf_res.ok is False
+    legacy_finding = next(
+        f for f in legacy_tvf_res.findings if f.rule == "LEGACY_PARSE_DOCUMENT_TVF"
+    )
+    assert legacy_finding.severity == "ERROR"
+    assert legacy_finding.remediation.index(
         "AI.CHUNK_DOCUMENT"
-    ) < retired_finding.remediation.index("ML.PROCESS_DOCUMENT")
+    ) < legacy_finding.remediation.index("ML.PROCESS_DOCUMENT")
+
+    legacy_ep_res = review_sql(
+        "SELECT AI.PARSE_DOCUMENT("
+        "ref, endpoint => 'projects/p/locations/us/processors/1') FROM docs"
+    )
+    assert legacy_ep_res.ok is False
+    assert any(f.rule == "LEGACY_PARSE_DOCUMENT_TVF" for f in legacy_ep_res.findings)
+
+    # 2) Scalar SELECT AI.PARSE_DOCUMENT('gs://bucket/doc.pdf') passes with 0 errors
+    scalar_parse_res = review_sql("SELECT AI.PARSE_DOCUMENT('gs://bucket/doc.pdf')")
+    assert scalar_parse_res.ok is True
+    assert scalar_parse_res.error_count == 0
+    assert scalar_parse_res.findings == []
+
+    # 3) Chaining AI.PARSE_DOCUMENT into AI.CHUNK_DOCUMENT without 'raw-docai'
+    warn_parse_chunk = review_sql(
+        "SELECT * FROM AI.CHUNK_DOCUMENT(("
+        "SELECT AI.PARSE_DOCUMENT(ref) AS parsed_document FROM docs))"
+    )
+    assert warn_parse_chunk.ok is True
+    assert warn_parse_chunk.error_count == 0
+    assert any(
+        f.rule == "PARSE_DOCUMENT_CHUNK_SCHEMA" and f.severity == "WARNING"
+        for f in warn_parse_chunk.findings
+    )
+
+    clean_parse_chunk = review_sql(
+        "SELECT * FROM AI.CHUNK_DOCUMENT(("
+        "SELECT AI.PARSE_DOCUMENT(ref, options => JSON '{\"schema\": \"raw-docai\"}') "
+        "AS parsed_document FROM docs)) WHERE status = ''"
+    )
+    assert clean_parse_chunk.ok is True
+    assert clean_parse_chunk.findings == []
+
+    # 4) gemini-4-hydrogen and gemini-4-carbon with thinking_budget or thinking_level: "XHIGH"
+    g4_hydrogen_budget = review_sql(
+        "SELECT AI.GENERATE('hi', endpoint => 'gemini-4-hydrogen', "
+        "model_params => JSON '{\"generation_config\": "
+        "{\"thinking_config\": {\"thinking_budget\": 1024}}}')"
+    )
+    assert g4_hydrogen_budget.ok is True
+    assert any(f.rule == "GEMINI_4_THINKING_BUDGET" for f in g4_hydrogen_budget.findings)
+
+    g4_carbon_xhigh = review_sql(
+        "SELECT AI.GENERATE('hi', endpoint => 'gemini-4-carbon', "
+        "model_params => JSON '{\"generation_config\": "
+        "{\"thinking_config\": {\"thinking_level\": \"XHIGH\"}}}')"
+    )
+    assert g4_carbon_xhigh.ok is True
+    assert any(f.rule == "GEMINI_4_THINKING_BUDGET" for f in g4_carbon_xhigh.findings)
+
+    g4_argon_clean = review_sql(
+        "SELECT AI.GENERATE('hi', endpoint => 'gemini-4-argon', "
+        "model_params => JSON '{\"generation_config\": "
+        "{\"thinking_config\": {\"thinking_level\": \"HIGH\"}}}')"
+    )
+    assert g4_argon_clean.ok is True
+    assert g4_argon_clean.findings == []
 
     deprecated_ep = review_sql(
         "SELECT AI.GENERATE('hi', endpoint => 'gemini-3.1-flash-lite-preview')"

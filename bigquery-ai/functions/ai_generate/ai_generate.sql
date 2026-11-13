@@ -3,7 +3,8 @@
 -- Scalar function that sends prompts to Gemini models and returns generated text
 -- or structured output. No model creation required.
 --
--- Default model: gemini-3.5-flash-lite (pin gemini-3.8-flash or gemini-4-argon)
+-- Default model: gemini-3.5-flash-lite (pin gemini-3.8-flash, gemini-4-argon,
+--                gemini-4-carbon, or gemini-4-hydrogen)
 -- Returns: STRUCT<result STRING, full_response JSON, status STRING>
 --          (or custom schema fields when output_schema is specified)
 -- Multimodal: Supports documents, images, and video via ObjectRef (see examples 13-15)
@@ -54,12 +55,40 @@ FROM (
 -- =============================================================================
 -- Example 4: Specifying an endpoint
 -- =============================================================================
--- Override the default model (gemini-3.5-flash-lite) with any Gemini model.
+-- Override the default model (gemini-3.5-flash-lite) with any GA Gemini 3.x or
+-- Gemini 4 model:
+--   - 'gemini-3.8-flash'    — Preferred Flash default ($0.75 / $3.75 per 1M
+--                             input/output tokens through Dec 31, 2026; supports
+--                             custom temperature)
+--   - 'gemini-4-argon'      — Preferred Pro / frontier reasoning default
+--                             ($2.00 / $10.00 through Nov 30, 2026; $4.00 / $20.00 Dec 1+)
+--   - 'gemini-4-carbon'     — Frontier / Pro reasoning model (GA 2026-11-10;
+--                             $2.00 / $10.00 through Nov 30, 2026; $4.00 / $20.00 Dec 1+)
+--   - 'gemini-4-hydrogen'   — Gemini 4 speed & efficiency model for coding,
+--                             agentic workflows, multimodal analysis, and tool use
+--                             (GA 2026-11-12; $1.50 / $7.50 per 1M tokens)
 SELECT
-  (AI.GENERATE(
-    'Write a haiku about data warehouses.',
-    endpoint => 'gemini-4-argon'
-  )).result AS haiku;
+  endpoint,
+  JSON_VALUE(resp.full_response, '$.model_version') AS model_version,
+  resp.result AS haiku
+FROM UNNEST([
+  STRUCT(
+    'gemini-3.8-flash' AS endpoint,
+    AI.GENERATE('Write a haiku about data warehouses.', endpoint => 'gemini-3.8-flash') AS resp
+  ),
+  STRUCT(
+    'gemini-4-argon',
+    AI.GENERATE('Write a haiku about data warehouses.', endpoint => 'gemini-4-argon')
+  ),
+  STRUCT(
+    'gemini-4-carbon',
+    AI.GENERATE('Write a haiku about data warehouses.', endpoint => 'gemini-4-carbon')
+  ),
+  STRUCT(
+    'gemini-4-hydrogen',
+    AI.GENERATE('Write a haiku about data warehouses.', endpoint => 'gemini-4-hydrogen')
+  )
+]);
 
 
 -- =============================================================================
@@ -107,9 +136,13 @@ FROM
 -- =============================================================================
 -- model_params accepts any field from the Gemini generateContent request body
 -- (except 'contents'). Use generation_config to control temperature, top_p, etc.
+-- Note: Gemini 4 models ('gemini-4-argon', 'gemini-4-carbon', 'gemini-4-hydrogen')
+-- ignore custom sampling parameters (temperature, top_p, top_k). Pin
+-- 'gemini-3.8-flash' when custom temperature control is required.
 SELECT
   (AI.GENERATE(
     'Invent a creative name for a new coffee shop.',
+    endpoint => 'gemini-3.8-flash',
     model_params => JSON '{"generation_config": {"temperature": 1.5}}'
   )).result AS creative_name;
 
@@ -117,14 +150,63 @@ SELECT
 -- =============================================================================
 -- Example 8: Using model_params — thinking_level
 -- =============================================================================
--- Gemini 3.x and 4.x models configure reasoning depth via thinking_level
--- ("LOW", "MEDIUM", "HIGH") in thinking_config.
+-- Gemini 3.x ('gemini-3.8-flash') and Gemini 4 ('gemini-4-argon',
+-- 'gemini-4-carbon', 'gemini-4-hydrogen') models configure reasoning depth via
+-- thinking_level ("LOW", "MEDIUM", "HIGH") in thinking_config.
+--
+-- Empirical BigQuery SQL validation notes for Gemini 4:
+--   - All three Gemini 4 models share a unified 1,048,576-token input+output
+--     window, ignore custom sampling parameters (temperature, top_p, top_k),
+--     and use thinking_config.thinking_level instead of thinking_budget.
+--   - In BigQuery SQL model_params, thinking_level accepts "LOW", "MEDIUM"
+--     (default), and "HIGH" on all three Gemini 4 models. Even though the
+--     Vertex AI Gemini 4 Hydrogen model card lists "XHIGH", BigQuery's SQL
+--     model_params GenerateContent proto validator rejects both "MINIMAL" and
+--     "XHIGH" (as well as thinking_budget) at query analysis time with:
+--     400 The model_params is invalid and does not conform to the GenerateContent request body.
 SELECT
-  (AI.GENERATE(
-    'What is the sum of all prime numbers less than 50?',
-    endpoint => 'gemini-4-argon',
-    model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}'
-  )).result AS answer;
+  endpoint,
+  thinking_level,
+  INT64(JSON_QUERY(resp.full_response, '$.usage_metadata.thoughts_token_count')) AS thoughts_tokens,
+  resp.result AS answer
+FROM UNNEST([
+  STRUCT(
+    'gemini-4-argon' AS endpoint,
+    'LOW' AS thinking_level,
+    AI.GENERATE(
+      'What is the sum of all prime numbers less than 50?',
+      endpoint => 'gemini-4-argon',
+      model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}'
+    ) AS resp
+  ),
+  STRUCT(
+    'gemini-4-carbon',
+    'LOW',
+    AI.GENERATE(
+      'What is the sum of all prime numbers less than 50?',
+      endpoint => 'gemini-4-carbon',
+      model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}'
+    )
+  ),
+  STRUCT(
+    'gemini-4-hydrogen',
+    'LOW',
+    AI.GENERATE(
+      'What is the sum of all prime numbers less than 50?',
+      endpoint => 'gemini-4-hydrogen',
+      model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "LOW"}}}'
+    )
+  ),
+  STRUCT(
+    'gemini-4-hydrogen',
+    'HIGH',
+    AI.GENERATE(
+      'What is the sum of all prime numbers less than 50?',
+      endpoint => 'gemini-4-hydrogen',
+      model_params => JSON '{"generation_config": {"thinking_config": {"thinking_level": "HIGH"}}}'
+    )
+  )
+]);
 
 
 -- =============================================================================

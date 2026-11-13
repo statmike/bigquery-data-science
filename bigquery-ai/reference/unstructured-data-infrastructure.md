@@ -49,8 +49,8 @@ These are not AI functions themselves, but the infrastructure that enables AI fu
 - `OBJ.FETCH_METADATA` enriches partial `ObjectRef` values with Cloud Storage metadata (content type, size, MD5 hash).
 - `OBJ.GET_ACCESS_URL` converts `ObjectRef` into `ObjectRefRuntime` with signed URLs — a tool for handing a URL to something outside the AI call, not a step on the way into one.
 - `OBJ.GET_READ_URL` returns a 45-minute read URL as `STRUCT<url, status>`, for displaying an object in query results.
-- **Typical pipeline:** URI → `OBJ.MAKE_REF` → any multimodal `AI.*` function (including [`AI.CHUNK_DOCUMENT`](document-processing.md#aichunk_document)). From an object table or from `OBJ.LIST`, the `ref` column replaces even the `OBJ.MAKE_REF` step — and `AI.CHUNK_DOCUMENT` can also take a `'gs://...'` URI or wildcard literal directly.
-- **`AI.CHUNK_DOCUMENT` subquery contract:** when passed a `(SELECT ...)` subquery instead of a `'gs://...'` literal or `TABLE object_table`, the subquery must return an `OBJECTREF` column **named `ref`** (for example `OBJ.MAKE_REF(uri) AS ref` or `SELECT * FROM OBJ.LIST(...)`), and `AI.CHUNK_DOCUMENT` passes through only the columns projected by that subquery. (Retired Preview `AI.PARSE_DOCUMENT` has been offline since 2026-06-01 with its docs withdrawn; `AI.CHUNK_DOCUMENT` is its GA replacement.)
+- **Typical pipeline:** URI → `OBJ.MAKE_REF` → any multimodal `AI.*` function (including [`AI.CHUNK_DOCUMENT`](document-processing.md#aichunk_document) and [`AI.PARSE_DOCUMENT`](document-processing.md#aiparse_document)). From an object table or from `OBJ.LIST`, the `ref` column replaces even the `OBJ.MAKE_REF` step — and both `AI.CHUNK_DOCUMENT` and `AI.PARSE_DOCUMENT` can also take a `'gs://...'` URI directly.
+- **`AI.CHUNK_DOCUMENT` subquery & `parsed_document` contract:** when passed a `(SELECT ...)` subquery or `TABLE` instead of a `'gs://...'` literal or `TABLE object_table`, the input must return either an `OBJECTREF` column **named `ref`** (for example `OBJ.MAKE_REF(uri) AS ref` or `SELECT * FROM OBJ.LIST(...)`) or a `JSON` column **named `parsed_document`** produced by `AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}')`. `AI.CHUNK_DOCUMENT` passes through all columns projected by that table or subquery.
 
 **RESOLVED (2026-09-15) -- AI functions take an `ObjectRef` directly; `OBJ.GET_ACCESS_URL` is not required.** The 2026-06-12 release note said so, the reference pages disagreed, and this project kept the wrapper because it was the one form documented everywhere. Both halves of that disagreement have now closed:
 
@@ -73,7 +73,7 @@ Every notebook in this project now passes the `ObjectRef`. **Nothing was depreca
 ## Object Tables
 - **Description:** Read-only external tables over unstructured data objects in Cloud Storage. Each row corresponds to a Cloud Storage object, with columns for object metadata. Object tables use access delegation via a Cloud resource connection — users need access to the table, not direct access to Cloud Storage.
 - **Use cases:** Indexing Cloud Storage objects for AI function processing, document analysis pipelines, image/video/audio inference, joining unstructured data results with structured BigQuery data.
-- [introduction](https://cloud.google.com/bigquery/docs/object-table-introduction) · [create](https://cloud.google.com/bigquery/docs/object-table-create) · [DDL reference](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_external_table_statement)
+- [introduction](https://cloud.google.com/bigquery/docs/object-table-introduction) · [create](https://docs.cloud.google.com/bigquery/docs/object-tables) · [DDL reference](https://cloud.google.com/bigquery/docs/reference/standard-sql/data-definition-language#create_external_table_statement)
 
 **CREATE syntax:**
 ```sql
@@ -157,7 +157,8 @@ Signed URLs expire after 6 hours. Row-level access policies restrict which URLs 
 - Connection must be in the same region as the dataset.
 
 **AI function integration:** every one of these reads the `ref` column as-is — an `ObjectRef` — with no signing step in between.
-- `AI.CHUNK_DOCUMENT` — zero-DDL layout-aware document chunking (`TABLE object_table` or `(SELECT ... ref ...)` subquery).
+- `AI.CHUNK_DOCUMENT` — zero-DDL layout-aware document chunking (`TABLE object_table`, `(SELECT ... ref ...)` subquery, or `(SELECT ... parsed_document ...)` subquery).
+- `AI.PARSE_DOCUMENT` — zero-DDL structured layout parsing (`SELECT AI.PARSE_DOCUMENT(ref) ...`), returning `layout-v1` reading-order blocks or `raw-docai` layout tree JSON (including Google Drive files passed as `ObjectRef`).
 - `ML.PROCESS_DOCUMENT` — document extraction via Document AI processors.
 - `AI.GENERATE_TEXT` / `AI.GENERATE` — text generation from object data: `STRUCT(text AS prompt, [ref] AS object_refs)`.
 - `AI.GENERATE_EMBEDDING` — embeddings from image/video data: a `content` column of `ObjectRef`.
@@ -578,13 +579,20 @@ SELECT AI.SIMILARITY(
 ) AS similarity;
 ```
 
-### Shape 5: Document Chunking TVF (`AI.CHUNK_DOCUMENT`)
+### Shape 5: Document Parsing & Chunking (`AI.PARSE_DOCUMENT` & `AI.CHUNK_DOCUMENT`)
 
-[`AI.CHUNK_DOCUMENT`](document-processing.md#aichunk_document) accepts **three** document input forms: a `'gs://...'` URI or wildcard literal (`13` output columns), `TABLE object_table` (`13` output columns), or a `(SELECT ...)` subquery returning an `OBJECTREF` column **named `ref`** (`5 + passthrough` output columns). When a subquery projects only `OBJ.MAKE_REF(uri) AS ref`, the result has **6 columns** (`chunk_id`, `content`, `start_page`, `end_page`, `status`, `ref`) with **no top-level `uri`** — read `ref.uri` and filter `WHERE status = ''`:
+[`AI.PARSE_DOCUMENT`](document-processing.md#aiparse_document) is a scalar function that accepts a `'gs://...'` URI string or an `ObjectRef` `STRUCT` (including Google Drive files passed as `ObjectRef`) and returns structured layout `JSON` (`layout-v1` reading-order blocks by default, or `raw-docai` layout tree). [`AI.CHUNK_DOCUMENT`](document-processing.md#aichunk_document) is a table-valued function that accepts **four** document input forms: a `'gs://...'` URI or wildcard literal (`13` output columns), `TABLE object_table` (`13` output columns), a `(SELECT ...)` subquery returning an `OBJECTREF` column **named `ref`** (`5 + passthrough` output columns), or a `TABLE` / `(SELECT ...)` subquery containing a `JSON` column **named `parsed_document`** produced by `AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}')`. When a subquery projects only `OBJ.MAKE_REF(uri) AS ref`, the result has **6 columns** (`chunk_id`, `content`, `start_page`, `end_page`, `status`, `ref`) with **no top-level `uri`** — read `ref.uri` and filter `WHERE status = ''`:
 
-**Functions:** `AI.CHUNK_DOCUMENT`
+**Functions:** `AI.PARSE_DOCUMENT`, `AI.CHUNK_DOCUMENT`
 
 ```sql
+-- Scalar structured layout parsing (layout-v1 default, or raw-docai for AI.CHUNK_DOCUMENT chaining)
+SELECT
+  uri,
+  AI.PARSE_DOCUMENT(ref) AS layout_v1_json,
+  AI.PARSE_DOCUMENT(ref, options => JSON '{"schema": "raw-docai"}') AS parsed_document
+FROM OBJ.LIST('gs://bucket/docs/*.pdf');
+
 -- Direct GCS wildcard literal (13 columns, top-level uri)
 SELECT uri, chunk_id, start_page, end_page, content
 FROM AI.CHUNK_DOCUMENT('gs://bucket/docs/*.pdf', chunk_size => 500)
@@ -605,9 +613,9 @@ WHERE status = '';
 |-------|-----------|----------------------|--------------|
 | STRUCT prompt | AI.GENERATE, AI.GENERATE_TEXT, AI.GENERATE_TABLE, AI.GENERATE_BOOL, AI.GENERATE_DOUBLE, AI.GENERATE_INT, ML.GENERATE_TEXT, AI.IF | No | `STRUCT(text AS prompt, [refs] AS object_refs)` |
 | Tuple | AI.SCORE | No (object table is the convenient source) | `('scoring text', ref)` |
-| Bare argument | AI.CLASSIFY, AI.AGG | No (object table is the convenient source) | `AI.CLASSIFY(ref, categories)`, `AI.AGG(STRUCT(ref), prompt)` |
+| Bare argument | AI.CLASSIFY, AI.AGG, AI.PARSE_DOCUMENT | No (object table is the convenient source) | `AI.CLASSIFY(ref, categories)`, `AI.AGG(STRUCT(ref), prompt)`, `AI.PARSE_DOCUMENT(ref)` |
 | `content` parameter | AI.EMBED, AI.SIMILARITY, AI.GENERATE_EMBEDDING, ML.GENERATE_EMBEDDING | No | Pass the `ObjectRef` as the content argument |
-| Document chunking TVF | AI.CHUNK_DOCUMENT | No | `'gs://...'` literal, `TABLE object_table`, or `(SELECT ... ObjectRef)` subquery |
+| Document chunking TVF | AI.CHUNK_DOCUMENT | No | `'gs://...'` literal, `TABLE object_table`, `(SELECT ... ObjectRef)` subquery, or `parsed_document` (`raw-docai`) table/subquery |
 | Object table (document processing) | ML.PROCESS_DOCUMENT | Yes | Object table rows as input to Document AI processor |
 | Not supported | AI.TRANSLATE, AI.COUNT_TOKENS, VECTOR_SEARCH, AI.SEARCH, AI.FORECAST, AI.DETECT_ANOMALIES, AI.PREDICT, AI.EVALUATE | — | Text/numeric input only |
 
