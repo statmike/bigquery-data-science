@@ -46,6 +46,11 @@ _SYMBOL_ALIASES: Mapping[str, str] = MappingProxyType(
         "AI.CHUNK": "AI.CHUNK_DOCUMENT",
         "DOCUMENT_CHUNKING": "AI.CHUNK_DOCUMENT",
         "LAYOUT_PARSER": "AI.CHUNK_DOCUMENT",
+        "PARSE_DOCUMENT": "AI.PARSE_DOCUMENT",
+        "AI_PARSE_DOCUMENT": "AI.PARSE_DOCUMENT",
+        "AIPARSE_DOCUMENT": "AI.PARSE_DOCUMENT",
+        "AI.PARSE": "AI.PARSE_DOCUMENT",
+        "DOCUMENT_PARSING": "AI.PARSE_DOCUMENT",
         "AI_TRANSLATE": "AI.TRANSLATE",
         "AITRANSLATE": "AI.TRANSLATE",
         "TRANSLATE": "AI.TRANSLATE",
@@ -63,11 +68,29 @@ _FALLBACK_PREREQUISITES: Mapping[str, Mapping[str, str]] = MappingProxyType(
                 "Skill": "`bigquery-ai`",
                 "Category": "Layout-Aware Document Chunking TVF",
                 "Connection Required": (
-                    "End-user creds (Connection optional; required for Object Tables)"
+                    "End-user creds (Connection optional; required for Object Tables; "
+                    "none when chunking `parsed_document`)"
                 ),
                 "Reservation Required": "On-demand OK",
                 "Status": "GA",
                 "Walkthrough": "bigquery-ai/narrative/ai_chunk_document.md",
+            }
+        ),
+        "AI.PARSE_DOCUMENT": MappingProxyType(
+            {
+                "Symbol": "`AI.PARSE_DOCUMENT`",
+                "Skill": "`bigquery-ai`",
+                "Category": (
+                    "Layout-Aware Document Parsing Scalar Function "
+                    "(`layout-v1` blocks or `raw-docai` tree for `AI.CHUNK_DOCUMENT`)"
+                ),
+                "Connection Required": (
+                    "EUC default or `CLOUD_RESOURCE` "
+                    "(`roles/storage.objectViewer` + `documentai.viewer`/`editor`)"
+                ),
+                "Reservation Required": "On-demand OK",
+                "Status": "GA",
+                "Walkthrough": "bigquery-ai/narrative/ai_parse_document.md",
             }
         ),
         "AI.TRANSLATE": MappingProxyType(
@@ -91,8 +114,8 @@ _FALLBACK_GOTCHAS: Mapping[str, tuple[str, ...]] = MappingProxyType(
                 "**`AI.CHUNK_DOCUMENT` output columns depend on input shape**: "
                 "`'gs://...'` URI literals and Object Tables return 13 columns "
                 "(including top-level `uri`), whereas `(SELECT OBJ.MAKE_REF(...) AS ref)` "
-                "subqueries return `5 + passthrough` columns (no top-level `uri` — "
-                "select `ref.uri`)."
+                "or `(SELECT ..., parsed_document)` subqueries return `5 + passthrough` "
+                "columns (no top-level `uri` — select `ref.uri`)."
             ),
             (
                 "**`AI.CHUNK_DOCUMENT` 3-way `status` contract**: Valid chunks emit "
@@ -105,6 +128,23 @@ _FALLBACK_GOTCHAS: Mapping[str, tuple[str, ...]] = MappingProxyType(
                 "auto-create `bq-created-layout-parser`, `roles/documentai.viewer` "
                 "thereafter); unsupported in `europe-west2` and `europe-west6`; inside "
                 "VPC-SC use 1-arg `OBJ.MAKE_REF('gs://...')` or `'gs://...'` with EUC."
+            ),
+        ),
+        "AI.PARSE_DOCUMENT": (
+            (
+                "**`AI.PARSE_DOCUMENT` is a GA scalar function (`-> JSON`) with two schemas "
+                "(`layout-v1` vs `raw-docai`)**: Default `layout-v1` returns flat reading-order "
+                "blocks (`title`, `heading`, `text`, `table` HTML, `list_item`, `image`, "
+                "`page_header`, `page_footer`) with 1-indexed `page_number` and normalized "
+                '`bbox`; `options => JSON \'{"schema": "raw-docai"}\'` returns the nested '
+                "Document AI layout tree required to chain `parsed_document` into "
+                "`AI.CHUNK_DOCUMENT`."
+            ),
+            (
+                "**`AI.PARSE_DOCUMENT` 3-way per-row error contract**: Valid parse has "
+                "`ARRAY_LENGTH(JSON_QUERY_ARRAY(parsed, '$.errors')) IS NULL`; unsupported "
+                "formats (`.txt`, `.png`) return `blocks: []` and populate "
+                "`$.errors[0].message`; missing GCS URIs return SQL `NULL`."
             ),
         ),
         "AI.TRANSLATE": (
@@ -141,7 +181,22 @@ _FALLBACK_SYNTAX: Mapping[str, tuple[str, str]] = MappingProxyType(
                 ")\n"
                 "```\n"
                 "- **Type:** Table-valued function (GA); `chunk_size` is an `INT64` "
-                "between `1` and `2000` (default `1000`)."
+                "between `1` and `2000` (default `1000`). Accepts pre-parsed "
+                "`parsed_document` (`raw-docai` JSON) from `AI.PARSE_DOCUMENT`."
+            ),
+        ),
+        "AI.PARSE_DOCUMENT": (
+            "bigquery-ai/syntax/aiparse_document.md",
+            (
+                "# `AI.PARSE_DOCUMENT`\n\n"
+                "```sql\n"
+                "AI.PARSE_DOCUMENT(\n"
+                "  [document => ] DOCUMENT\n"
+                "  [, connection_id => 'CONNECTION_ID']\n"
+                '  [, options => JSON \'{"schema": "layout-v1" | "raw-docai"}\']\n'
+                ") -> JSON\n"
+                "```\n"
+                "- **Type:** Scalar function (returns `JSON`) — GA."
             ),
         ),
         "AI.TRANSLATE": (
@@ -266,6 +321,10 @@ _MEDIA_KEYWORDS: tuple[str, ...] = (
     "chunking",
     "chunk_document",
     "ai.chunk_document",
+    "parse_document",
+    "ai.parse_document",
+    "raw-docai",
+    "layout-v1",
     "layout parser",
     "docx",
     "pptx",
@@ -403,6 +462,8 @@ _GENERATIVE_KEYWORDS: tuple[str, ...] = (
     "reusable_column_aliases_mode",
     "effective_project_options",
     "gemini-3.8-flash",
+    "gemini-4-hydrogen",
+    "gemini-4-carbon",
     "gemini-4-argon",
 )
 
@@ -1114,7 +1175,10 @@ def triage_task(
                 "over a candidate pool of `10 * top_k` semantic rows, so retrieving a row "
                 "at semantic rank R requires `top_k >= R/10` (and higher below R=500). "
                 "For document RAG, chunk files first with GA `AI.CHUNK_DOCUMENT` "
-                "(auto-provisioned `bq-created-layout-parser`, no `CREATE MODEL`)."
+                "(auto-provisioned `bq-created-layout-parser`, no `CREATE MODEL`), "
+                "or parse once with `AI.PARSE_DOCUMENT(..., options => "
+                'JSON \'{"schema": "raw-docai"}\')` '
+                "and pass `parsed_document` into `AI.CHUNK_DOCUMENT` to tune `chunk_size`."
             ),
             prerequisites=(
                 "`AI.EMBED` and `AI.SIMILARITY` with `model => 'embeddinggemma-300m'` "
@@ -1143,10 +1207,13 @@ def triage_task(
             recommended_skills=["bigquery-ai", "bigquery-ml"],
             primary_options=[
                 (
-                    "Zero-DDL document chunking & translation (GA): "
-                    "`AI.CHUNK_DOCUMENT` (PDF/HTML/DOCX/PPTX/XLSX/XLSM layout chunking "
-                    "via auto-provisioned `bq-created-layout-parser`, `chunk_size` "
-                    "1..2000) and `AI.TRANSLATE` (EUC scalar translation with `'nmt'` "
+                    "Zero-DDL document parsing, chunking & translation (GA): "
+                    "`AI.PARSE_DOCUMENT` (scalar `-> JSON` returning `layout-v1` "
+                    "reading-order blocks or `raw-docai` layout tree via "
+                    "auto-provisioned `bq-created-layout-parser`), "
+                    "`AI.CHUNK_DOCUMENT` (PDF/HTML/DOCX/PPTX/XLSX/XLSM or "
+                    "`parsed_document` `raw-docai` layout chunking, `chunk_size` "
+                    "1..2000), and `AI.TRANSLATE` (EUC scalar translation with `'nmt'` "
                     "or `'translation-llm'`, dynamic per-row `target_language` / "
                     "`source_language`, `return_details => TRUE` where `status = 'OK'`) "
                     "in `bigquery-ai`"
@@ -1159,7 +1226,8 @@ def triage_task(
                 (
                     "Direct `ObjectRef` multimodal prompts: `OBJ.LIST` / `OBJ.MAKE_REF` "
                     "/ Object Tables passed straight into `AI.GENERATE*`, `AI.CLASSIFY`, "
-                    "`AI.SCORE`, `AI.IF`, `AI.EMBED`, `AI.SIMILARITY` (`bigquery-ai`)"
+                    "`AI.SCORE`, `AI.IF`, `AI.EMBED`, `AI.SIMILARITY`, "
+                    "`AI.PARSE_DOCUMENT`, `AI.CHUNK_DOCUMENT` (`bigquery-ai`)"
                 ),
                 (
                     "SQL image tensor preprocessing: `ML.DECODE_IMAGE`, "
@@ -1168,8 +1236,11 @@ def triage_task(
                 ),
             ],
             head_to_head=(
-                "Do not recommend `AI.PARSE_DOCUMENT` (offline since 2026-06-01): use "
-                "GA `AI.CHUNK_DOCUMENT` for zero-DDL layout-aware chunking and RAG, or "
+                "Use GA scalar `AI.PARSE_DOCUMENT` for zero-DDL layout block extraction "
+                "(`layout-v1` reading-order blocks with HTML tables and `bbox`, or "
+                '`options => JSON \'{"schema": "raw-docai"}\'` aliased `AS parsed_document` '
+                "to parse once and chunk many times with `AI.CHUNK_DOCUMENT`), GA "
+                "`AI.CHUNK_DOCUMENT` for direct layout-aware RAG chunking, and "
                 "`ML.PROCESS_DOCUMENT` for specialized Invoice/Form/Custom Document AI "
                 "processors. For translation, prefer GA `AI.TRANSLATE` (`status = 'OK'` "
                 "when `return_details => TRUE`, EUC-only, `US`/`EU` multi-region residency) "
@@ -1179,7 +1250,7 @@ def triage_task(
                 "(inside VPC-SC, use 1-arg `OBJ.MAKE_REF('gs://...')` with EUC)."
             ),
             prerequisites=(
-                "`AI.CHUNK_DOCUMENT` requires `documentai.googleapis.com` "
+                "`AI.PARSE_DOCUMENT` and `AI.CHUNK_DOCUMENT` require `documentai.googleapis.com` "
                 "(`roles/documentai.editor` on first run to create "
                 "`bq-created-layout-parser`, `roles/documentai.viewer` thereafter; "
                 "excluded in `europe-west2` and `europe-west6`). `AI.TRANSLATE` uses "
@@ -1194,7 +1265,8 @@ def triage_task(
                     "`managed-functions.md`, and `cloud-ai-service-models.md`"
                 ),
                 (
-                    "Run `bigquery-data-science lookup AI.CHUNK_DOCUMENT`, "
+                    "Run `bigquery-data-science lookup AI.PARSE_DOCUMENT`, "
+                    "`bigquery-data-science lookup AI.CHUNK_DOCUMENT`, "
                     "`bigquery-data-science lookup AI.TRANSLATE`, and "
                     "`bigquery-data-science lookup ML.PROCESS_DOCUMENT`"
                 ),
@@ -1373,6 +1445,7 @@ _WALKTHROUGH_ALIASES: Mapping[str, str] = MappingProxyType(
         "entity_features_at_time": "feature_store",
         "features_at_time": "feature_store",
         "chunk_document": "ai_chunk_document",
+        "parse_document": "ai_parse_document",
         "layout_parser": "ai_chunk_document",
         "translation_llm": "ai_translate",
         "tllm": "ai_translate",
@@ -1592,6 +1665,30 @@ _CREATE_MODEL_HANDLE_RE = re.compile(
 )
 _GEMINI_EMB2_PIN_RE = re.compile(
     r"\b(?:endpoint|model)\s*(?:=>|=)\s*['\"]gemini-embedding-2['\"]",
+    re.IGNORECASE,
+)
+_GEMINI_4_PIN_RE = re.compile(
+    r"\b(?:endpoint|model)\s*(?:=>|=)\s*['\"]gemini-4-(?:argon|carbon|hydrogen)['\"]",
+    re.IGNORECASE,
+)
+_GEMINI_4_THINKING_BUDGET_RE = re.compile(
+    r"\bthinking_?budget\b",
+    re.IGNORECASE,
+)
+_GEMINI_4_UNSUPPORTED_THINKING_LEVEL_RE = re.compile(
+    r"thinking_?level['\"\s:=]+['\"]?(?:MINIMAL|XHIGH)\b",
+    re.IGNORECASE,
+)
+_LEGACY_PARSE_DOC_TVF_RE = re.compile(
+    r"\b(?:FROM|JOIN)\s+AI\.PARSE_DOCUMENT\s*\(",
+    re.IGNORECASE,
+)
+_LEGACY_PARSE_DOC_ENDPOINT_RE = re.compile(
+    r"\b(?:endpoint|processor_id)\s*(?:=>|=)",
+    re.IGNORECASE,
+)
+_LEGACY_PARSE_DOC_TABLE_ARG_RE = re.compile(
+    r"^\s*TABLE\b",
     re.IGNORECASE,
 )
 _MODEL_REF_RE = re.compile(
@@ -1855,6 +1952,24 @@ def _iter_function_call_args(sql: str, function_name: str) -> list[str]:
     return [args for args, _ in _iter_function_call_spans(sql, function_name)]
 
 
+def _top_level_call_args(masked_call_args: str) -> str:
+    """Replace nested parenthesized expressions with spaces so only top-level args remain."""
+    out: list[str] = []
+    depth = 0
+    for char in masked_call_args:
+        if char == "(":
+            depth += 1
+            out.append("(")
+        elif char == ")":
+            depth = max(0, depth - 1)
+            out.append(")")
+        elif depth > 0:
+            out.append("\n" if char == "\n" else " ")
+        else:
+            out.append(char)
+    return "".join(out)
+
+
 def review_sql(
     sql: str,
     skills_dir: Path | None = None,
@@ -1896,18 +2011,32 @@ def review_sql(
     findings: list[ReviewFinding] = []
 
     if "AI.PARSE_DOCUMENT" in detected or re.search(r"\bAI\.PARSE_DOCUMENT\b", masked_upper):
-        findings.append(
-            ReviewFinding(
-                severity="ERROR",
-                rule="RETIRED_FUNCTION",
-                message="`AI.PARSE_DOCUMENT` was retired and taken offline on 2026-06-01.",
-                remediation=(
-                    "Use `AI.CHUNK_DOCUMENT` (GA) for layout-aware document chunking "
-                    "and RAG, `ML.PROCESS_DOCUMENT` for specialized Invoice/Form/Custom "
-                    "Document AI processors, or pass `ObjectRef` directly to `AI.GENERATE`."
-                ),
-            )
+        parse_doc_calls = _iter_function_call_args(masked, "AI.PARSE_DOCUMENT")
+        has_legacy_tvf = _LEGACY_PARSE_DOC_TVF_RE.search(masked) is not None
+        has_legacy_arg = any(
+            _LEGACY_PARSE_DOC_ENDPOINT_RE.search(call_args) is not None
+            or _LEGACY_PARSE_DOC_TABLE_ARG_RE.search(call_args) is not None
+            for call_args in parse_doc_calls
         )
+        if has_legacy_tvf or has_legacy_arg:
+            findings.append(
+                ReviewFinding(
+                    severity="ERROR",
+                    rule="LEGACY_PARSE_DOCUMENT_TVF",
+                    message=(
+                        "`AI.PARSE_DOCUMENT` is a GA scalar function (`-> JSON`), not the "
+                        "legacy early-Preview `FROM AI.PARSE_DOCUMENT(TABLE ..., "
+                        "endpoint => ...)` TVF."
+                    ),
+                    remediation=(
+                        "Call scalar `AI.PARSE_DOCUMENT(document [, connection_id => '...'] "
+                        '[, options => JSON \'{"schema": "layout-v1" | "raw-docai"}\'])` '
+                        "in `SELECT`, use `FROM AI.CHUNK_DOCUMENT(...)` for layout-aware "
+                        "RAG chunking, or use `ML.PROCESS_DOCUMENT` for specialized "
+                        "Document AI processors."
+                    ),
+                )
+            )
 
     if "HYBRID_SEARCH" in detected:
         findings.append(
@@ -1926,8 +2055,10 @@ def review_sql(
     allowed_models: set[str] = set()
     deprecated_models: dict[str, str] = {}
     if allow_file is not None and allow_file.is_file():
-        allowed_models = load_allow_list(allow_file, "bigquery-ai") | load_allow_list(
-            allow_file, "bigquery-ml"
+        allowed_models = (
+            load_allow_list(allow_file, "bigquery-ai")
+            | load_allow_list(allow_file, "bigquery-ml")
+            | {"gemini-4-hydrogen", "gemini-4-carbon", "gemini-4-argon"}
         )
         raw_allow = json.loads(allow_file.read_text(encoding="utf-8"))
         if isinstance(raw_allow.get("deprecated"), dict):
@@ -1949,13 +2080,14 @@ def review_sql(
                     f"Replace retired `{endpoint_value}` with "
                     f"`{deprecated_models[endpoint_value]}` "
                     "(or current preferred defaults `'gemini-3.8-flash'`, "
-                    "`'gemini-4-argon'`, `'gemini-3.5-flash-lite'`, "
-                    "`'gemini-embedding-2'`)."
+                    "`'gemini-4-hydrogen'`, `'gemini-4-carbon'`, `'gemini-4-argon'`, "
+                    "`'gemini-3.5-flash-lite'`, `'gemini-embedding-2'`)."
                 )
             else:
                 remediation = (
                     "Pin a current supported model from `skills/pinned-models.json` "
-                    "such as `'gemini-3.8-flash'`, `'gemini-4-argon'`, "
+                    "such as `'gemini-3.8-flash'`, `'gemini-4-hydrogen'`, "
+                    "`'gemini-4-carbon'`, `'gemini-4-argon'`, "
                     "`'gemini-3.5-flash-lite'`, `'gemini-embedding-2'`, "
                     "`'gemini-embedding-001'`, `'text-embedding-005'`, "
                     "`'embeddinggemma-300m'`, `'TimesFM 2.5'`, `'TimesFM 3.0'`, "
@@ -1974,6 +2106,10 @@ def review_sql(
             )
 
     emb2_handles: set[str] = set()
+    gemini4_handles: set[str] = set()
+    emitted_emb2_warn = False
+    emitted_gemini4_warn = False
+    emitted_parse_chunk_warn = False
     stmt_start = 0
     for sep_match in re.finditer(r";|$", masked):
         stmt_end = sep_match.start()
@@ -1993,6 +2129,12 @@ def review_sql(
             elif _ENDPOINT_ARG_RE.search(stmt_raw):
                 emb2_handles.discard(raw_handle)
                 emb2_handles.discard(short_handle)
+            if _GEMINI_4_PIN_RE.search(stmt_raw):
+                gemini4_handles.add(raw_handle)
+                gemini4_handles.add(short_handle)
+            elif _ENDPOINT_ARG_RE.search(stmt_raw):
+                gemini4_handles.discard(raw_handle)
+                gemini4_handles.discard(short_handle)
 
         uses_emb2 = _GEMINI_EMB2_PIN_RE.search(stmt_raw) is not None
         if not uses_emb2 and emb2_handles:
@@ -2003,7 +2145,7 @@ def review_sql(
                     uses_emb2 = True
                     break
 
-        if uses_emb2:
+        if uses_emb2 and not emitted_emb2_warn:
             emb_struct_Calls = (
                 _iter_function_call_args(stmt_masked, "STRUCT")
                 + _iter_function_call_args(stmt_masked, "AI.GENERATE_EMBEDDING")
@@ -2018,6 +2160,7 @@ def review_sql(
                 or _EMB_UNSUPPORTED_JSON_KEY_RE.search(stmt_raw) is not None
             )
             if has_unsupported_arg:
+                emitted_emb2_warn = True
                 findings.append(
                     ReviewFinding(
                         severity="WARNING",
@@ -2035,7 +2178,66 @@ def review_sql(
                         ),
                     )
                 )
-                break
+
+        uses_gemini4 = _GEMINI_4_PIN_RE.search(stmt_raw) is not None
+        if not uses_gemini4 and gemini4_handles:
+            for ref_match in _MODEL_REF_RE.finditer(stmt_masked):
+                ref_handle = ref_match.group(1).strip("`").strip().lower()
+                ref_short = ref_handle.rsplit(".", 1)[-1]
+                if ref_handle in gemini4_handles or ref_short in gemini4_handles:
+                    uses_gemini4 = True
+                    break
+
+        if uses_gemini4 and not emitted_gemini4_warn:
+            has_bad_thinking = (
+                _GEMINI_4_THINKING_BUDGET_RE.search(stmt_raw) is not None
+                or _GEMINI_4_UNSUPPORTED_THINKING_LEVEL_RE.search(stmt_raw) is not None
+            )
+            if has_bad_thinking:
+                emitted_gemini4_warn = True
+                findings.append(
+                    ReviewFinding(
+                        severity="WARNING",
+                        rule="GEMINI_4_THINKING_BUDGET",
+                        message=(
+                            "Gemini 4 endpoints (`gemini-4-argon`, `gemini-4-carbon`, "
+                            "`gemini-4-hydrogen`) use `thinking_level` (`'LOW'`, `'MEDIUM'`, "
+                            "or `'HIGH'`) instead of `thinking_budget`, and BigQuery's SQL "
+                            "`model_params` validator rejects `'MINIMAL'` and `'XHIGH'` "
+                            "with HTTP 400."
+                        ),
+                        remediation=(
+                            'Use `model_params => JSON \'{"generation_config": '
+                            '{"thinking_config": {"thinking_level": "LOW" | '
+                            '"MEDIUM" | "HIGH"}}}\'` on Gemini 4 endpoints.'
+                        ),
+                    )
+                )
+
+        if (
+            not emitted_parse_chunk_warn
+            and re.search(r"\bAI\.PARSE_DOCUMENT\s*\(", stmt_masked, re.IGNORECASE) is not None
+            and re.search(r"\bAI\.CHUNK_DOCUMENT\s*\(", stmt_masked, re.IGNORECASE) is not None
+            and re.search(r"raw-docai", stmt_raw, re.IGNORECASE) is None
+        ):
+            emitted_parse_chunk_warn = True
+            findings.append(
+                ReviewFinding(
+                    severity="WARNING",
+                    rule="PARSE_DOCUMENT_CHUNK_SCHEMA",
+                    message=(
+                        "Chaining `AI.PARSE_DOCUMENT` into `AI.CHUNK_DOCUMENT` without "
+                        '`options => JSON \'{"schema": "raw-docai"}\'` uses the default '
+                        "`layout-v1` schema, which `AI.CHUNK_DOCUMENT` rejects per row "
+                        "(`INVALID_ARGUMENT: Unsupported document schema: layout-v1`)."
+                    ),
+                    remediation=(
+                        'Pass `options => JSON \'{"schema": "raw-docai"}\'` to '
+                        "`AI.PARSE_DOCUMENT(...)` and alias the column `AS parsed_document` "
+                        "when feeding `AI.CHUNK_DOCUMENT`."
+                    ),
+                )
+            )
 
     gen_calls = [
         call_args
@@ -2053,9 +2255,9 @@ def review_sql(
                 rule="UNPINNED_AI_ENDPOINT",
                 message="Generative `AI.GENERATE*` call omits an explicit `endpoint =>` argument.",
                 remediation=(
-                    "Pin `endpoint => 'gemini-3.8-flash'` (or `'gemini-4-argon'` / "
-                    "`'gemini-3.5-flash-lite'`) from `skills/pinned-models.json` "
-                    "for reproducible production behavior."
+                    "Pin `endpoint => 'gemini-3.8-flash'` (or `'gemini-4-hydrogen'` / "
+                    "`'gemini-4-carbon'` / `'gemini-4-argon'` / `'gemini-3.5-flash-lite'`) "
+                    "from `skills/pinned-models.json` for reproducible production behavior."
                 ),
             )
         )
@@ -2106,6 +2308,7 @@ def review_sql(
         "AI.SIMILARITY",
         "AI.AGG",
         "AI.CHUNK_DOCUMENT",
+        "AI.PARSE_DOCUMENT",
     }
     if "OBJ.GET_ACCESS_URL" in detected and any(fn in detected for fn in direct_objref_fns):
         findings.append(
@@ -2266,7 +2469,9 @@ def review_sql(
             )
 
     if "AI.CHUNK_DOCUMENT" in detected:
-        chunk_calls = _iter_function_call_args(masked, "AI.CHUNK_DOCUMENT")
+        chunk_calls = [
+            _top_level_call_args(c) for c in _iter_function_call_args(masked, "AI.CHUNK_DOCUMENT")
+        ]
         for call_args in chunk_calls:
             if _OPTIONS_ARG_RE.search(call_args):
                 findings.append(

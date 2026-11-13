@@ -105,7 +105,8 @@ ORDER BY target_tokens;
 
 
 -- ============================================================================
--- Example 3: All 3 input shapes — URI wildcard, Object Table, and subquery
+-- Example 3: All 4 input shapes — URI wildcard, Object Table, ObjectRef
+--            subquery, and `parsed_document` chaining
 -- ============================================================================
 
 -- Shape A: URI wildcard literal with delegated `connection_id` (13 columns)
@@ -171,6 +172,35 @@ FROM AI.CHUNK_DOCUMENT(
 )
 WHERE status = ''
 ORDER BY doc_id, chunk_id;
+
+-- Shape D: `(SELECT ... AS parsed_document)` subquery ("Parse Once, Chunk Many Times")
+-- Chain `AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}')`
+-- into `AI.CHUNK_DOCUMENT` (`5 + passthrough` columns).
+-- Note: Passing default `layout-v1` JSON into `AI.CHUNK_DOCUMENT` returns a
+-- per-row failure (`status = 'INVALID_ARGUMENT: Unsupported document schema: layout-v1'`).
+SELECT
+  doc_id,
+  chunk_id,
+  start_page,
+  end_page,
+  CHAR_LENGTH(content) AS char_len,
+  content
+FROM AI.CHUNK_DOCUMENT(
+  (
+    SELECT
+      'DOC-RUNBOOK' AS doc_id,
+      AI.PARSE_DOCUMENT(
+        OBJ.MAKE_REF(
+          'gs://your-gcp-project-id/bq_ai_functions/ai_chunk_document/docs/handbook_multipage.pdf',
+          'your-gcp-project-id.US.bq_ai_functions'
+        ),
+        options => JSON '{"schema": "raw-docai"}'
+      ) AS parsed_document
+  ),
+  chunk_size => 400
+)
+WHERE status = ''
+ORDER BY chunk_id;
 
 
 -- ============================================================================

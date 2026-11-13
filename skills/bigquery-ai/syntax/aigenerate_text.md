@@ -105,15 +105,15 @@ AI.GENERATE_TEXT(
 | `TABLE` / `QUERY_STATEMENT` | Table/Query | All | Required (one of) | -- | -- | Input data. Must have a `prompt` column. If no prompt column exists, use QUERY_STATEMENT with an alias. |
 | `PROMPT` (object tables) | STRING | Gemini object tables | Required | -- | <16,000 tokens | Prompt for analyzing visual content |
 | `max_output_tokens` | INT64 | All | Optional | 1024 | Gemini: [1,8192]; Claude/Llama/Mistral/Open: [1,4096] | Max tokens in response |
-| `top_p` | FLOAT64 | All | Optional | 0.95 (Gemini, Llama, Mistral); model-determined (Claude, Open) | [0.0, 1.0] | Nucleus sampling parameter |
-| `temperature` | FLOAT64 | Gemini, Llama, Mistral, Open | Optional | 0 (Gemini, Llama, Mistral); model-determined (Open) | [0.0, 1.0] | Randomness in token selection |
+| `top_p` | FLOAT64 | All | Optional | 0.95 (Gemini, Llama, Mistral); model-determined (Claude, Open) | [0.0, 1.0] | Nucleus sampling parameter (ignored by Gemini 4 models `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) |
+| `temperature` | FLOAT64 | Gemini, Llama, Mistral, Open | Optional | 0 (Gemini, Llama, Mistral); model-determined (Open) | [0.0, 1.0] | Randomness in token selection (ignored by Gemini 4 models `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) |
 | `top_k` | INT64 | Claude, Open | Optional | Model-determined | [1, 40] | Top-K sampling |
 | `stop_sequences` | ARRAY\<STRING\> | Gemini, Llama, Mistral | Optional | Empty array | -- | Strings to exclude from responses |
 | `ground_with_google_search` | BOOL | Gemini | Optional | FALSE | -- | Enable Google Search grounding |
 | `safety_settings` | ARRAY\<STRUCT\<STRING AS category, STRING AS threshold\>\> | Gemini | Optional | BLOCK_MEDIUM_AND_ABOVE | -- | Content safety filtering |
 | `request_type` | STRING | Gemini | Optional | UNSPECIFIED | SHARED, DEDICATED, UNSPECIFIED | Quota type for Provisioned Throughput |
 | `use_chat_mode` | BOOL | Open models | Optional | FALSE | -- | When TRUE, enables chat mode for open models. |
-| `model_params` | JSON string | All | Optional | -- | -- | JSON conforming to generateContent request body. Cannot be used simultaneously with top-level parameters. |
+| `model_params` | JSON string | All | Optional | -- | -- | JSON conforming to generateContent request body. Cannot be used simultaneously with top-level parameters. On Gemini 3.x and Gemini 4 (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`), configure reasoning via `thinking_config.thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`; `"MINIMAL"`, `"XHIGH"`, and `thinking_budget` are rejected with HTTP 400). |
 
 Safety settings categories: `HARM_CATEGORY_HATE_SPEECH`, `HARM_CATEGORY_DANGEROUS_CONTENT`, `HARM_CATEGORY_HARASSMENT`, `HARM_CATEGORY_SEXUALLY_EXPLICIT`
 
@@ -144,7 +144,7 @@ All models return the input table columns plus:
 | Open models | `full_response` | JSON | Complete Vertex AI API JSON response |
 | Open models | `status` | STRING | API status |
 
-**Supported models:** Remote models over any GA or preview Gemini models, Anthropic Claude models, Mistral AI models, Llama models, and supported open models (all via `CREATE MODEL`).
+**Supported models:** Remote models over any GA or preview Gemini models (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, `gemini-3.5-flash-lite`), Anthropic Claude models, Mistral AI models, Llama models, and supported open models (all via `CREATE MODEL`).
 
 **Best practices:**
 - Avoid using LIMIT and OFFSET in the prompt query (causes processing all data first). Write query results to a table first, then reference that table.
@@ -153,7 +153,7 @@ All models return the input table columns plus:
 **Limitations:**
 - Model and input table must be in the same region.
 - Resource exhausted errors can occur for some rows when API call volume exceeds quota limits. Use BigQuery remote inference SQL scripts or Dataform package to handle quota errors iteratively.
-- Gemini 2.5 models incur thinking process charges.
+- Gemini 2.5 models incur thinking process charges. For Gemini 3.0+ and Gemini 4 (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`), configure reasoning via `thinking_config.thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`) in `model_params` (`"MINIMAL"`, `"XHIGH"`, and `thinking_budget` are rejected with HTTP 400); Gemini 4 models also ignore custom sampling parameters (`temperature`, `top_p`, `top_k`).
 - Object table Cloud Storage bucket must be in the same project as the model.
 - Object table queries only support WHERE and ORDER BY clauses.
 - Object table prompt must be under 16,000 tokens.
@@ -162,6 +162,6 @@ All models return the input table columns plus:
 
 **Provisioned throughput:** Supported via `request_type` parameter; must pre-purchase matching quota.
 
-**BigFrames API:** `bigframes.bigquery.ai.generate_text(model, data)` — TVF wrapper that takes a model name string and DataFrame/Series. Also available as `bigframes.ml.llm.GeminiTextGenerator` (sklearn-style: create model, then `.predict()`), though in `bigframes 2.51.0` `GeminiTextGenerator` hardcodes a client-side `_GEMINI_ENDPOINTS` allowlist (`gemini-1.5-*`, `gemini-2.0-*`, `gemini-2.5-*`) and emits an `UnknownModelWarning` for `gemini-3.8-flash` or `gemini-4-argon` even though `CREATE MODEL` succeeds; prefer `bbq.ai.generate` / `bbq.ai.generate_text`. `GeminiTextGenerator` also supports `.fit()` for fine-tuning and `.score()` for evaluation. For Claude models: `bigframes.ml.llm.Claude3TextGenerator`.
+**BigFrames API:** `bigframes.bigquery.ai.generate_text(model, data)` — TVF wrapper that takes a model name string and DataFrame/Series. Also available as `bigframes.ml.llm.GeminiTextGenerator` (sklearn-style: create model, then `.predict()`), though in `bigframes 2.51.0` `GeminiTextGenerator` hardcodes a client-side `_GEMINI_ENDPOINTS` allowlist (`gemini-1.5-*`, `gemini-2.0-*`, `gemini-2.5-*`) and emits an `UnknownModelWarning` for `gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, or `gemini-4-hydrogen` even though `CREATE MODEL` succeeds; prefer `bbq.ai.generate` / `bbq.ai.generate_text`. `GeminiTextGenerator` also supports `.fit()` for fine-tuning and `.score()` for evaluation. For Claude models: `bigframes.ml.llm.Claude3TextGenerator`.
 
 ---

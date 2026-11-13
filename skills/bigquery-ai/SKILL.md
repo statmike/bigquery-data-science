@@ -1,8 +1,8 @@
 ---
 name: bigquery-ai
-description: Use when calling Gemini, TimesFM, TabFM, Cloud Translation, or pre-trained Cloud AI services from BigQuery SQL or BigFrames — generation (AI.GENERATE*, AI.COUNT_TOKENS), managed scoring/classification/translation (AI.IF, AI.SCORE, AI.CLASSIFY, AI.AGG, AI.TRANSLATE), document chunking (AI.CHUNK_DOCUMENT), embeddings and vector/hybrid search (AI.EMBED, AI.SIMILARITY, VECTOR_SEARCH, AI.SEARCH), forecasting/prediction (AI.FORECAST, AI.PREDICT, AI.KEY_DRIVERS), and Cloud AI service models (ML.PROCESS_DOCUMENT, ML.TRANSLATE, ML.TRANSCRIBE).
+description: Use when calling Gemini, TimesFM, TabFM, Cloud Translation, or pre-trained Cloud AI services from BigQuery SQL or BigFrames — generation (AI.GENERATE*, AI.COUNT_TOKENS), managed scoring/classification/translation (AI.IF, AI.SCORE, AI.CLASSIFY, AI.AGG, AI.TRANSLATE), document parsing and chunking (AI.PARSE_DOCUMENT, AI.CHUNK_DOCUMENT), embeddings and vector/hybrid search (AI.EMBED, AI.SIMILARITY, VECTOR_SEARCH, AI.SEARCH), forecasting/prediction (AI.FORECAST, AI.PREDICT, AI.KEY_DRIVERS), and Cloud AI service models (ML.PROCESS_DOCUMENT, ML.TRANSLATE, ML.TRANSCRIBE).
 metadata:
-  version: "0.11.0"
+  version: "0.12.0"
 ---
 
 # BigQuery AI (`bigquery-ai`)
@@ -18,7 +18,7 @@ This skill packages a verified, field-tested 4-Lens reference distilled from liv
 3. **Do you need to embed text/multimodal content, compute pairwise similarity, or run vector/hybrid RRF search?** → see [`reference/embeddings-and-search.md`](reference/embeddings-and-search.md)
 4. **Do you need zero-training predictions** — forecast a time series (`AI.FORECAST` on TimesFM 2.5 / 3.0), detect anomalies (`AI.DETECT_ANOMALIES`), or predict tabular targets without training (`AI.PREDICT` + `AI.EVALUATE` on TabFM)? → see [`reference/predictive-ai.md`](reference/predictive-ai.md)
 5. **Do you need to explain why a summable metric moved (`AI.KEY_DRIVERS`), or estimate the causal impact of an intervention (`AI.CAUSAL_EFFECT`)?** → see [`reference/augmented-analytics.md`](reference/augmented-analytics.md) (which also routes `AI.CAUSAL_EFFECT` to [`../bigquery-ml/reference/workflows-and-pipelines.md`](../bigquery-ml/reference/workflows-and-pipelines.md))
-6. **Are you chunking PDF/HTML/DOCX/PPTX/XLSX documents (`AI.CHUNK_DOCUMENT`), extracting structured records from PDFs/images (`ML.PROCESS_DOCUMENT`), or passing `ObjectRef` media into `AI.*` functions?** → see [`reference/document-processing.md`](reference/document-processing.md)
+6. **Are you parsing or chunking PDF/HTML/DOCX/PPTX/XLSX documents (`AI.PARSE_DOCUMENT`, `AI.CHUNK_DOCUMENT`), extracting structured records from PDFs/images (`ML.PROCESS_DOCUMENT`), or passing `ObjectRef` media into `AI.*` functions?** → see [`reference/document-processing.md`](reference/document-processing.md)
 7. **Do you need a pre-trained Cloud AI service (`REMOTE_SERVICE_TYPE`) with a fixed API schema and per-row status column** (`ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`, `ML.PROCESS_DOCUMENT`)? → see [`reference/cloud-ai-service-models.md`](reference/cloud-ai-service-models.md)
 8. **Are you composing multiple capabilities into an end-to-end application** (RAG, hybrid catalog search, document intelligence, log triage, content moderation, metric diagnostics)? → see [`reference/workflows.md`](reference/workflows.md)
 
@@ -33,24 +33,25 @@ If the task is ambiguous between zero-training foundation functions (`bigquery-a
 
 ## Tool Wrapper & Generator Rules (SQL + `bigframes.bigquery.ai`)
 
-- **Dual Surface & Pinned Models**: Always pin the explicit `endpoint` or `model` parameter (`'gemini-3.8-flash'`, `'gemini-4-argon'`, `'gemini-3.5-flash-lite'`, `'gemini-embedding-2'`, `'gemini-embedding-001'`, `'embeddinggemma-300m'`, `'TimesFM 2.5'`, `'TimesFM 3.0'`, `'nmt'`, `'translation-llm'`) from `skills/pinned-models.json` so silent default upgrades never shift outputs. Pair SQL calls with `bigframes.bigquery.ai` / `bigframes.ml.llm` wrappers when generating Python notebooks.
+- **Dual Surface & Pinned Models**: Always pin the explicit `endpoint` or `model` parameter (`'gemini-3.8-flash'`, `'gemini-4-hydrogen'`, `'gemini-4-carbon'`, `'gemini-4-argon'`, `'gemini-3.5-flash-lite'`, `'gemini-embedding-2'`, `'gemini-embedding-001'`, `'embeddinggemma-300m'`, `'TimesFM 2.5'`, `'TimesFM 3.0'`, `'nmt'`, `'translation-llm'`) from `skills/pinned-models.json` so silent default upgrades never shift outputs. Pair SQL calls with `bigframes.bigquery.ai` / `bigframes.ml.llm` wrappers when generating Python notebooks.
 - **Per-Statement Syntax Lookup (Lens 3)**: Before emitting `AI.*`, `VECTOR_SEARCH`, or `OBJ.*` calls, inspect [`syntax/INDEX.md`](syntax/INDEX.md) (or run `bigquery-data-science lookup <SYMBOL>`) to read the exact `< 25 KB` syntax card in `syntax/*.md`.
-- **Direct `ObjectRef` Input**: Pass `ObjectRef` columns (from an Object Table's `ref` column, `OBJ.LIST(...)`, or `OBJ.MAKE_REF(uri, connection)`) directly into `AI.GENERATE*`, `AI.CLASSIFY`, `AI.SCORE`, `AI.IF`, `AI.AGG`, `AI.EMBED`, and `AI.CHUNK_DOCUMENT` (`(SELECT ref FROM ...)` subquery) without wrapping in `OBJ.GET_ACCESS_URL`.
+- **Direct `ObjectRef` Input**: Pass `ObjectRef` columns (from an Object Table's `ref` column, `OBJ.LIST(...)`, or `OBJ.MAKE_REF(uri, connection)`) directly into `AI.GENERATE*`, `AI.CLASSIFY`, `AI.SCORE`, `AI.IF`, `AI.AGG`, `AI.EMBED`, `AI.PARSE_DOCUMENT`, and `AI.CHUNK_DOCUMENT` (`(SELECT ref FROM ...)` subquery) without wrapping in `OBJ.GET_ACCESS_URL`.
 
 ## Reviewer Verification Checklist & Rubric
 
 Before returning any `bigquery-ai` SQL or Python code, verify against this checklist:
 
-- [ ] **No Retired `AI.PARSE_DOCUMENT`**: Reject any query using `AI.PARSE_DOCUMENT` (offline since 2026-06-01); replace with `AI.CHUNK_DOCUMENT` (for RAG chunking), `ML.PROCESS_DOCUMENT` (for specialized processor extraction), or `AI.GENERATE` + `output_schema`.
+- [ ] **Scalar `AI.PARSE_DOCUMENT` & `raw-docai` Schema for `AI.CHUNK_DOCUMENT` Chaining**: `AI.PARSE_DOCUMENT` is a GA **scalar** function returning `JSON` (never use the legacy early-Preview `FROM AI.PARSE_DOCUMENT(TABLE ..., endpoint => ...)` TVF syntax). When chaining `AI.PARSE_DOCUMENT` into `AI.CHUNK_DOCUMENT`, pass `options => JSON '{"schema": "raw-docai"}'` and alias the column `AS parsed_document` (default `layout-v1` returns per-row `Unsupported document schema: layout-v1`).
 - [ ] **No Non-Existent `HYBRID_SEARCH` TVF**: Use `VECTOR_SEARCH(..., options => '{"lexical_search_columns": [...]}')` or `AI.SEARCH(..., mode => 'HYBRID')` and size `top_k >= R/10` for target semantic rank `R`.
 - [ ] **`output_schema` Field Access**: When `output_schema` is passed to `AI.GENERATE` or `AI.GENERATE_TABLE`, select the schema field names directly (never `.result`, which disappears when `output_schema` is specified).
+- [ ] **Gemini 4 `thinking_level` (`LOW`/`MEDIUM`/`HIGH` only in SQL) & No `thinking_budget`**: On `'gemini-4-hydrogen'`, `'gemini-4-carbon'`, and `'gemini-4-argon'`, use `thinkingConfig.thinkingLevel` (`'LOW'`, `'MEDIUM'`, or `'HIGH'` in BigQuery SQL `model_params`; `'MINIMAL'` and `'XHIGH'` are rejected by BigQuery's SQL `model_params` validator with `400`, and `thinking_budget` is a Gemini 3.5 parameter). Sampling overrides (`temperature`, `top_p`, `top_k`, `seed`) are accepted but ignored by Gemini 4 endpoints.
 - [ ] **No `task_type` or `title` with `gemini-embedding-2`, and `outputDimensionality <= 2,000` for `CREATE VECTOR INDEX`**: Never pass `task_type` or `title` when `endpoint => 'gemini-embedding-2'` (rejected with `400 Bad Request`), and pass camelCase `model_params => JSON '{"outputDimensionality": 768}'` on `AI.EMBED` (or `STRUCT(768 AS output_dimensionality)` on `AI.GENERATE_EMBEDDING`) whenever vectors will be indexed with `CREATE VECTOR INDEX` (`<= 2,000` dims ceiling vs `3,072` default).
 - [ ] **Subquery Sampling Before `LIMIT`**: Materialize or subquery-limit input rows *before* invoking per-row `AI.*` scalar functions so `LIMIT` does not evaluate and bill the entire table.
-- [ ] **Per-Row Status Check on Cloud AI & Chunking TVFs**: Queries calling `AI.CHUNK_DOCUMENT`, `ML.PROCESS_DOCUMENT`, `ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, or `ML.TRANSCRIBE` inspect `status` / `<function>_status` because per-row failures do not fail the BigQuery job.
+- [ ] **Per-Row Status Check on Cloud AI, Parsing & Chunking Functions**: Queries calling `AI.CHUNK_DOCUMENT`, `ML.PROCESS_DOCUMENT`, `ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, or `ML.TRANSCRIBE` inspect `status` / `<function>_status` (and `AI.PARSE_DOCUMENT` queries inspect `JSON_QUERY_ARRAY(parsed, '$.errors')`) because per-row failures do not fail the BigQuery job.
 
 ## Cross-Cutting Gotchas (Apply Across Functions)
 
-- **`AI.PARSE_DOCUMENT` is offline and its documentation has been withdrawn** (since 2026-06-01). Always use `AI.CHUNK_DOCUMENT` (GA, zero processor DDL) for document chunking, `ML.PROCESS_DOCUMENT` (via a `CLOUD_AI_DOCUMENT_V1` remote model) for specialized entity extraction, or `AI.GENERATE` over `ObjectRef`.
+- **`AI.PARSE_DOCUMENT` is a GA scalar function (`-> JSON`) with two schemas (`layout-v1` vs `raw-docai`)**: Default `layout-v1` returns flat reading-order blocks (`title`, `heading`, `text`, `table` HTML, `list_item`, `image`, `page_header`, `page_footer`) with 1-indexed `page_number` and normalized `bbox`, whereas `options => JSON '{"schema": "raw-docai"}'` returns the nested Document AI layout tree required to chain `parsed_document` into `AI.CHUNK_DOCUMENT`. Never use the legacy early-Preview `FROM AI.PARSE_DOCUMENT(TABLE ..., endpoint => ...)` TVF syntax.
 - **`output_schema` replaces the `result` field entirely** in `AI.GENERATE` and `AI.GENERATE_TABLE`.
 - **`LIMIT` / `OFFSET` on an outer `SELECT` does not reduce billed LLM calls** — filter or `LIMIT` inside a CTE/subquery before calling scalar `AI.*` functions.
 - **Pass `ObjectRef` directly to multimodal `AI.*` functions** — `OBJ.GET_ACCESS_URL` is only needed when generating short-lived signed URLs (`<= 6` hours; never persist signed URLs), and in VPC Service Controls (VPC-SC) perimeters use direct `OBJ.MAKE_REF(uri)` or un-wrapped `ObjectRef` because signed HTTPS URLs trigger `HTTP links are not supported for requests restricted by VPCSC`.
@@ -68,7 +69,7 @@ Before returning any `bigquery-ai` SQL or Python code, verify against this check
   - [`reference/embeddings-and-search.md`](reference/embeddings-and-search.md) — `AI.EMBED`, `AI.GENERATE_EMBEDDING`, `ML.GENERATE_EMBEDDING`, `AI.SIMILARITY`, `VECTOR_SEARCH`, `AI.SEARCH`, and hybrid RRF search
   - [`reference/predictive-ai.md`](reference/predictive-ai.md) — `AI.FORECAST`, `AI.DETECT_ANOMALIES`, `AI.PREDICT`, `AI.EVALUATE` (TimesFM & TabFM)
   - [`reference/augmented-analytics.md`](reference/augmented-analytics.md) — `AI.KEY_DRIVERS` and routing for `AI.CAUSAL_EFFECT`
-  - [`reference/document-processing.md`](reference/document-processing.md) — `AI.CHUNK_DOCUMENT`, `ML.PROCESS_DOCUMENT`, `AI.PARSE_DOCUMENT` (retired), Object Tables, `OBJ.LIST`, `OBJ.MAKE_REF`, `OBJ.FETCH_METADATA`, `OBJ.GET_ACCESS_URL`
+  - [`reference/document-processing.md`](reference/document-processing.md) — `AI.CHUNK_DOCUMENT`, `AI.PARSE_DOCUMENT`, `ML.PROCESS_DOCUMENT`, Object Tables, `OBJ.LIST`, `OBJ.MAKE_REF`, `OBJ.FETCH_METADATA`, `OBJ.GET_ACCESS_URL`
   - [`reference/cloud-ai-service-models.md`](reference/cloud-ai-service-models.md) — `ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`, `ML.PROCESS_DOCUMENT`
   - [`reference/workflows.md`](reference/workflows.md) — 14 composed end-to-end workflows (RAG, hybrid catalog search, document intelligence, tabular prediction, etc.)
 - **Lens 3 — Per-Statement Syntax Cards (`syntax/`, < 25 KB each)**: [`syntax/INDEX.md`](syntax/INDEX.md) (46 H2-sliced syntax cards)

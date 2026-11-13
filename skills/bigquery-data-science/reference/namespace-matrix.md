@@ -102,8 +102,8 @@ Most BigQuery ML and BigQuery AI features run on standard on-demand pricing, **e
 | `AI.EVALUATE` | `bigquery-ai` | Zero-Training TimesFM / TabFM Eval | None | On-demand OK | GA (TS) / Preview (TabFM) | `bigquery-ai/narrative/ai_evaluate.md` |
 | `AI.PREDICT` | `bigquery-ai` | Zero-Training TabFM Prediction | None | On-demand OK | Preview | `bigquery-ai/narrative/ai_predict.md` |
 | `AI.KEY_DRIVERS` | `bigquery-ai` | Model-Free Driver Analysis TVF | None | On-demand OK | GA | `bigquery-ai/narrative/ai_key_drivers.md` |
-| `AI.CHUNK_DOCUMENT` | `bigquery-ai` | Layout-Aware Document Chunking TVF (PDF, HTML, DOCX, PPTX, XLSX) | `CLOUD_RESOURCE` (`roles/storage.objectViewer` + `documentai.apiUser` + `serviceUsageConsumer`) | On-demand OK | GA | `bigquery-ai/narrative/ai_chunk_document.md` |
-| `AI.PARSE_DOCUMENT` | `bigquery-ai` | **RETIRED (Offline 2026-06-01)** | Replaced by `AI.CHUNK_DOCUMENT` + `ML.PROCESS_DOCUMENT` | N/A | Retired | `bigquery-ai/narrative/ai_parse_document.md` |
+| `AI.CHUNK_DOCUMENT` | `bigquery-ai` | Layout-Aware Document Chunking TVF (PDF, HTML, DOCX, PPTX, XLSX, or `parsed_document` `raw-docai` JSON) | `CLOUD_RESOURCE` (`roles/storage.objectViewer` + `documentai.apiUser` + `serviceUsageConsumer`; none when chunking `parsed_document`) | On-demand OK | GA | `bigquery-ai/narrative/ai_chunk_document.md` |
+| `AI.PARSE_DOCUMENT` | `bigquery-ai` | Layout-Aware Document Parsing Scalar Function (`layout-v1` blocks or `raw-docai` tree for `AI.CHUNK_DOCUMENT`) | EUC default or `CLOUD_RESOURCE` (`roles/storage.objectViewer` + `documentai.viewer`/`editor`) | On-demand OK | GA | `bigquery-ai/narrative/ai_parse_document.md` |
 
 ## Pre-Trained Cloud AI Service Models & Object Infrastructure (`bigquery-ai`)
 

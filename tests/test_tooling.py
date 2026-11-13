@@ -417,6 +417,7 @@ def test_status_labels_passes_on_repo_and_detects_drift(tmp_path: Path) -> None:
     )
     for ga_sym in (
         "AI.CHUNK_DOCUMENT",
+        "AI.PARSE_DOCUMENT",
         "AI.TRANSLATE",
         "AI.COUNT_TOKENS",
         "AI.IF",
@@ -711,14 +712,14 @@ def test_sql_companions_and_single_source_pinned_models(
     errs_missing = check_sql_companions(tmp_path, SKILLS_ROOT)
     assert any("missing paired SQL companion" in e for e in errs_missing)
 
-    # 2. Present .sql companion but missing primary symbol AI.FORECAST and using retired function
+    # 2. Present .sql companion but missing primary symbol AI.FORECAST and using legacy TVF syntax
     sql_file = fn_dir / "ai_forecast.sql"
     sql_file.write_text(
         "SELECT * FROM AI.PARSE_DOCUMENT(TABLE `docs`);\n",
         encoding="utf-8",
     )
     errs_bad_sql = check_sql_companions(tmp_path, SKILLS_ROOT)
-    assert any("RETIRED_FUNCTION" in e for e in errs_bad_sql)
+    assert any("LEGACY_PARSE_DOCUMENT_TVF" in e for e in errs_bad_sql)
     assert any("missing primary symbol 'AI.FORECAST'" in e for e in errs_bad_sql)
     assert (
         main(

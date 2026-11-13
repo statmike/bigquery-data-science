@@ -18,7 +18,7 @@ An end-to-end document processing pipeline that composes four AI functions:
 
 **Functions used:** `functions/ai_classify` (`AI.CLASSIFY`) | `functions/ai_generate` (`AI.GENERATE`) | `functions/ai_score` (`AI.SCORE`) | `functions/ai_agg` (`AI.AGG`)
 
-**For specialized document parsing:** See `functions/ml_process_document` (`ML.PROCESS_DOCUMENT`) for Document AI integration
+**For specialized document parsing & RAG chunking:** See `functions/ai_parse_document` (`AI.PARSE_DOCUMENT`) (GA zero-DDL scalar layout JSON with reading-order blocks, HTML tables, and `raw-docai` layout tree), `functions/ai_chunk_document` (`AI.CHUNK_DOCUMENT`) (GA zero-DDL layout-aware RAG chunking TVF), and `functions/ml_process_document` (`ML.PROCESS_DOCUMENT`) (specialized Document AI entity extractors)
 
 **Prerequisites:** `setup` (Setup guide) | `RESOURCES.md` (Function reference)
 

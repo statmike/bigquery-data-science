@@ -2,8 +2,8 @@
 
 > **Source:** [`bigquery-ai/reference/document-processing.md#aichunk_document`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/document-processing.md#aichunk_document)
 
-- **Description:** Table-valued function that splits unstructured documents in Cloud Storage into layout-aware text chunks using an auto-provisioned Document AI Layout Parser processor (`bq-created-layout-parser`) — requiring zero `CREATE MODEL` DDL and zero manual Document AI processor setup.
-- **Use cases:** Layout-aware chunking of PDFs, Word documents, PowerPoint decks, Excel workbooks, and HTML pages for RAG pipelines (`AI.CHUNK_DOCUMENT` -> `AI.EMBED` -> `VECTOR_SEARCH` / `AI.SEARCH`), section-preserving document ingestion with ancestor headings, ad-hoc single-URI or wildcard GCS document parsing without creating an object table.
+- **Description:** Table-valued function that splits unstructured documents in Cloud Storage (or pre-parsed `raw-docai` JSON from [`AI.PARSE_DOCUMENT`](aiparse_document.md)) into layout-aware text chunks using an auto-provisioned Document AI Layout Parser processor (`bq-created-layout-parser`) — requiring zero `CREATE MODEL` DDL and zero manual Document AI processor setup.
+- **Use cases:** Layout-aware chunking of PDFs, Word documents, PowerPoint decks, Excel workbooks, and HTML pages for RAG pipelines (`AI.CHUNK_DOCUMENT` -> `AI.EMBED` -> `VECTOR_SEARCH` / `AI.SEARCH`), re-chunking pre-parsed `AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}')` tables across multiple `chunk_size` experiments, section-preserving document ingestion with ancestor headings, ad-hoc single-URI or wildcard GCS document parsing without creating an object table.
 - [documentation](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-chunk-document) · [notebook](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/functions/ai_chunk_document/ai_chunk_document.ipynb) · [sql](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/functions/ai_chunk_document/ai_chunk_document.sql)
 - **Type:** Table-valued function (returns a table) — GA
 
@@ -21,19 +21,20 @@ FROM AI.CHUNK_DOCUMENT(
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| `'STORAGE_URI'` \| `TABLE input_table` \| `(query_statement)` | `STRING` literal, object table, or subquery | Required | -- | Document source: (1) a Cloud Storage `'gs://bucket/path/file.pdf'` URI or `'gs://bucket/docs/*.pdf'` wildcard string literal, (2) a BigQuery `EXTERNAL` object table (`TABLE project.dataset.object_table`), or (3) a parenthesized `SELECT` subquery returning an `OBJECTREF` column **named `ref`** (for example via `OBJ.MAKE_REF(uri) AS ref` or `OBJ.LIST(...)`, optionally alongside additional passthrough columns). |
-| `connection_id` | `STRING` (named parameter) | Optional (required for `TABLE object_table`) | End-user credentials | Cloud resource connection (`'PROJECT_ID.LOCATION.CONNECTION_ID'` or `'LOCATION.CONNECTION_ID'`) whose service account accesses Cloud Storage and Document AI instead of caller end-user credentials (EUC). Required when reading `TABLE object_table` (must match the object table's connection); on `(query_statement)`, must match `ref.authorizer` (or be omitted for 1-arg `OBJ.MAKE_REF(uri)`); on `'gs://...'` URI literals, upstream docs state EUC-only though live `2026-11-02` probes confirmed `connection_id` is also accepted. |
+| `'STORAGE_URI'` \| `TABLE input_table` \| `(query_statement)` | `STRING` literal, table, or subquery | Required | -- | Document source: (1) a Cloud Storage `'gs://bucket/path/file.pdf'` URI or `'gs://bucket/docs/*.pdf'` wildcard string literal, (2) a BigQuery `EXTERNAL` object table (`TABLE project.dataset.object_table`), (3) a parenthesized `SELECT` subquery returning an `OBJECTREF` column **named `ref`** (for example via `OBJ.MAKE_REF(uri) AS ref` or `OBJ.LIST(...)`, optionally alongside additional passthrough columns), or (4) a `TABLE` or `(query_statement)` containing a `JSON` column **named `parsed_document`** produced by `AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}')`. |
+| `connection_id` | `STRING` (named parameter) | Optional (required for `TABLE object_table`) | End-user credentials | Cloud resource connection (`'PROJECT_ID.LOCATION.CONNECTION_ID'` or `'LOCATION.CONNECTION_ID'`) whose service account accesses Cloud Storage and Document AI instead of caller end-user credentials (EUC). Required when reading `TABLE object_table` (must match the object table's connection); on `(query_statement)`, must match `ref.authorizer` (or be omitted for 1-arg `OBJ.MAKE_REF(uri)` or `parsed_document` inputs); on `'gs://...'` URI literals, upstream docs state EUC-only though live `2026-11-02` probes confirmed `connection_id` is also accepted. |
 | `chunk_size` | `INT64` (named parameter) | Optional | `1000` | Target chunk size in tokens. Must be an `INT64` literal in `[1, 2000]`; values outside `1..2000` fail query validation. Smaller values (such as `chunk_size => 250` or `chunk_size => 500`) yield finer-grained RAG retrieval units while still prepending ancestor section headings. |
 
-**Three input shapes and output column counts:**
+**Four input shapes and output column counts:**
 
 | Input Shape | SQL Pattern | Output Columns | URI Column Access |
 |-------------|-------------|----------------|-------------------|
 | **1. Storage URI / wildcard** | `AI.CHUNK_DOCUMENT('gs://bucket/docs/*.pdf', chunk_size => 500)` | **13 columns** (`5` chunk columns + `8` object metadata columns: `uri`, `generation`, `content_type`, `size`, `md5_hash`, `updated`, `metadata`, `ref`) | Top-level `uri` |
 | **2. Object table** | `AI.CHUNK_DOCUMENT(TABLE \`PROJECT_ID.DATASET.OBJECT_TABLE\`, chunk_size => 500)` | **13 columns** (`5` chunk columns + the object table's `8` columns) | Top-level `uri` |
 | **3. `ObjectRef` subquery** | `AI.CHUNK_DOCUMENT((SELECT doc_id, OBJ.MAKE_REF(uri) AS ref FROM ...), chunk_size => 500)` | **`5 + N` columns** (`5` chunk columns + the `N` columns projected by the subquery) | `ref.uri` unless the subquery also projected `uri` explicitly |
+| **4. Pre-parsed `parsed_document` table / subquery** | `AI.CHUNK_DOCUMENT(TABLE \`PROJECT_ID.DATASET.parsed_docs\`, chunk_size => 250)` *(where `parsed_document` holds `raw-docai` JSON from `AI.PARSE_DOCUMENT`)* | **`5 + N` columns** (`5` chunk columns + all `N` columns of the input table/subquery, including `parsed_document`) | Any passthrough `uri` / `doc_id` column included alongside `parsed_document` |
 
-> **GOTCHA — Subquery `ref` column binding & passthrough columns:** The `(query_statement)` form binds its input column **by exact column name (`ref`)**, not by column count (`AI.CHUNK_DOCUMENT expects the input table to have a column named 'ref' or 'parsed_document', but both are missing.`). When `(query_statement)` selects only `OBJ.MAKE_REF(uri) AS ref`, `AI.CHUNK_DOCUMENT` returns **6 columns** (`chunk_id`, `content`, `start_page`, `end_page`, `status`, `ref`) with **no top-level `uri` column** — read `ref.uri` or project `uri` alongside `ref` in the subquery.
+> **GOTCHA — Subquery `ref` or `parsed_document` column binding & schema requirement:** The `TABLE` / `(query_statement)` forms bind their input column **by exact column name (`ref` or `parsed_document`)**, not by column position (`AI.CHUNK_DOCUMENT expects the input table to have a column named 'ref' or 'parsed_document', but both are missing.`). When chaining [`AI.PARSE_DOCUMENT`](aiparse_document.md) into `AI.CHUNK_DOCUMENT`, you **must** pass `options => JSON '{"schema": "raw-docai"}'` to `AI.PARSE_DOCUMENT`; passing default `layout-v1` JSON into `AI.CHUNK_DOCUMENT` returns per-row `status = 'INVALID_ARGUMENT: Unsupported document schema: layout-v1'` with `content = NULL`. When `(query_statement)` selects only `OBJ.MAKE_REF(uri) AS ref`, `AI.CHUNK_DOCUMENT` returns **6 columns** (`chunk_id`, `content`, `start_page`, `end_page`, `status`, `ref`) with **no top-level `uri` column** — read `ref.uri` or project `uri` alongside `ref` in the subquery.
 
 **Outputs (core chunk columns):**
 
@@ -77,12 +78,28 @@ FROM AI.CHUNK_DOCUMENT(
   chunk_size => 300
 )
 WHERE status = '';
+
+-- 3. "Parse once, chunk many times": re-chunk a pre-parsed raw-docai JSON column
+SELECT doc_id, chunk_id, start_page, end_page, content
+FROM AI.CHUNK_DOCUMENT(
+  (
+    SELECT
+      doc_id,
+      AI.PARSE_DOCUMENT(
+        OBJ.MAKE_REF(gcs_uri),
+        options => JSON '{"schema": "raw-docai"}'
+      ) AS parsed_document
+    FROM `your-gcp-project-id.DATASET_ID.document_catalog`
+  ),
+  chunk_size => 250
+)
+WHERE status = '';
 ```
 
 **Supported file types and size limits:**
 - **Supported formats:** PDF (`.pdf`), HTML (`.html`), Word OOXML (`.docx`), PowerPoint OOXML (`.pptx`), and Excel OOXML (`.xlsx`, `.xlsm`).
 - **Unsupported formats:** Plain text (`.txt`), Markdown (`.md`), and standalone raster images (`.png`, `.jpg`, `.jpeg`, `.gif`, `.tiff`, `.bmp`, `.webp`) return non-empty per-row `status` errors. Chunk `.txt`/`.md` directly in SQL or use [`ML.PROCESS_DOCUMENT`](mlprocess_document.md) with an OCR/specialized processor for standalone images.
-- **Size and page limits:** Up to **20 MB / 15 pages** on the synchronous Document AI path, and up to **1 GB / 500 pages** on the batch PDF path.
+- **Size and page limits:** Up to **20 MB / 15 pages** on the synchronous Document AI path, up to **1 GB / 500 pages** on the batch PDF path, and up to **130 pages** when chaining pre-parsed output from [`AI.PARSE_DOCUMENT`](aiparse_document.md).
 
 **Auto-provisioned processor & IAM prerequisites:**
 1. Enable the Cloud Document AI API (`documentai.googleapis.com`) in the billing/execution project.
@@ -98,13 +115,14 @@ because connection-backed `ObjectRef` resolution mints signed HTTPS access URLs.
 
 **Best practices:**
 - Persist chunked output with `CREATE TABLE ... AS SELECT ... FROM AI.CHUNK_DOCUMENT(...) WHERE status = ''` before calling `AI.EMBED` so documents are parsed once rather than re-billed on every query.
+- When you also need structured layout inspection (`layout-v1`) or want to test multiple `chunk_size` settings without re-paying Document AI per-page parsing fees, materialize `AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}') AS parsed_document` once and pass that table to `AI.CHUNK_DOCUMENT`.
 - Inspect failed documents separately with `WHERE status IS NOT NULL AND status != ''` (Document AI errors) and `WHERE status IS NULL` (missing `OBJ.MAKE_REF` URIs).
 - Tune `chunk_size` (`250`–`500` tokens for dense Q&A retrieval, `1000` default for broader passage context); ancestor headings are automatically prepended so small chunks retain section context.
 
 **Locations:** Supported in the **`US`** and **`EU`** multi-regions and in US and EU single regions **excluding London (`europe-west2`) and Zurich (`europe-west6`)**.
 
-**Pricing & Provisioned throughput:** Billed at standard Document AI Layout Parser rates (**$10 per 1,000 pages** processed) plus BigQuery query compute; `bq-created-layout-parser` incurs zero idle fee. Subject to Document AI Layout Parser quotas rather than Vertex AI Gemini Provisioned Throughput.
+**Pricing & Provisioned throughput:** Billed at standard Document AI Layout Parser rates (**$10 per 1,000 pages** processed) plus BigQuery query compute when reading from Cloud Storage; re-chunking an already materialized `parsed_document` JSON column incurs only BigQuery query compute. `bq-created-layout-parser` incurs zero idle fee. Subject to Document AI Layout Parser quotas rather than Vertex AI Gemini Provisioned Throughput.
 
-**BigFrames API:** As of `bigframes 2.51.0`, there is no dedicated `bigframes.bigquery.ai.chunk_document()` wrapper; execute via `bpd.read_gbq_query("SELECT * FROM AI.CHUNK_DOCUMENT(...)")`.
+**BigFrames API:** As of `bigframes 2.53.0`, there is no dedicated `bigframes.bigquery.ai.chunk_document()` wrapper; execute via `bpd.read_gbq_query("SELECT * FROM AI.CHUNK_DOCUMENT(...)")`.
 
 ---

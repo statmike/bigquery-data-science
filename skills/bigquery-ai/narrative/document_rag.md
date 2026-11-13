@@ -4,7 +4,7 @@
 
 A complete document-based Retrieval-Augmented Generation (RAG) pipeline built entirely in BigQuery SQL:
 
-1. **Chunk** real PDFs into layout-aware sections with `AI.CHUNK_DOCUMENT`
+1. **Parse & Chunk** real PDFs into layout-aware sections with `AI.CHUNK_DOCUMENT` (plus parse-once chunk-size tuning via `AI.PARSE_DOCUMENT`)
 2. **Embed** document chunks with `AI.EMBED` (`gemini-embedding-2`)
 3. **Search** for relevant chunks with `VECTOR_SEARCH`
 4. **Answer** questions with `AI.GENERATE` (`gemini-3.8-flash`), grounded in retrieved chunks with page and chunk citations
@@ -13,10 +13,10 @@ A complete document-based Retrieval-Augmented Generation (RAG) pipeline built en
 - Building an end-to-end PDF RAG pipeline in BigQuery SQL with zero manual Document AI processor setup
 - Layout-aware chunking (`chunk_size => 250`) across 20 single-page invoices and a multi-page policy document, preserving `chunk_id`, `start_page`, and `end_page` provenance
 - Enforcing `AI.CHUNK_DOCUMENT`'s three-way `status` contract (`WHERE status = ''`) before embedding
-- Comparing Object Table input against inline `OBJ.MAKE_REF` and GCS URI wildcard chunking
+- Comparing all four `AI.CHUNK_DOCUMENT` input modes: Object Table (`TABLE`), inline `OBJ.MAKE_REF` subquery, GCS URI wildcard, and pre-parsed `AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}')` (`parsed_document` — *"Parse Once, Chunk Many Times"*)
 - Unified task-agnostic 3,072-dimensional embeddings (`gemini-embedding-2`, no `task_type` needed) and page-cited grounded generation vs ungrounded direct generation
 
-**Functions used:** `functions/ai_chunk_document` (`AI.CHUNK_DOCUMENT`) | `functions/ai_embed` (`AI.EMBED`) | `functions/vector_search` (`VECTOR_SEARCH`) | `functions/ai_generate` (`AI.GENERATE`)
+**Functions used:** `functions/ai_chunk_document` (`AI.CHUNK_DOCUMENT`) | `functions/ai_parse_document` (`AI.PARSE_DOCUMENT`) | `functions/ai_embed` (`AI.EMBED`) | `functions/vector_search` (`VECTOR_SEARCH`) | `functions/ai_generate` (`AI.GENERATE`)
 
 **Prerequisites:** `setup` (Setup guide) | `reference/document-processing.md` (Document processing reference) | `RESOURCES.md` (Function reference)
 
@@ -25,7 +25,7 @@ A complete document-based Retrieval-Augmented Generation (RAG) pipeline built en
 
 Set your project and location, authenticate, and configure shared resources.
 
-> This workflow uses: (1) a **Cloud resource connection** with Cloud Storage, Document AI, and Vertex AI roles, and (2) **Cloud Storage** + an **object table** pointing to the staged PDFs. Unlike `ML.PROCESS_DOCUMENT`, `AI.CHUNK_DOCUMENT` requires **no manual Document AI processor creation** — BigQuery automatically provisions and reuses a zero-idle-fee `bq-created-layout-parser` processor on first run. See the `setup` (Setup Reference) and `reference/document-processing.md` (Document Processing Reference) for details.
+> This workflow uses: (1) a **Cloud resource connection** with Cloud Storage, Document AI, and Vertex AI roles, and (2) **Cloud Storage** + an **object table** pointing to the staged PDFs. Unlike `ML.PROCESS_DOCUMENT`, both `AI.CHUNK_DOCUMENT` and `AI.PARSE_DOCUMENT` require **no manual Document AI processor creation** — BigQuery automatically provisions and reuses a zero-idle-fee `bq-created-layout-parser` processor on first run. See the `setup` (Setup Reference) and `reference/document-processing.md` (Document Processing Reference) for details.
 
 ```python
 import os
@@ -263,8 +263,18 @@ df.head(6)
 
 `AI.CHUNK_DOCUMENT` reads documents from the object table, parses layout structure (headings, paragraphs, tables) via BigQuery's managed `bq-created-layout-parser` processor, and splits long documents into chunks up to `chunk_size` tokens (`1`–`2000`, default `1000`).
 
-Two details matter in every production pipeline:
-1. **Matching `connection_id`:** When reading an object table (or `OBJ.MAKE_REF` subquery), `connection_id` in `AI.CHUNK_DOCUMENT` must match the connection bound to those object references.
+### Where `AI.CHUNK_DOCUMENT` and `AI.PARSE_DOCUMENT` fit alone and together
+
+Both `functions/ai_chunk_document` (`AI.CHUNK_DOCUMENT`) and `functions/ai_parse_document` (`AI.PARSE_DOCUMENT`) use the same auto-provisioned `bq-created-layout-parser` processor (`$0` idle fee), so you can choose between one-step chunking, element-level JSON parsing, or chaining them together:
+
+| Pattern | SQL Surface | Output Shape | When to Use It in Document Pipelines |
+|---|---|---|---|
+| **`AI.CHUNK_DOCUMENT` alone** *(used below for the main RAG index)* | `FROM AI.CHUNK_DOCUMENT(TABLE obj_table, connection_id => ..., chunk_size => 250)` | $N$ rows per document (`chunk_id`, `start_page`, `end_page`, `content`, `status`) | You already know your target `chunk_size` and want RAG-ready text chunks with page spans in a single SQL step |
+| **`AI.PARSE_DOCUMENT` alone** (`"layout-v1"`, default) | `SELECT AI.PARSE_DOCUMENT(ref, connection_id => ...)` | 1 `JSON` value per document (`$.blocks` with `type`, `page_number`, `bbox`, HTML `<table>`) | You want to extract HTML `<table>` elements, filter specific block types (`heading`, `table`, `list_item`), or inspect normalized `[min_y, min_x, max_y, max_x]` coordinates |
+| **`AI.PARSE_DOCUMENT` → `AI.CHUNK_DOCUMENT` together** (`"raw-docai"`, *shown at the end of Step 1*) | `AI.PARSE_DOCUMENT(ref, ..., options => JSON '{"schema": "raw-docai"}') AS parsed_document` → `FROM AI.CHUNK_DOCUMENT(TABLE parsed, chunk_size => ...)` | Cached `raw-docai` layout tree re-sliced into $N$ chunk rows at any `chunk_size` | **"Parse Once, Chunk Many Times"** — tune `chunk_size` (e.g. `150` vs `250` vs `500` tokens) or build multiple chunk tables without paying to re-parse the PDFs in Document AI |
+
+Two operational details matter in every production pipeline:
+1. **Matching `connection_id`:** When reading an object table (or `OBJ.MAKE_REF` subquery), `connection_id` in `AI.CHUNK_DOCUMENT` must match the connection bound to those object references (when reading a pre-parsed `parsed_document` table from `AI.PARSE_DOCUMENT`, `connection_id` is omitted on `AI.CHUNK_DOCUMENT`).
 2. **Three-way `status` filtering:** `AI.CHUNK_DOCUMENT` sets `status = ''` (empty string) on success, a non-empty error message on corrupt or unsupported files, and `NULL` when an `ObjectRef` points to a missing GCS object. Always filter `WHERE status = ''` before downstream embedding — filtering `WHERE status IS NULL` would discard every valid chunk.
 
 Below we materialize the raw chunking output with `chunk_size => 250`, verify the per-row `status` summary, and keep clean chunks for Step 2.
@@ -349,11 +359,12 @@ client.query(f"""
 """).to_dataframe()
 ```
 
-### Alternative: Inline `ObjectRef` and URI wildcard — skip the object table
+### Alternative input modes: Inline `ObjectRef`, URI wildcard, and pre-parsed `AI.PARSE_DOCUMENT`
 
-You don't need to create an external object table for ad-hoc document chunking. `AI.CHUNK_DOCUMENT` also accepts:
+You don't need to create an external object table for ad-hoc document chunking or chunk-size experimentation. Beyond an object table, `AI.CHUNK_DOCUMENT` accepts three other input shapes:
 - **An inline `ObjectRef` subquery** (`SELECT uri, OBJ.MAKE_REF(uri, 'connection') AS ref FROM ...`), which returns the 5 chunk columns (`chunk_id`, `start_page`, `end_page`, `content`, `status`) **plus** whatever passthrough columns your subquery selects (if you omit `uri` from the subquery `SELECT`, read `ref.uri` instead).
 - **A Cloud Storage URI or wildcard string** (`'gs://bucket/path/*.pdf'`), which returns the same 13 columns as an object table.
+- **A pre-parsed `parsed_document` `JSON` column** from `functions/ai_parse_document` (`AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}')`), which lets you parse PDFs once and re-chunk at multiple `chunk_size` values without re-invoking Document AI.
 
 ```python
 # Ad-hoc inline ObjectRef subquery over 3 specific files — no object table required
@@ -386,6 +397,56 @@ LIMIT 6
 df = client.query(query).to_dataframe()
 print(f'Inline ObjectRef approach: returned {len(df)} preview rows across {df["document"].nunique()} documents')
 df
+```
+
+### Tuning `chunk_size` without re-parsing: `AI.PARSE_DOCUMENT` (`raw-docai`) → `AI.CHUNK_DOCUMENT`
+
+When tuning RAG retrieval quality across a document corpus, calling `AI.CHUNK_DOCUMENT` directly on raw PDFs at three candidate `chunk_size` values invokes the Document AI Layout Parser three times on every page. Instead, use the two-stage **"Parse Once, Chunk Many Times"** pattern:
+
+1. Call scalar `functions/ai_parse_document` (`AI.PARSE_DOCUMENT`) once per document with `options => JSON '{"schema": "raw-docai"}'` and alias the output column **`AS parsed_document`**. (`AI.PARSE_DOCUMENT`'s default `"layout-v1"` schema is built for direct SQL block/table inspection; `"raw-docai"` preserves the full Document AI layout tree required by `AI.CHUNK_DOCUMENT` — passing `"layout-v1"` into `AI.CHUNK_DOCUMENT` returns `status = 'INVALID_ARGUMENT: Unsupported document schema: layout-v1'`.)
+2. Pass that table or CTE into `AI.CHUNK_DOCUMENT` at multiple `chunk_size` settings (`150`, `250`, and `500` tokens below) — `connection_id` is omitted on `AI.CHUNK_DOCUMENT` because Document AI has already parsed the PDF.
+
+```python
+# Parse the 3-page AP policy PDF ONCE with AI.PARSE_DOCUMENT (raw-docai),
+# then compare AI.CHUNK_DOCUMENT across three chunk_size settings without re-parsing
+policy_uri = f'gs://{BUCKET}/{prefix}/ap_vendor_policy.pdf'
+
+query = f"""
+WITH parsed_once AS (
+  SELECT
+    'ap_vendor_policy.pdf' AS document,
+    AI.PARSE_DOCUMENT(
+      OBJ.MAKE_REF('{policy_uri}', '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}'),
+      connection_id => '{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}',
+      options => JSON '{{"schema": "raw-docai"}}'
+    ) AS parsed_document
+),
+chunk_grid AS (
+  SELECT 150 AS target_chunk_size, chunk_id, start_page, end_page, content, status
+  FROM AI.CHUNK_DOCUMENT(TABLE parsed_once, chunk_size => 150)
+  UNION ALL
+  SELECT 250 AS target_chunk_size, chunk_id, start_page, end_page, content, status
+  FROM AI.CHUNK_DOCUMENT(TABLE parsed_once, chunk_size => 250)
+  UNION ALL
+  SELECT 500 AS target_chunk_size, chunk_id, start_page, end_page, content, status
+  FROM AI.CHUNK_DOCUMENT(TABLE parsed_once, chunk_size => 500)
+)
+SELECT
+  target_chunk_size,
+  COUNT(*) AS total_chunks,
+  COUNTIF(status = '') AS valid_chunks,
+  MIN(LENGTH(content)) AS min_chars,
+  CAST(ROUND(AVG(LENGTH(content))) AS INT64) AS avg_chars,
+  MAX(LENGTH(content)) AS max_chars,
+  CONCAT(CAST(MIN(start_page) AS STRING), '-', CAST(MAX(end_page) AS STRING)) AS page_span
+FROM chunk_grid
+WHERE status = ''
+GROUP BY target_chunk_size
+ORDER BY target_chunk_size
+"""
+df_tuning = client.query(query).to_dataframe()
+print('Parse-once chunk-size comparison on ap_vendor_policy.pdf (3 pages):')
+df_tuning
 ```
 
 ---
@@ -653,10 +714,10 @@ for _, row in df.iterrows():
 
 ### Choosing a document QA pattern in BigQuery
 
-| Dimension | Direct `AI.GENERATE` (text only) | Multimodal `AI.GENERATE` (`ObjectRef` input) | Document RAG (`AI.CHUNK_DOCUMENT` + `VECTOR_SEARCH`) |
-|-----------|----------------------------------|----------------------------------------------|------------------------------------------------------|
-| **Setup** | None | Object table or `OBJ.MAKE_REF` | Object table / `OBJ.MAKE_REF` + persisted chunk & embedding tables |
-| **Per-question cost** | Lowest (prompt tokens only) | Re-reads full PDF bytes on every prompt | Embeds query once + passes only top-`k` chunks |
-| **Multi-document search** | Cannot access private files | Must already know which row/file to inspect | Searches across hundreds or thousands of PDFs, DOCX, PPTX, XLSX, and HTML files |
-| **Citations** | None | File-level `uri` only | Exact `uri`, `chunk_id`, `start_page`, and `end_page` |
-| **Best for** | General world knowledge or text already inline in a SQL column | One-pass field extraction or visual inspection on a known document (see `workflows/document_intelligence` (Document Intelligence)) | Reusable question answering and policy/invoice search across a growing document corpus |
+| Dimension | Direct `AI.GENERATE` (text only) | Multimodal `AI.GENERATE` (`ObjectRef` input) | Layout Parsing (`AI.PARSE_DOCUMENT`) | Document RAG (`AI.CHUNK_DOCUMENT` + `VECTOR_SEARCH`) |
+|-----------|----------------------------------|----------------------------------------------|--------------------------------------|------------------------------------------------------|
+| **Setup** | None | Object table or `OBJ.MAKE_REF` | Object table / `OBJ.MAKE_REF` (scalar `JSON` output) | Object table / `OBJ.MAKE_REF` (or `raw-docai` from `AI.PARSE_DOCUMENT`) + persisted chunk & embedding tables |
+| **Per-question cost** | Lowest (prompt tokens only) | Re-reads full PDF bytes on every prompt | Parses once into `layout-v1` blocks or `raw-docai` JSON | Embeds query once + passes only top-`k` chunks |
+| **Multi-document search** | Cannot access private files | Must already know which row/file to inspect | SQL filtering over `UNNEST(blocks)` (headings, HTML `<table>`, `bbox`) | Semantic/hybrid search across hundreds or thousands of PDFs, DOCX, PPTX, XLSX, and HTML files |
+| **Citations** | None | File-level `uri` only | Exact `page_number`, `id`, and normalized `bbox` per block | Exact `uri`, `chunk_id`, `start_page`, and `end_page` |
+| **Best for** | General world knowledge or text already inline in a SQL column | One-pass field extraction or visual inspection on a known document (see `workflows/document_intelligence` (Document Intelligence)) | Extracting HTML tables, bounding boxes, or parsing once (`raw-docai`) to tune `AI.CHUNK_DOCUMENT` `chunk_size` | Reusable question answering and policy/invoice search across a growing document corpus |

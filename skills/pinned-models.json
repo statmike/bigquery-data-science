@@ -1,5 +1,6 @@
 {
   "_comment": "Allow list for `bigquery-data-science check-pinned-models` (also run by `bigquery-data-science sweep`). Keys are repo-relative project paths; `*` applies to every project, and `deprecated` maps retired model/endpoint literals to their recommended replacements for `review-sql`. A model or endpoint literal pinned anywhere in a project (notebook code cells, .sql, fenced code in markdown, .py) that is not listed in `*` or the project key fails the check.",
+  "updated": "2026-11-13",
   "*": [
     "text-embedding-005",
     "text-multilingual-embedding-002",
@@ -21,6 +22,8 @@
     "gemini-3.7-flash",
     "gemini-3.8-flash",
     "gemini-4-argon",
+    "gemini-4-carbon",
+    "gemini-4-hydrogen",
     "TimesFM 2.5",
     "TimesFM 3.0",
     "claude-sonnet-4-20250514",
@@ -35,6 +38,109 @@
     "pro": "gemini-4-argon",
     "flash_lite": "gemini-3.5-flash-lite",
     "embedding": "gemini-embedding-2"
+  },
+  "allowed_models": {
+    "AI.GENERATE": [
+      "gemini-3.8-flash",
+      "gemini-4-argon",
+      "gemini-4-carbon",
+      "gemini-4-hydrogen",
+      "gemini-3.5-flash-lite",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite"
+    ],
+    "AI.GENERATE_BOOL": [
+      "gemini-3.8-flash",
+      "gemini-4-argon",
+      "gemini-4-carbon",
+      "gemini-4-hydrogen",
+      "gemini-3.5-flash-lite",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite"
+    ],
+    "AI.GENERATE_INT": [
+      "gemini-3.8-flash",
+      "gemini-4-argon",
+      "gemini-4-carbon",
+      "gemini-4-hydrogen",
+      "gemini-3.5-flash-lite",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite"
+    ],
+    "AI.GENERATE_DOUBLE": [
+      "gemini-3.8-flash",
+      "gemini-4-argon",
+      "gemini-4-carbon",
+      "gemini-4-hydrogen",
+      "gemini-3.5-flash-lite",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite"
+    ],
+    "AI.COUNT_TOKENS": [
+      "gemini-3.8-flash",
+      "gemini-4-argon",
+      "gemini-4-carbon",
+      "gemini-4-hydrogen",
+      "gemini-3.5-flash-lite",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite"
+    ],
+    "AI.AGG": [
+      "gemini-3.8-flash",
+      "gemini-4-argon",
+      "gemini-4-carbon",
+      "gemini-4-hydrogen",
+      "gemini-3.5-flash-lite",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite"
+    ],
+    "AI.GENERATE_TEXT": [
+      "gemini-3.8-flash",
+      "gemini-4-argon",
+      "gemini-4-carbon",
+      "gemini-4-hydrogen",
+      "gemini-3.5-flash-lite",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite",
+      "claude-sonnet-4-20250514"
+    ],
+    "AI.GENERATE_TABLE": [
+      "gemini-3.8-flash",
+      "gemini-4-argon",
+      "gemini-4-carbon",
+      "gemini-4-hydrogen",
+      "gemini-3.5-flash-lite",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite"
+    ],
+    "ML.GENERATE_TEXT": [
+      "gemini-3.8-flash",
+      "gemini-4-argon",
+      "gemini-4-carbon",
+      "gemini-4-hydrogen",
+      "gemini-3.5-flash-lite",
+      "gemini-3.7-flash",
+      "gemini-3.6-flash",
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite",
+      "claude-sonnet-4-20250514"
+    ]
   },
   "legacy_models": {
     "gemini-2.5-flash": {

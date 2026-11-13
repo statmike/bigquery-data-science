@@ -63,9 +63,9 @@ Function Name
 - **[Embedding Generation and Semantic Search](reference/embedding-generation-and-semantic-search.md)** — `AI.EMBED`, `AI.GENERATE_EMBEDDING` (including MaaS remote embedding models), `ML.GENERATE_EMBEDDING`, `AI.SIMILARITY`, `VECTOR_SEARCH`, `AI.SEARCH`, and hybrid search
 - **[Predictive AI](reference/predictive-ai.md)** — `AI.FORECAST`, `AI.DETECT_ANOMALIES`, `AI.PREDICT`, `AI.EVALUATE` — the TimesFM and TabFM foundation models
 - **[Augmented Analytics](reference/augmented-analytics.md)** — `AI.KEY_DRIVERS` — model-free contribution analysis, plus the pointer to `AI.CAUSAL_EFFECT`, which is [documented in `bigquery-ml`](../bigquery-ml/reference/model-free-functions.md#aicausal_effect) alongside the other causal estimators
-- **[Document Processing](reference/document-processing.md)** — `AI.CHUNK_DOCUMENT`, `ML.PROCESS_DOCUMENT`, and archived `AI.PARSE_DOCUMENT` — zero-DDL layout-aware document chunking alongside specialized Document AI processor extraction
-- **[Cloud AI Service Models](reference/cloud-ai-service-models.md)** — `ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`, and `ML.PROCESS_DOCUMENT` — remote models over pre-trained Cloud AI services rather than Gemini, with the per-service API and IAM matrix and routing guidance against zero-DDL [`AI.TRANSLATE`](reference/managed-functions.md#aitranslate) and [`AI.CHUNK_DOCUMENT`](reference/document-processing.md#aichunk_document)
-- **[Unstructured Data Infrastructure](reference/unstructured-data-infrastructure.md)** — object tables, the `OBJ.*` functions (including `OBJ.LIST`, the wildcard listing that returns ready `ObjectRef`s with no object table), the ObjectRef / ObjectRefRuntime schema reference, and the five call shapes (including `AI.CHUNK_DOCUMENT`) that consume `ObjectRef` values directly
+- **[Document Processing](reference/document-processing.md)** — `AI.CHUNK_DOCUMENT`, `AI.PARSE_DOCUMENT`, and `ML.PROCESS_DOCUMENT` — zero-DDL layout-aware document chunking and structured layout parsing alongside specialized Document AI processor extraction
+- **[Cloud AI Service Models](reference/cloud-ai-service-models.md)** — `ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`, and `ML.PROCESS_DOCUMENT` — remote models over pre-trained Cloud AI services rather than Gemini, with the per-service API and IAM matrix and routing guidance against zero-DDL [`AI.TRANSLATE`](reference/managed-functions.md#aitranslate), [`AI.CHUNK_DOCUMENT`](reference/document-processing.md#aichunk_document), and [`AI.PARSE_DOCUMENT`](reference/document-processing.md#aiparse_document)
+- **[Unstructured Data Infrastructure](reference/unstructured-data-infrastructure.md)** — object tables, the `OBJ.*` functions (including `OBJ.LIST`, the wildcard listing that returns ready `ObjectRef`s with no object table), the ObjectRef / ObjectRefRuntime schema reference, and the five call shapes (including `AI.CHUNK_DOCUMENT` and `AI.PARSE_DOCUMENT`) that consume `ObjectRef` values directly
 
 ---
 
@@ -75,14 +75,25 @@ Every generative function documents its supported models as "any GA or preview G
 
 **The default is `gemini-3.5-flash-lite`.** Omit `endpoint` and that is what you get, on every function that takes the argument. Reading `full_response.model_version` (or `modelVersion` inside the raw Vertex JSON payload) on `AI.GENERATE` and `AI.GENERATE_BOOL` confirms `gemini-3.5-flash-lite` across unpinned runs. The default has moved before and nothing in the release notes announces it when it does, so an unpinned call is a different model from one month to the next. Every unpinned example in this project runs on the current default and its stored outputs reflect that model; pin `endpoint` whenever an output has to stay reproducible.
 
-**Gemini 3.x and 4.x are the documented families.** The `AI.GENERATE` reference page lists `gemini-4-argon` (GA as of 2026-10-13), `gemini-3.1-flash-lite` (GA; `gemini-3.1-flash-lite-preview` is retired), `gemini-3.5-flash`, `gemini-3.5-flash-lite`, `gemini-3.6-flash`, `gemini-3.7-flash` and `gemini-3.8-flash` as supported models. All resolve (measured live). The 2.5 family -- `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.5-flash-lite` -- is no longer on that list but still resolves and returns its own `modelVersion`; `gemini-2.0-flash` does not (*"Unsupported endpoint: Publisher model ... was not found"*). The examples in this project that pin a Gemini endpoint standardize on `gemini-3.8-flash` (latest GA Flash) and `gemini-4-argon` (latest GA Pro / frontier reasoning model, replacing `gemini-2.5-pro`; note that `gemini-3.8-pro` and `gemini-3.5-pro` do not exist as publisher endpoints), while unpinned examples resolve to the current default (`gemini-3.5-flash-lite`). To pin an endpoint explicitly:
+**Gemini 3.x and 4.x are the documented families.** The `AI.GENERATE` reference page lists three Gemini 4 endpoints and six Gemini 3.x endpoints as supported models (all resolve live):
+
+| Endpoint | Launch Stage | Release Date | Typical Role |
+|---|---|---|---|
+| `gemini-4-hydrogen` | GA | `2026-11-12` | High-throughput Gemini 4 reasoning & structured extraction |
+| `gemini-4-carbon` | GA | `2026-11-10` | Balanced Gemini 4 reasoning & synthesis |
+| `gemini-4-argon` | GA | `2026-10-13` | Flagship Gemini 4 frontier reasoning (`preferred_defaults.pro`) |
+| `gemini-3.8-flash` | GA | `2026-09-21` | Fast general-purpose multimodal generation (`preferred_defaults.flash`) |
+| `gemini-3.5-flash-lite` | GA | `2026-09-09` | Default unpinned endpoint (`preferred_defaults.flash_lite`) |
+| `gemini-3.7-flash` · `gemini-3.6-flash` · `gemini-3.5-flash` · `gemini-3.1-flash-lite` | GA | `2026-08`–`2026-09` | Earlier Gemini 3.x Flash / Flash-Lite variants (`gemini-3.1-flash-lite-preview` is retired) |
+
+The 2.5 family -- `gemini-2.5-flash`, `gemini-2.5-pro`, `gemini-2.5-flash-lite` -- is no longer on that list but still resolves and returns its own `modelVersion`; `gemini-2.0-flash` does not (*"Unsupported endpoint: Publisher model ... was not found"*). The examples in this project that pin a Gemini endpoint standardize on `gemini-3.8-flash` (latest GA Flash) and `gemini-4-argon` (flagship GA Gemini 4 reasoning model, alongside `gemini-4-carbon` and `gemini-4-hydrogen`; note that `gemini-3.8-pro` and `gemini-3.5-pro` do not exist as publisher endpoints), while unpinned examples resolve to the current default (`gemini-3.5-flash-lite`). To pin an endpoint explicitly:
 
 ```sql
 SELECT AI.GENERATE(('Summarize: ', body), endpoint => 'gemini-3.8-flash').result
 FROM `PROJECT_ID.DATASET_ID.TABLE_ID`;
 ```
 
-**Thinking controls differ by generation.** Gemini 2.5 takes `thinking_budget` inside `model_params.generation_config.thinking_config`; for Gemini 3.0 and later (`gemini-3.8-flash` and `gemini-4-argon`) the documented control is `thinking_level` (`LOW`, `MEDIUM`, `HIGH`) in the same place. `thinking_budget: 0` is still accepted on `gemini-3.5-flash` (measured), but write `thinking_level` for 3.x and `gemini-4-argon`.
+**Thinking controls differ by generation.** Gemini 2.5 takes `thinking_budget` inside `model_params.generation_config.thinking_config`; for Gemini 3.0 and later (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) the documented control is `thinking_level` (`LOW`, `MEDIUM`, `HIGH`) in the same place. Passing `thinking_budget` or `thinking_level` set to `"MINIMAL"` or `"XHIGH"` to a Gemini 4 endpoint in BigQuery SQL `model_params` is rejected with HTTP 400 (`Invalid model_params`), and Gemini 4 models silently ignore `temperature`, `top_p`, and `top_k`. `thinking_budget: 0` is still accepted on `gemini-3.5-flash` (measured), but write `thinking_level` (`LOW`, `MEDIUM`, or `HIGH`) for 3.x and 4.x.
 
 **A naming note.** The reference pages now call the model host the **Gemini Enterprise Agent Platform** -- "Agent Platform" for short -- where they used to say Vertex AI. Endpoints, connections, IAM roles and the `aiplatform.googleapis.com` hostnames are unchanged; only the product name moved. This project adopts the new name as pages are touched.
 

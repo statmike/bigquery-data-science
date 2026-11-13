@@ -41,7 +41,7 @@ ML.HASH_BUCKETIZE(string_expression, hash_bucket_size)
 
 ---
 
-**Family note:** All three are exportable feature-preprocessing functions when used in the `TRANSFORM` clause, so the transformation is reapplied automatically during `ML.PREDICT` and accompanies exported / Vertex-registered models. `ML.BUCKETIZE` and `ML.HASH_BUCKETIZE` are scalar; `ML.QUANTILE_BUCKETIZE` is analytic and requires an empty `OVER()` clause. See the [Manual feature preprocessing](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-preprocessing-functions) reference.
+**Family note:** All three are exportable feature-preprocessing functions when used in the `TRANSFORM` clause, so the transformation is reapplied automatically during `ML.PREDICT` and accompanies exported / Vertex-registered models. `ML.BUCKETIZE` and `ML.HASH_BUCKETIZE` are scalar; `ML.QUANTILE_BUCKETIZE` is analytic and requires an empty `OVER()` clause. See the [Manual feature preprocessing](https://cloud.google.com/bigquery/docs/manual-preprocessing) reference.
 
 
 ---

@@ -56,7 +56,7 @@ When `flatten_json_output` is TRUE:
 | `ml_generate_text_grounding_result` | STRING | Grounding sources (Gemini only, when ground_with_google_search is TRUE) |
 | `ml_generate_text_status` | STRING | API status |
 
-**Supported models:** Same as AI.GENERATE_TEXT (remote models over Gemini, Claude, Llama, Mistral, open models). Also explicitly supports remote models over fine-tuned Gemini models.
+**Supported models:** Same as AI.GENERATE_TEXT (remote models over Gemini — including `gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, and `gemini-3.5-flash-lite` — plus Claude, Llama, Mistral, and open models). Also explicitly supports remote models over fine-tuned Gemini models.
 
 **Best practices / Limitations / Locations / Provisioned throughput:** Same as AI.GENERATE_TEXT.
 

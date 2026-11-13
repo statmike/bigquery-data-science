@@ -114,13 +114,20 @@ SELECT AI.SIMILARITY(
 ) AS similarity;
 ```
 
-### Shape 5: Document Chunking TVF (`AI.CHUNK_DOCUMENT`)
+### Shape 5: Document Parsing & Chunking (`AI.PARSE_DOCUMENT` & `AI.CHUNK_DOCUMENT`)
 
-[`AI.CHUNK_DOCUMENT`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/document-processing.md#aichunk_document) accepts **three** document input forms: a `'gs://...'` URI or wildcard literal (`13` output columns), `TABLE object_table` (`13` output columns), or a `(SELECT ...)` subquery returning an `OBJECTREF` column **named `ref`** (`5 + passthrough` output columns). When a subquery projects only `OBJ.MAKE_REF(uri) AS ref`, the result has **6 columns** (`chunk_id`, `content`, `start_page`, `end_page`, `status`, `ref`) with **no top-level `uri`** — read `ref.uri` and filter `WHERE status = ''`:
+[`AI.PARSE_DOCUMENT`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/document-processing.md#aiparse_document) is a scalar function that accepts a `'gs://...'` URI string or an `ObjectRef` `STRUCT` (including Google Drive files passed as `ObjectRef`) and returns structured layout `JSON` (`layout-v1` reading-order blocks by default, or `raw-docai` layout tree). [`AI.CHUNK_DOCUMENT`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/reference/document-processing.md#aichunk_document) is a table-valued function that accepts **four** document input forms: a `'gs://...'` URI or wildcard literal (`13` output columns), `TABLE object_table` (`13` output columns), a `(SELECT ...)` subquery returning an `OBJECTREF` column **named `ref`** (`5 + passthrough` output columns), or a `TABLE` / `(SELECT ...)` subquery containing a `JSON` column **named `parsed_document`** produced by `AI.PARSE_DOCUMENT(..., options => JSON '{"schema": "raw-docai"}')`. When a subquery projects only `OBJ.MAKE_REF(uri) AS ref`, the result has **6 columns** (`chunk_id`, `content`, `start_page`, `end_page`, `status`, `ref`) with **no top-level `uri`** — read `ref.uri` and filter `WHERE status = ''`:
 
-**Functions:** `AI.CHUNK_DOCUMENT`
+**Functions:** `AI.PARSE_DOCUMENT`, `AI.CHUNK_DOCUMENT`
 
 ```sql
+-- Scalar structured layout parsing (layout-v1 default, or raw-docai for AI.CHUNK_DOCUMENT chaining)
+SELECT
+  uri,
+  AI.PARSE_DOCUMENT(ref) AS layout_v1_json,
+  AI.PARSE_DOCUMENT(ref, options => JSON '{"schema": "raw-docai"}') AS parsed_document
+FROM OBJ.LIST('gs://bucket/docs/*.pdf');
+
 -- Direct GCS wildcard literal (13 columns, top-level uri)
 SELECT uri, chunk_id, start_page, end_page, content
 FROM AI.CHUNK_DOCUMENT('gs://bucket/docs/*.pdf', chunk_size => 500)
@@ -141,9 +148,9 @@ WHERE status = '';
 |-------|-----------|----------------------|--------------|
 | STRUCT prompt | AI.GENERATE, AI.GENERATE_TEXT, AI.GENERATE_TABLE, AI.GENERATE_BOOL, AI.GENERATE_DOUBLE, AI.GENERATE_INT, ML.GENERATE_TEXT, AI.IF | No | `STRUCT(text AS prompt, [refs] AS object_refs)` |
 | Tuple | AI.SCORE | No (object table is the convenient source) | `('scoring text', ref)` |
-| Bare argument | AI.CLASSIFY, AI.AGG | No (object table is the convenient source) | `AI.CLASSIFY(ref, categories)`, `AI.AGG(STRUCT(ref), prompt)` |
+| Bare argument | AI.CLASSIFY, AI.AGG, AI.PARSE_DOCUMENT | No (object table is the convenient source) | `AI.CLASSIFY(ref, categories)`, `AI.AGG(STRUCT(ref), prompt)`, `AI.PARSE_DOCUMENT(ref)` |
 | `content` parameter | AI.EMBED, AI.SIMILARITY, AI.GENERATE_EMBEDDING, ML.GENERATE_EMBEDDING | No | Pass the `ObjectRef` as the content argument |
-| Document chunking TVF | AI.CHUNK_DOCUMENT | No | `'gs://...'` literal, `TABLE object_table`, or `(SELECT ... ObjectRef)` subquery |
+| Document chunking TVF | AI.CHUNK_DOCUMENT | No | `'gs://...'` literal, `TABLE object_table`, `(SELECT ... ObjectRef)` subquery, or `parsed_document` (`raw-docai`) table/subquery |
 | Object table (document processing) | ML.PROCESS_DOCUMENT | Yes | Object table rows as input to Document AI processor |
 | Not supported | AI.TRANSLATE, AI.COUNT_TOKENS, VECTOR_SEARCH, AI.SEARCH, AI.FORECAST, AI.DETECT_ANOMALIES, AI.PREDICT, AI.EVALUATE | — | Text/numeric input only |
 

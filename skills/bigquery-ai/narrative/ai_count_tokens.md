@@ -115,13 +115,17 @@ client.query(query).to_dataframe()
 
 ### 4. Specify a model endpoint
 
-`endpoint` selects which model's tokenizer rules to use. If omitted, the default model used by `AI.GENERATE` is used.
+`endpoint` selects which model's tokenizer rules to use. If omitted, the default model used by `AI.GENERATE` (`gemini-3.5-flash-lite`) is used. Below we compare input token counts across all current GA Gemini 3.x and Gemini 4 endpoints (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`, and `gemini-3.5-flash-lite`).
 
 ```python
 query = """
 SELECT
   review,
-  AI.COUNT_TOKENS(review, endpoint => 'gemini-4-argon').result AS num_tokens
+  AI.COUNT_TOKENS(review, endpoint => 'gemini-3.8-flash').result AS tokens_3_8_flash,
+  AI.COUNT_TOKENS(review, endpoint => 'gemini-4-argon').result AS tokens_4_argon,
+  AI.COUNT_TOKENS(review, endpoint => 'gemini-4-carbon').result AS tokens_4_carbon,
+  AI.COUNT_TOKENS(review, endpoint => 'gemini-4-hydrogen').result AS tokens_4_hydrogen,
+  AI.COUNT_TOKENS(review, endpoint => 'gemini-3.5-flash-lite').result AS tokens_3_5_flash_lite
 FROM `bigquery-public-data.imdb.reviews`
 LIMIT 5
 """

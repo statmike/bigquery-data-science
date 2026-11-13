@@ -74,7 +74,7 @@ Workflows compose multiple AI functions together for end-to-end scenarios. See [
 | [Semantic Search System](workflows/semantic_search/) | AI.EMBED, VECTOR_SEARCH, AI.SEARCH | Build and query a semantic search index, three ways: manual, simplified, and hybrid |
 | [Catalog Search](workflows/catalog_search/) | AI.EMBED, VECTOR_SEARCH, AI.SEARCH | Hybrid retrieval over a real product catalog: what rank fusion does and does not buy you for exact-token lookups, with a corpus large enough to actually populate a vector index |
 | [RAG Pipeline](workflows/rag_pipeline/) | AI.GENERATE_TABLE, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | Generate a knowledge base, embed, search, answer questions |
-| [Document RAG](workflows/document_rag/) | AI.CHUNK_DOCUMENT, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | Chunk real PDF documents in Cloud Storage with zero DDL (`AI.CHUNK_DOCUMENT`), embed chunks (`AI.EMBED`), retrieve with page provenance (`VECTOR_SEARCH`), and answer questions with grounded context (`AI.GENERATE`) |
+| [Document RAG](workflows/document_rag/) | AI.CHUNK_DOCUMENT, AI.PARSE_DOCUMENT, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | Chunk real PDF documents in Cloud Storage with zero DDL (`AI.CHUNK_DOCUMENT`, plus parse-once chunk-size tuning via `AI.PARSE_DOCUMENT`), embed chunks (`AI.EMBED`), retrieve with page provenance (`VECTOR_SEARCH`), and answer questions with grounded context (`AI.GENERATE`) |
 | [Time Series Intelligence](workflows/time_series_intelligence/) | AI.FORECAST, AI.DETECT_ANOMALIES, AI.EVALUATE, AI.KEY_DRIVERS | Forecast, detect anomalies, evaluate accuracy, explain changes by segment |
 | [Zero-Shot Tabular Prediction](workflows/tabular_prediction/) | AI.PREDICT, AI.EVALUATE, AI.KEY_DRIVERS, AI.GENERATE | Zero-shot regression and classification with TabFM, scored and explained — no model training |
 | [Metric Diagnostics](workflows/metric_diagnostics/) | AI.KEY_DRIVERS, AI.PREDICT, AI.CAUSAL_EFFECT, AI.GENERATE | Explain why a metric moved between two periods, project it forward, then narrate the drivers in plain language — and stop short of calling any of it causal. A placebo test with `AI.CAUSAL_EFFECT` at six dates where nothing happened returns a significant result at one of them, which is why the diagnostic steps stay descriptive |
@@ -177,9 +177,9 @@ When using a task-typed model and unsure, default to `RETRIEVAL_DOCUMENT` / `RET
 
 | Function | Examples | Type | Status | Requires Model | Multimodal | What It Does |
 |----------|----------|------|--------|----------------|------------|--------------|
-| `AI.CHUNK_DOCUMENT` | [notebook](functions/ai_chunk_document/ai_chunk_document.ipynb) · [sql](functions/ai_chunk_document/ai_chunk_document.sql) | TVF | GA | No | URI / `ObjectRef` subquery / Object table | Split PDF, HTML, DOCX, PPTX, and XLSX/XLSM documents in Cloud Storage into layout-aware chunks with ancestor headings and 1-indexed PDF page spans (`start_page`, `end_page`). Zero `CREATE MODEL` or manual processor DDL. |
+| `AI.CHUNK_DOCUMENT` | [notebook](functions/ai_chunk_document/ai_chunk_document.ipynb) · [sql](functions/ai_chunk_document/ai_chunk_document.sql) | TVF | GA | No | URI / `ObjectRef` subquery / Object table / `parsed_document` | Split PDF, HTML, DOCX, PPTX, and XLSX/XLSM documents in Cloud Storage (or pre-parsed `raw-docai` JSON from `AI.PARSE_DOCUMENT`) into layout-aware chunks with ancestor headings and 1-indexed PDF page spans (`start_page`, `end_page`). Zero `CREATE MODEL` or manual processor DDL. |
+| `AI.PARSE_DOCUMENT` | [notebook](functions/ai_parse_document/ai_parse_document.ipynb) · [sql](functions/ai_parse_document/ai_parse_document.sql) | Scalar | GA | No | URI / `ObjectRef` | Parse PDF, HTML, DOCX, PPTX, or XLSX into structured layout JSON (`layout-v1` reading-order blocks with HTML tables & bounding boxes, or `raw-docai` layout tree to chain into `AI.CHUNK_DOCUMENT`) using an auto-provisioned Document AI Layout Parser. |
 | `ML.PROCESS_DOCUMENT` | [notebook](functions/ml_process_document/ml_process_document.ipynb) · [sql](functions/ml_process_document/ml_process_document.sql) | TVF | GA | Yes | Object table | Extract structured data from documents in Cloud Storage using specialized Document AI processors (Invoice, Expense, Form, OCR). |
-| `AI.PARSE_DOCUMENT` ⚠️ | [notebook](functions/ai_parse_document/ai_parse_document.ipynb) · [sql](functions/ai_parse_document/ai_parse_document.sql) | TVF | Preview (⚠️ **offline** since 2026-06-01; **reference docs withdrawn**) | No* | Object table | Historical pre-withdrawal record of Document AI Layout Parser TVF. **Use `AI.CHUNK_DOCUMENT` for RAG chunking or `ML.PROCESS_DOCUMENT` for specialized entity extraction.** |
 
 `ML.PROCESS_DOCUMENT` is also a member of the family below — everything there about connections, IAM, per-row failures and the model object applies to it.
 
@@ -260,7 +260,7 @@ flowchart TD
 
     subgraph DOC["5. Document Processing &amp; Pre-Trained Cloud AI Service Models"]
         direction LR
-        D1["<b>Document Chunking &amp; Extraction</b><br/>AI.CHUNK_DOCUMENT (TVF · No Model)<br/>ML.PROCESS_DOCUMENT (Object table + REMOTE)"]
+        D1["<b>Document Parsing, Chunking &amp; Extraction</b><br/>AI.PARSE_DOCUMENT (Scalar) · AI.CHUNK_DOCUMENT (TVF)<br/>ML.PROCESS_DOCUMENT (Object table + REMOTE)"]
         D2["<b>Text &amp; Speech Cloud AI (REMOTE)</b><br/>ML.TRANSLATE (Translation V3)<br/>ML.UNDERSTAND_TEXT · ML.TRANSCRIBE"]
         D3["<b>Vision Cloud AI (REMOTE)</b><br/>ML.ANNOTATE_IMAGE (Vision API)<br/>Object tables + Cloud Resource Connection"]
         D1 ~~~ D2 ~~~ D3
@@ -323,7 +323,7 @@ bigquery-ai/
 │   ├── ai_key_drivers/
 │   ├── ai_chunk_document/
 │   ├── ml_process_document/
-│   ├── ai_parse_document/       # Offline archive — use ai_chunk_document or ml_process_document
+│   ├── ai_parse_document/
 │   ├── ml_translate/
 │   ├── ml_understand_text/
 │   ├── ml_annotate_image/

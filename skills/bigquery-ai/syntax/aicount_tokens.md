@@ -20,7 +20,7 @@ AI.COUNT_TOKENS(
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `INPUT` | STRING | Required | -- | The input text prompt for which to count tokens. |
-| `endpoint` | STRING literal (named parameter) | Optional | The default model used by `AI.GENERATE` | Name of the generative AI model whose tokenization rules to use (e.g. `'gemini-3.8-flash'` or `'gemini-4-argon'`). |
+| `endpoint` | STRING literal (named parameter) | Optional | The default model used by `AI.GENERATE` (`gemini-3.5-flash-lite`) | Name of the generative AI model whose tokenization rules to use (e.g., `'gemini-3.8-flash'`, `'gemini-4-argon'`, `'gemini-4-carbon'`, `'gemini-4-hydrogen'`, or `'gemini-3.5-flash-lite'`). |
 
 **Outputs:** Returns a `STRUCT` with:
 
@@ -28,6 +28,8 @@ AI.COUNT_TOKENS(
 |-------|------|-------------|
 | `result` | INT64 | Total **input** token count. `NULL` if the input is `NULL` or an API error occurred. |
 | `full_response` | JSON | Per-modality token detail, e.g. `{"promptTokensDetails":[{"modality":"TEXT","tokenCount":180}],"totalTokens":180}`. `NULL` on `NULL` input or API error. |
+
+**Supported models:** Any current GA Gemini model (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, `gemini-3.5-flash-lite`). Default when omitted: `gemini-3.5-flash-lite`. All Gemini 3.x and Gemini 4 endpoints share a unified `1,048,576`-token input context window.
 
 **Best practices:**
 - Because counting is free, aggregate `AI.COUNT_TOKENS(col).result` across a column (`SUM`/`AVG`/`MAX`) to size a batch workload before running the paid generation functions over it.

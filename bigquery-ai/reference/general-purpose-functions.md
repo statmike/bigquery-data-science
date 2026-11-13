@@ -87,8 +87,8 @@ AI.GENERATE(
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` (positional, must be first) | STRING or STRUCT | Required | -- | The prompt to send to the model. Can be a STRING value or a STRUCT containing one or more fields of type STRING, ARRAY\<STRING\>, ObjectRef, or ARRAY\<ObjectRef\>. STRUCT fields are concatenated in order (like CONCAT), so the field *names* carry no meaning. At most one video object is allowed. |
-| `endpoint` | STRING | Optional | `gemini-3.5-flash-lite` | The model endpoint on the Gemini Enterprise Agent Platform (formerly Vertex AI). Specify any GA or preview Gemini model by name (BigQuery auto-resolves the full endpoint). Can also specify a full global endpoint URL. The default is measured, not inferred -- see [Choosing a Gemini Model Endpoint](../RESOURCES.md#choosing-a-gemini-model-endpoint). |
-| `model_params` | JSON literal | Optional | -- | Additional parameters conforming to the `generateContent` request body format. Can set any field except `contents`. Supports `thinking_config` (use `thinking_budget` for Gemini 2.5 models, `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`) for Gemini 3.0+ including `gemini-3.8-flash` and `gemini-4-argon`), `cachedContent`, `tools` (e.g., `googleSearch` — requires Gemini 2.0+, `googleMaps`), `generation_config`, etc. |
+| `endpoint` | STRING | Optional | `gemini-3.5-flash-lite` | The model endpoint on the Gemini Enterprise Agent Platform (formerly Vertex AI). Specify any GA or preview Gemini model by name, such as `'gemini-3.8-flash'`, `'gemini-4-argon'`, `'gemini-4-carbon'` (GA `2026-11-10`), or `'gemini-4-hydrogen'` (GA `2026-11-12`) (BigQuery auto-resolves the full endpoint). Can also specify a full global endpoint URL. The default is measured, not inferred -- see [Choosing a Gemini Model Endpoint](../RESOURCES.md#choosing-a-gemini-model-endpoint). |
+| `model_params` | JSON literal | Optional | -- | Additional parameters conforming to the `generateContent` request body format. Can set any field except `contents`. Supports `thinking_config` (use `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`) for Gemini 3.0+ and Gemini 4 models including `gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, and `gemini-4-hydrogen`; legacy Gemini 2.5 models used `thinking_budget`), `cachedContent`, `tools` (e.g., `googleSearch` — requires Gemini 2.0+, `googleMaps`), `generation_config`, etc. On all Gemini 4 models (`gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`), BigQuery's SQL `model_params` `GenerateContent` proto validator accepts `"LOW"`, `"MEDIUM"`, and `"HIGH"` for `thinking_level` and rejects `"MINIMAL"`, `"XHIGH"`, and `thinking_budget` at query analysis time (`400 The model_params is invalid and does not conform to the GenerateContent request body`), while custom sampling parameters (`temperature`, `top_p`, `top_k`) are ignored. |
 | `output_schema` | STRING | Optional | -- | Schema for structured output as comma-separated fields. Each field has a name, data type, and optional `OPTIONS(description = '...')`. Supported types: `STRING`, `INT64`, `FLOAT64`, `BOOL`, `ARRAY`, `STRUCT`. When specified, replaces the `result` field in output with custom schema fields. |
 | `connection_id` | STRING | Optional | End-user credentials | Connection for model communication, in format `[PROJECT_ID].LOCATION.CONNECTION_ID`. |
 | `request_type` | STRING | Optional | `UNSPECIFIED` | Quota type. Values: `SHARED` (DSQ only), `DEDICATED` (Provisioned Throughput only, error if unavailable), `UNSPECIFIED` (default -- uses Provisioned Throughput first if purchased, overflows to DSQ). |
@@ -109,7 +109,15 @@ Returns a STRUCT with:
 | `full_response` | JSON | Full response from `projects.locations.endpoints.generateContent`. |
 | `status` | STRING | API response status. Empty if successful. |
 
-**Supported models:** Any GA or preview Gemini model; pinned examples standardize on `gemini-3.8-flash` (latest GA Flash) and `gemini-4-argon` (latest GA Pro / frontier reasoning model, replacing `gemini-2.5-pro`), alongside the Gemini 3.x family. Default when omitted: `gemini-3.5-flash-lite`. Can use global endpoint for cross-region processing.
+**Supported models:** Any GA or preview Gemini model; pinned examples standardize on `gemini-3.8-flash` (preferred Flash default; `$0.75 / $3.75` per 1M input/output tokens through Dec 31, 2026, and supports custom `temperature`) and `gemini-4-argon` (preferred Pro / frontier reasoning default, replacing `gemini-2.5-pro`), alongside the newly GA Gemini 4 endpoints `gemini-4-carbon` (GA `2026-11-10`; frontier/Pro reasoning model alongside `gemini-4-argon`, `$2.00 / $10.00` per 1M input/output tokens through Nov 30, 2026 and `$4.00 / $20.00` starting Dec 1, 2026) and `gemini-4-hydrogen` (GA `2026-11-12`; Gemini 4 speed & efficiency model for everyday coding, agentic workflows, multimodal analysis, and tool use, `$1.50 / $7.50` per 1M input/output tokens, `65,536` max output tokens per segment) as well as `gemini-3.5-flash-lite`. All three Gemini 4 models (`gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) share a unified `1,048,576`-token input+output context window. Default when omitted: `gemini-3.5-flash-lite`. Can use global endpoint for cross-region processing.
+
+| Endpoint | Tier / Role | GA Date | Pricing (per 1M input / output tokens) | Context / Max Output | BigQuery SQL `thinking_level` (`model_params`) | Custom Sampling (`temperature` / `top_p` / `top_k`) |
+|----------|-------------|---------|----------------------------------------|----------------------|------------------------------------------------|-----------------------------------------------------|
+| `gemini-3.8-flash` | Preferred Flash default | 2026-09-10 | `$0.75 / $3.75` (intro through Dec 31, 2026) | `1,048,576` / `65,536` | `"LOW"`, `"MEDIUM"`, `"HIGH"` | Supported |
+| `gemini-4-argon` | Preferred Pro / frontier reasoning default | 2026-10-08 | `$2.00 / $10.00` (intro through Nov 30, 2026; `$4.00 / $20.00` Dec 1+) | `1,048,576` unified / `65,536` | `"LOW"`, `"MEDIUM"`, `"HIGH"` (`"MINIMAL"`, `"XHIGH"`, `thinking_budget` rejected with 400) | Ignored |
+| `gemini-4-carbon` | Frontier / Pro reasoning | 2026-11-10 | `$2.00 / $10.00` (intro through Nov 30, 2026; `$4.00 / $20.00` Dec 1+) | `1,048,576` unified / `65,536` | `"LOW"`, `"MEDIUM"`, `"HIGH"` (`"MINIMAL"`, `"XHIGH"`, `thinking_budget` rejected with 400) | Ignored |
+| `gemini-4-hydrogen` | Gemini 4 speed & efficiency (coding, agentic, multimodal, tool use) | 2026-11-12 | `$1.50 / $7.50` | `1,048,576` unified / `65,536` | `"LOW"`, `"MEDIUM"`, `"HIGH"` (`"MINIMAL"`, `"XHIGH"`, `thinking_budget` rejected with 400) | Ignored |
+| `gemini-3.5-flash-lite` | Low-cost / high-throughput (unpinned default) | 2026-05-14 | `$0.10 / $0.40` | `1,048,576` / `65,536` | `"LOW"`, `"MEDIUM"`, `"HIGH"` | Supported |
 
 **Best practices:**
 - Function incurs Vertex AI charges each time it is called. Track costs accordingly.
@@ -121,13 +129,14 @@ Returns a STRUCT with:
 - Global endpoint does not allow controlling or knowing the data processing region.
 - Gemini 2.5 models incur thinking charges; budget can be set for Flash/Flash-Lite but not Pro.
 - Google Search grounding requires Gemini 2.0 or later models.
-- For Gemini 3.0+ (`gemini-3.8-flash` and `gemini-4-argon`), use `thinking_level` (`LOW`, `MEDIUM`, `HIGH`) in `thinking_config` instead of `thinking_budget`.
+- For Gemini 3.0+ and Gemini 4 (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`), use `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`) in `thinking_config` instead of `thinking_budget`. Even though the Vertex AI Gemini 4 Hydrogen model card lists `"XHIGH"`, BigQuery's SQL `model_params` `GenerateContent` proto validator rejects both `"MINIMAL"` and `"XHIGH"` (and `thinking_budget`) at query analysis time (`400 The model_params is invalid and does not conform to the GenerateContent request body`).
+- All three Gemini 4 models (`gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) ignore custom sampling parameters (`temperature`, `top_p`, `top_k`); use `gemini-3.8-flash` when custom `temperature` control is required.
 
 **Locations:** All regions that support Gemini models, plus US and EU multi-regions.
 
 **Provisioned throughput:** Supported via `request_type` parameter. Must purchase Provisioned Throughput quota matching the same Gemini model and region. For US multi-region: select `us-central1` region when purchasing. For EU multi-region: select `europe-west4` region when purchasing.
 
-**BigFrames API:** `bigframes.bigquery.ai.generate()` — Scalar function returning a Series of structs. Supports `output_schema` as `Mapping[str, str]`. Prompt is a tuple of string literals and Series: `bbq.ai.generate(("Summarize: ", df["text"]), output_schema={"summary": "STRING"})`. Access result via `.struct.field("result")`. Prefer `bbq.ai.generate` / `bbq.ai.generate_text` over `bigframes.ml.llm.GeminiTextGenerator`, which in `bigframes 2.51.0` hardcodes a client-side `_GEMINI_ENDPOINTS` allowlist (`gemini-1.5-*`, `gemini-2.0-*`, `gemini-2.5-*`) and emits an `UnknownModelWarning` for `gemini-3.8-flash` or `gemini-4-argon` even though `CREATE MODEL` succeeds.
+**BigFrames API:** `bigframes.bigquery.ai.generate()` — Scalar function returning a Series of structs. Supports `output_schema` as `Mapping[str, str]`. Prompt is a tuple of string literals and Series: `bbq.ai.generate(("Summarize: ", df["text"]), output_schema={"summary": "STRING"})`. Access result via `.struct.field("result")`. Prefer `bbq.ai.generate` / `bbq.ai.generate_text` over `bigframes.ml.llm.GeminiTextGenerator`, which in `bigframes 2.51.0` hardcodes a client-side `_GEMINI_ENDPOINTS` allowlist (`gemini-1.5-*`, `gemini-2.0-*`, `gemini-2.5-*`) and emits an `UnknownModelWarning` for `gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, or `gemini-4-hydrogen` even though `CREATE MODEL` succeeds.
 
 ### Reusable column aliases for unpacking `AI.*` outputs
 
@@ -285,15 +294,15 @@ AI.GENERATE_TEXT(
 | `TABLE` / `QUERY_STATEMENT` | Table/Query | All | Required (one of) | -- | -- | Input data. Must have a `prompt` column. If no prompt column exists, use QUERY_STATEMENT with an alias. |
 | `PROMPT` (object tables) | STRING | Gemini object tables | Required | -- | <16,000 tokens | Prompt for analyzing visual content |
 | `max_output_tokens` | INT64 | All | Optional | 1024 | Gemini: [1,8192]; Claude/Llama/Mistral/Open: [1,4096] | Max tokens in response |
-| `top_p` | FLOAT64 | All | Optional | 0.95 (Gemini, Llama, Mistral); model-determined (Claude, Open) | [0.0, 1.0] | Nucleus sampling parameter |
-| `temperature` | FLOAT64 | Gemini, Llama, Mistral, Open | Optional | 0 (Gemini, Llama, Mistral); model-determined (Open) | [0.0, 1.0] | Randomness in token selection |
+| `top_p` | FLOAT64 | All | Optional | 0.95 (Gemini, Llama, Mistral); model-determined (Claude, Open) | [0.0, 1.0] | Nucleus sampling parameter (ignored by Gemini 4 models `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) |
+| `temperature` | FLOAT64 | Gemini, Llama, Mistral, Open | Optional | 0 (Gemini, Llama, Mistral); model-determined (Open) | [0.0, 1.0] | Randomness in token selection (ignored by Gemini 4 models `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) |
 | `top_k` | INT64 | Claude, Open | Optional | Model-determined | [1, 40] | Top-K sampling |
 | `stop_sequences` | ARRAY\<STRING\> | Gemini, Llama, Mistral | Optional | Empty array | -- | Strings to exclude from responses |
 | `ground_with_google_search` | BOOL | Gemini | Optional | FALSE | -- | Enable Google Search grounding |
 | `safety_settings` | ARRAY\<STRUCT\<STRING AS category, STRING AS threshold\>\> | Gemini | Optional | BLOCK_MEDIUM_AND_ABOVE | -- | Content safety filtering |
 | `request_type` | STRING | Gemini | Optional | UNSPECIFIED | SHARED, DEDICATED, UNSPECIFIED | Quota type for Provisioned Throughput |
 | `use_chat_mode` | BOOL | Open models | Optional | FALSE | -- | When TRUE, enables chat mode for open models. |
-| `model_params` | JSON string | All | Optional | -- | -- | JSON conforming to generateContent request body. Cannot be used simultaneously with top-level parameters. |
+| `model_params` | JSON string | All | Optional | -- | -- | JSON conforming to generateContent request body. Cannot be used simultaneously with top-level parameters. On Gemini 3.x and Gemini 4 (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`), configure reasoning via `thinking_config.thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`; `"MINIMAL"`, `"XHIGH"`, and `thinking_budget` are rejected with HTTP 400). |
 
 Safety settings categories: `HARM_CATEGORY_HATE_SPEECH`, `HARM_CATEGORY_DANGEROUS_CONTENT`, `HARM_CATEGORY_HARASSMENT`, `HARM_CATEGORY_SEXUALLY_EXPLICIT`
 
@@ -324,7 +333,7 @@ All models return the input table columns plus:
 | Open models | `full_response` | JSON | Complete Vertex AI API JSON response |
 | Open models | `status` | STRING | API status |
 
-**Supported models:** Remote models over any GA or preview Gemini models, Anthropic Claude models, Mistral AI models, Llama models, and supported open models (all via `CREATE MODEL`).
+**Supported models:** Remote models over any GA or preview Gemini models (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, `gemini-3.5-flash-lite`), Anthropic Claude models, Mistral AI models, Llama models, and supported open models (all via `CREATE MODEL`).
 
 **Best practices:**
 - Avoid using LIMIT and OFFSET in the prompt query (causes processing all data first). Write query results to a table first, then reference that table.
@@ -333,7 +342,7 @@ All models return the input table columns plus:
 **Limitations:**
 - Model and input table must be in the same region.
 - Resource exhausted errors can occur for some rows when API call volume exceeds quota limits. Use BigQuery remote inference SQL scripts or Dataform package to handle quota errors iteratively.
-- Gemini 2.5 models incur thinking process charges.
+- Gemini 2.5 models incur thinking process charges. For Gemini 3.0+ and Gemini 4 (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`), configure reasoning via `thinking_config.thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`) in `model_params` (`"MINIMAL"`, `"XHIGH"`, and `thinking_budget` are rejected with HTTP 400); Gemini 4 models also ignore custom sampling parameters (`temperature`, `top_p`, `top_k`).
 - Object table Cloud Storage bucket must be in the same project as the model.
 - Object table queries only support WHERE and ORDER BY clauses.
 - Object table prompt must be under 16,000 tokens.
@@ -342,7 +351,7 @@ All models return the input table columns plus:
 
 **Provisioned throughput:** Supported via `request_type` parameter; must pre-purchase matching quota.
 
-**BigFrames API:** `bigframes.bigquery.ai.generate_text(model, data)` — TVF wrapper that takes a model name string and DataFrame/Series. Also available as `bigframes.ml.llm.GeminiTextGenerator` (sklearn-style: create model, then `.predict()`), though in `bigframes 2.51.0` `GeminiTextGenerator` hardcodes a client-side `_GEMINI_ENDPOINTS` allowlist (`gemini-1.5-*`, `gemini-2.0-*`, `gemini-2.5-*`) and emits an `UnknownModelWarning` for `gemini-3.8-flash` or `gemini-4-argon` even though `CREATE MODEL` succeeds; prefer `bbq.ai.generate` / `bbq.ai.generate_text`. `GeminiTextGenerator` also supports `.fit()` for fine-tuning and `.score()` for evaluation. For Claude models: `bigframes.ml.llm.Claude3TextGenerator`.
+**BigFrames API:** `bigframes.bigquery.ai.generate_text(model, data)` — TVF wrapper that takes a model name string and DataFrame/Series. Also available as `bigframes.ml.llm.GeminiTextGenerator` (sklearn-style: create model, then `.predict()`), though in `bigframes 2.51.0` `GeminiTextGenerator` hardcodes a client-side `_GEMINI_ENDPOINTS` allowlist (`gemini-1.5-*`, `gemini-2.0-*`, `gemini-2.5-*`) and emits an `UnknownModelWarning` for `gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, or `gemini-4-hydrogen` even though `CREATE MODEL` succeeds; prefer `bbq.ai.generate` / `bbq.ai.generate_text`. `GeminiTextGenerator` also supports `.fit()` for fine-tuning and `.score()` for evaluation. For Claude models: `bigframes.ml.llm.Claude3TextGenerator`.
 
 ---
 
@@ -377,8 +386,8 @@ AI.GENERATE_TABLE(
 | `TABLE` / `QUERY_STATEMENT` | Table/Query | Required (one of) | -- | -- | Input data. Must produce a `prompt` column. |
 | `output_schema` | STRING | Required | -- | -- | Schema as comma-separated fields with name, type, optional `OPTIONS(description='...')`. Supported types: `STRING`, `INT64`, `FLOAT64`, `BOOL`, `ARRAY`, `STRUCT`. |
 | `max_output_tokens` | INT64 | Optional | Model-determined | [1, 8192] | Max tokens in response |
-| `top_p` | FLOAT64 | Optional | Model-determined | [0.0, 1.0] | Nucleus sampling |
-| `temperature` | FLOAT64 | Optional | Model-determined | [0.0, 2.0] | Randomness control |
+| `top_p` | FLOAT64 | Optional | Model-determined | [0.0, 1.0] | Nucleus sampling (ignored by Gemini 4 models `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) |
+| `temperature` | FLOAT64 | Optional | Model-determined | [0.0, 2.0] | Randomness control (ignored by Gemini 4 models `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) |
 | `stop_sequences` | ARRAY\<STRING\> | Optional | Empty array | -- | Strings to exclude |
 | `safety_settings` | ARRAY\<STRUCT\<STRING AS category, STRING AS threshold\>\> | Optional | BLOCK_MEDIUM_AND_ABOVE | -- | Content safety thresholds |
 | `request_type` | STRING | Optional | UNSPECIFIED | SHARED, DEDICATED, UNSPECIFIED | Provisioned Throughput quota control |
@@ -394,11 +403,11 @@ Prompt input can be a STRING value or a STRUCT value with STRING, ARRAY\<STRING\
 | `full_response` | JSON | Response from `projects.locations.endpoints.generateContent` |
 | `status` | STRING | API response status (empty = success) |
 
-**Supported models:** Remote models over any GA or preview Gemini models (via CREATE MODEL).
+**Supported models:** Remote models over any GA or preview Gemini models (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, `gemini-3.5-flash-lite`) via `CREATE MODEL`.
 
 **Best practices:** To minimize Vertex AI charges, write query results to a table and then reference that table. Model and input table must be in the same region.
 
-**Limitations:** Model and input table must be in the same region. Resource exhausted errors possible. Video limited to 2 minutes. Gemini 2.5 models incur thinking charges.
+**Limitations:** Model and input table must be in the same region. Resource exhausted errors possible. Video limited to 2 minutes. Gemini 2.5 models incur thinking charges; Gemini 4 models (`gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`) ignore custom sampling parameters (`temperature`, `top_p`).
 
 **Locations:** Must run in the same region or multi-region as the remote model. Supported Gemini regions plus US and EU multi-regions.
 
@@ -430,8 +439,8 @@ AI.GENERATE_BOOL(
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `prompt` (positional, must be first) | STRING or STRUCT | Required | -- | Same semantics as AI.GENERATE: STRING or STRUCT with STRING/ARRAY\<STRING\>/ObjectRef/ARRAY\<ObjectRef\> fields. At most one video. |
-| `endpoint` | STRING | Optional | `gemini-3.5-flash-lite` | Any GA or preview Gemini model. BigQuery auto-resolves the full endpoint from model name -- see [Choosing a Gemini Model Endpoint](../RESOURCES.md#choosing-a-gemini-model-endpoint) for the 3.x multi-regional restriction. |
-| `model_params` | JSON literal | Optional | -- | Conforms to generateContent request body (all fields except `contents`). Supports thinking_config, etc. |
+| `endpoint` | STRING | Optional | `gemini-3.5-flash-lite` | Any GA or preview Gemini model (`'gemini-3.8-flash'`, `'gemini-4-argon'`, `'gemini-4-carbon'`, `'gemini-4-hydrogen'`, `'gemini-3.5-flash-lite'`). BigQuery auto-resolves the full endpoint from model name -- see [Choosing a Gemini Model Endpoint](../RESOURCES.md#choosing-a-gemini-model-endpoint). |
+| `model_params` | JSON literal | Optional | -- | Conforms to generateContent request body (all fields except `contents`). Supports `thinking_config` (`thinking_level` in `"LOW"`, `"MEDIUM"`, `"HIGH"` on Gemini 3.x and Gemini 4; `"MINIMAL"`, `"XHIGH"`, and `thinking_budget` are rejected with HTTP 400; `temperature`/`top_p`/`top_k` are ignored on Gemini 4), etc. |
 | `connection_id` | STRING | Optional | End-user credentials | Format: `[PROJECT_ID].LOCATION.CONNECTION_ID` |
 | `request_type` | STRING | Optional | UNSPECIFIED | `SHARED`, `DEDICATED`, `UNSPECIFIED` |
 
@@ -445,11 +454,11 @@ Returns a STRUCT per row:
 | `full_response` | JSON | Full response from `projects.locations.endpoints.generateContent`. |
 | `status` | STRING | API response status (empty = success). |
 
-**Supported models:** Any GA or preview Gemini model. Default: `gemini-3.5-flash-lite`.
+**Supported models:** Any GA or preview Gemini model (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, `gemini-3.5-flash-lite`). Default: `gemini-3.5-flash-lite`.
 
 **Best practices:** Incurs Vertex AI charges each call. Materialize data to a table before calling with LIMIT to minimize charges.
 
-**Limitations:** Preview feature (Pre-GA Offerings Terms apply). Video limited to 2 minutes. At most one video object per prompt. Gemini 2.5 thinking charges apply. For Gemini 3.0+, use `thinking_level` in `thinking_config` instead of `thinking_budget`.
+**Limitations:** Preview feature (Pre-GA Offerings Terms apply). Video limited to 2 minutes. At most one video object per prompt. Gemini 2.5 thinking charges apply. For Gemini 3.0+ and Gemini 4 (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, `gemini-4-hydrogen`), use `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"`) in `thinking_config` instead of `thinking_budget` (`"MINIMAL"`, `"XHIGH"`, and `thinking_budget` are rejected with HTTP 400, and custom `temperature`/`top_p`/`top_k` are ignored on Gemini 4).
 
 **Locations:** All regions supporting Gemini models, plus US and EU multi-regions.
 
@@ -488,11 +497,11 @@ Returns a STRUCT per row:
 | `full_response` | JSON | Full response from generateContent. |
 | `status` | STRING | API response status (empty = success). |
 
-**Supported models:** Any GA or preview Gemini model. Default: `gemini-3.5-flash-lite`.
+**Supported models:** Any GA or preview Gemini model (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, `gemini-3.5-flash-lite`). Default: `gemini-3.5-flash-lite`.
 
 **Best practices:** Same as AI.GENERATE_BOOL.
 
-**Limitations:** Same as AI.GENERATE_BOOL (Preview, video limits, thinking charges).
+**Limitations:** Same as AI.GENERATE_BOOL (Preview, video limits, `thinking_level` `"LOW"`/`"MEDIUM"`/`"HIGH"` on Gemini 3.x and Gemini 4, `MINIMAL`/`XHIGH`/`thinking_budget` rejected with HTTP 400, `temperature`/`top_p`/`top_k` ignored on Gemini 4).
 
 **Locations:** All Gemini-supporting regions plus US and EU multi-regions.
 
@@ -531,11 +540,11 @@ Returns a STRUCT per row:
 | `full_response` | JSON | Full response from generateContent. |
 | `status` | STRING | API response status (empty = success). |
 
-**Supported models:** Any GA or preview Gemini model. Default: `gemini-3.5-flash-lite`.
+**Supported models:** Any GA or preview Gemini model (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, `gemini-3.5-flash-lite`). Default: `gemini-3.5-flash-lite`.
 
 **Best practices:** Same as AI.GENERATE_BOOL.
 
-**Limitations:** Same as AI.GENERATE_BOOL (Preview, video limits, thinking charges).
+**Limitations:** Same as AI.GENERATE_BOOL (Preview, video limits, `thinking_level` `"LOW"`/`"MEDIUM"`/`"HIGH"` on Gemini 3.x and Gemini 4, `MINIMAL`/`XHIGH`/`thinking_budget` rejected with HTTP 400, `temperature`/`top_p`/`top_k` ignored on Gemini 4).
 
 **Locations:** All Gemini-supporting regions plus US and EU multi-regions.
 
@@ -600,7 +609,7 @@ When `flatten_json_output` is TRUE:
 | `ml_generate_text_grounding_result` | STRING | Grounding sources (Gemini only, when ground_with_google_search is TRUE) |
 | `ml_generate_text_status` | STRING | API status |
 
-**Supported models:** Same as AI.GENERATE_TEXT (remote models over Gemini, Claude, Llama, Mistral, open models). Also explicitly supports remote models over fine-tuned Gemini models.
+**Supported models:** Same as AI.GENERATE_TEXT (remote models over Gemini — including `gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, and `gemini-3.5-flash-lite` — plus Claude, Llama, Mistral, and open models). Also explicitly supports remote models over fine-tuned Gemini models.
 
 **Best practices / Limitations / Locations / Provisioned throughput:** Same as AI.GENERATE_TEXT.
 
@@ -627,7 +636,7 @@ AI.COUNT_TOKENS(
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `INPUT` | STRING | Required | -- | The input text prompt for which to count tokens. |
-| `endpoint` | STRING literal (named parameter) | Optional | The default model used by `AI.GENERATE` | Name of the generative AI model whose tokenization rules to use (e.g. `'gemini-3.8-flash'` or `'gemini-4-argon'`). |
+| `endpoint` | STRING literal (named parameter) | Optional | The default model used by `AI.GENERATE` (`gemini-3.5-flash-lite`) | Name of the generative AI model whose tokenization rules to use (e.g., `'gemini-3.8-flash'`, `'gemini-4-argon'`, `'gemini-4-carbon'`, `'gemini-4-hydrogen'`, or `'gemini-3.5-flash-lite'`). |
 
 **Outputs:** Returns a `STRUCT` with:
 
@@ -635,6 +644,8 @@ AI.COUNT_TOKENS(
 |-------|------|-------------|
 | `result` | INT64 | Total **input** token count. `NULL` if the input is `NULL` or an API error occurred. |
 | `full_response` | JSON | Per-modality token detail, e.g. `{"promptTokensDetails":[{"modality":"TEXT","tokenCount":180}],"totalTokens":180}`. `NULL` on `NULL` input or API error. |
+
+**Supported models:** Any current GA Gemini model (`gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon` GA `2026-11-10`, `gemini-4-hydrogen` GA `2026-11-12`, `gemini-3.5-flash-lite`). Default when omitted: `gemini-3.5-flash-lite`. All Gemini 3.x and Gemini 4 endpoints share a unified `1,048,576`-token input context window.
 
 **Best practices:**
 - Because counting is free, aggregate `AI.COUNT_TOKENS(col).result` across a column (`SUM`/`AVG`/`MAX`) to size a batch workload before running the paid generation functions over it.

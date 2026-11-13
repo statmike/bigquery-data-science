@@ -55,7 +55,7 @@ Work through [the individual function notebooks](../functions/) first. A workflo
 | [Semantic Search System](semantic_search/) | AI.EMBED, VECTOR_SEARCH, AI.SEARCH | The same search index built three ways — manual, simplified, and hybrid — so you can see what each layer of convenience costs you |
 | [Catalog Search](catalog_search/) | AI.EMBED, VECTOR_SEARCH, AI.SEARCH | Hybrid retrieval over a real product catalog: what rank fusion buys for an exact-token lookup and what it does not, plus a corpus large enough to actually populate a vector index |
 | [RAG Pipeline](rag_pipeline/) | AI.GENERATE_TABLE, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | Generate a knowledge base, embed it, retrieve against it, and answer questions with the retrieved context |
-| [Document RAG](document_rag/) | AI.CHUNK_DOCUMENT, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | The same pipeline over real single- and multi-page PDFs — layout-aware chunking with page citations, asymmetric embeddings, and grounded answers |
+| [Document RAG](document_rag/) | AI.CHUNK_DOCUMENT, AI.PARSE_DOCUMENT, AI.EMBED, VECTOR_SEARCH, AI.GENERATE | The same pipeline over real single- and multi-page PDFs — layout-aware chunking with page citations, parse-once `chunk_size` tuning (`raw-docai`), unified embeddings, and grounded answers |
 | [Image Deduplication](image_deduplication/) | AI.EMBED, VECTOR_SEARCH | Grouping near-duplicate images by embedding similarity to keep train/test splits honest |
 
 ### Prediction and diagnosis

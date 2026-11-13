@@ -29,6 +29,8 @@ Setting `model_registry = 'VERTEX_AI'` inside `CREATE MODEL ... OPTIONS(...)` au
     1. `EXPORT MODEL` to `gs://...`
     2. `aiplatform.Model.upload(artifact_uri=..., serving_container_image_uri=...)` (without the broken explanation spec)
     3. `model.deploy(machine_type="n1-standard-2")`
+- **Custom Organization Policies for BigQuery ML Models (Preview `2026-11-06`)**:
+  - Enterprise platform administrators can define Custom Organization Policy constraints over `bigquery.googleapis.com/Model` resources (`CREATE` and `UPDATE` operations) to enforce governance rules at `CREATE MODEL` / `ALTER MODEL` time — such as requiring CMEK (`kms_key_name`), requiring `model_registry = 'VERTEX_AI'`, or restricting allowed `model_type` / remote `endpoint` values across an organization or folder.
 
 ---
 
