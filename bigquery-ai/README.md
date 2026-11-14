@@ -79,6 +79,7 @@ Workflows compose multiple AI functions together for end-to-end scenarios. See [
 | [Zero-Shot Tabular Prediction](workflows/tabular_prediction/) | AI.PREDICT, AI.EVALUATE, AI.KEY_DRIVERS, AI.GENERATE | Zero-shot regression and classification with TabFM, scored and explained — no model training |
 | [Metric Diagnostics](workflows/metric_diagnostics/) | AI.KEY_DRIVERS, AI.PREDICT, AI.CAUSAL_EFFECT, AI.GENERATE | Explain why a metric moved between two periods, project it forward, then narrate the drivers in plain language — and stop short of calling any of it causal. A placebo test with `AI.CAUSAL_EFFECT` at six dates where nothing happened returns a significant result at one of them, which is why the diagnostic steps stay descriptive |
 | [Document Intelligence](workflows/document_intelligence/) | AI.CLASSIFY, AI.GENERATE, AI.SCORE, AI.AGG | Classify mixed documents, extract key fields, score quality, and aggregate typed summaries with `AI.AGG` (`output_schema`) |
+| [Insurance Claims Adjustment](workflows/claims_adjustment/) | AI.IF, AI.SCORE, AI.CLASSIFY, AI.GENERATE, AI.AGG | Gate claimant photo quality (`AI.SCORE` + `AI.IF`), classify and sub-classify Auto and Roof claims (`AI.CLASSIFY`), route edge cases to human review, extract type-specific damage schemas (`AI.GENERATE`), and compile adjuster dispatch queues (`AI.AGG`) |
 | [Content Moderation](workflows/content_moderation/) | AI.GENERATE_TABLE, AI.IF, AI.CLASSIFY, AI.SCORE, AI.GENERATE, AI.AGG | Flag, categorize, score, and summarize user-generated content with typed `AI.AGG` (`output_schema`) |
 | [Multimodal Analysis](workflows/multimodal_analysis/) | AI.EMBED, AI.SIMILARITY, AI.GENERATE | Embed document images, find similar documents, generate visual descriptions |
 | [Log Analysis](workflows/log_analysis/) | AI.GENERATE_TABLE, AI.CLASSIFY, AI.SCORE, AI.AGG, AI.EMBED, VECTOR_SEARCH | Classify tickets, score priority, synthesize patterns and typed escalation digests with `AI.AGG` (`output_schema`), then retrieve by error code with hybrid search — and measure how far up the ranking a lexical hit can actually lift a row |
@@ -302,6 +303,9 @@ bigquery-ai/
 ├── reference/               ◄ The detailed function reference, one page per category
 ├── overview.ipynb           ◄ Interactive overview notebook
 ├── setup/                   ◄ Connections, models, quotas reference
+├── data/                    ◄ Synthetic dataset generators & ground-truth manifests
+│   ├── documents/           ◄ 100 PDFs (50 invoices + 50 receipts) + manifest.json
+│   └── claims/              ◄ 24 JPEG insurance claim photos + manifest.json
 ├── functions/               ◄ Per-function deep dives (SQL + notebook)
 │   ├── ai_generate/
 │   ├── ai_generate_text/
@@ -329,7 +333,7 @@ bigquery-ai/
 │   ├── ml_annotate_image/
 │   ├── ml_transcribe/
 │   └── ... (+ legacy/variant functions)
-└── workflows/               ◄ End-to-end composed workflows
+└── workflows/               ◄ End-to-end composed workflows (15 workflows)
     ├── data_enrichment/
     ├── document_rag/
     ├── content_analysis/
@@ -340,6 +344,7 @@ bigquery-ai/
     ├── tabular_prediction/
     ├── time_series_intelligence/
     ├── document_intelligence/
+    ├── claims_adjustment/
     ├── content_moderation/
     ├── multimodal_analysis/
     ├── log_analysis/

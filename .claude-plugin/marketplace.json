@@ -1,6 +1,6 @@
 {
   "name": "bigquery-data-science",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "description": "BigQuery Data Science Agent Skills: umbrella router (bigquery-data-science) plus 4-Lens domain skills for BigQuery ML (bigquery-ml), BigQuery AI (bigquery-ai), and Production MLOps (bigquery-mlops).",
   "owner": {
     "name": "Mike Henderson",
@@ -9,14 +9,14 @@
   "repository": "https://github.com/statmike/bigquery-data-science",
   "license": "Apache-2.0",
   "metadata": {
-    "version": "0.12.0",
-    "description": "4-Lens progressive-disclosure skills distilled from 106 live-executed BigQuery ML and BigQuery AI notebooks."
+    "version": "0.13.0",
+    "description": "4-Lens progressive-disclosure skills distilled from 108 live-executed BigQuery ML and BigQuery AI notebooks."
   },
   "plugins": [
     {
       "name": "bigquery-data-science",
       "description": "Umbrella router and ML.* vs AI.* namespace decoder with 10 head-to-head empirical comparisons, prerequisite matrix, and multi-skill composition playbooks.",
-      "version": "0.12.0",
+      "version": "0.13.0",
       "author": {
         "name": "Mike Henderson",
         "url": "https://github.com/statmike"
@@ -32,7 +32,7 @@
     {
       "name": "bigquery-ml",
       "description": "Train, evaluate, explain, export, and orchestrate BigQuery ML models (CREATE MODEL) and model-free ML.* functions, causal inference workflows, and MLOps pipelines.",
-      "version": "0.12.0",
+      "version": "0.13.0",
       "author": {
         "name": "Mike Henderson",
         "url": "https://github.com/statmike"
@@ -43,7 +43,7 @@
     {
       "name": "bigquery-ai",
       "description": "Call Gemini and generative AI.*, embeddings, VECTOR_SEARCH/AI.SEARCH, zero-shot TimesFM/TabFM (AI.FORECAST, AI.PREDICT), AI.KEY_DRIVERS, and pre-trained Cloud AI services from BigQuery SQL.",
-      "version": "0.12.0",
+      "version": "0.13.0",
       "author": {
         "name": "Mike Henderson",
         "url": "https://github.com/statmike"
@@ -53,8 +53,8 @@
     },
     {
       "name": "bigquery-mlops",
-      "description": "Production MLOps for BigQuery ML, BigQuery AI, and external models logging to BigQuery: 8 orchestration patterns, Vertex AI Model Registry & online endpoints, ONNX/XGBoost/TF import/export, drift/skew monitoring, and point-in-time feature store synchronization.",
-      "version": "0.12.0",
+      "description": "Production MLOps for BigQuery ML, BigQuery AI, and external models logging to BigQuery: 9 orchestration patterns, Vertex AI Model Registry & online endpoints, ONNX/XGBoost/TF import/export, drift/skew monitoring, and point-in-time feature store synchronization.",
+      "version": "0.13.0",
       "author": {
         "name": "Mike Henderson",
         "url": "https://github.com/statmike"

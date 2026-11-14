@@ -16,6 +16,13 @@ repos:
         language: system
         pass_filenames: false
 
+      - id: ruff-format
+        name: ruff format --check (src & tests)
+        entry: uv run --frozen ruff format --check src tests
+        language: system
+        types: [python]
+        pass_filenames: false
+
       - id: ruff-check
         name: ruff check (src & tests)
         entry: uv run --frozen ruff check src tests

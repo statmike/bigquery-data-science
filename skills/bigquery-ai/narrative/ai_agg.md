@@ -18,7 +18,7 @@
 - `AI.GENERATE` is a **scalar** function — returns one result per input row
 - `AI.AGG` automatically batches large datasets; `AI.GENERATE` requires manual batching
 
-**Featured in:** `workflows/content_analysis` (Content Analysis Pipeline) | `workflows/content_moderation` (Content Moderation) | `workflows/document_intelligence` (Document Intelligence) | `workflows/log_analysis` (Log Analysis)
+**Featured in:** `workflows/content_analysis` (Content Analysis Pipeline) | `workflows/content_moderation` (Content Moderation) | `workflows/document_intelligence` (Document Intelligence) | `workflows/log_analysis` (Log Analysis) | `workflows/claims_adjustment` (Insurance Claims Adjustment)
 
 **Multimodal:** Supports image input via `reference/unstructured-data-infrastructure.md#objectref-and-objectrefruntime-schema-reference` (ObjectRef). Pass a STRUCT input with `ObjectRef` fields to aggregate over images.
 

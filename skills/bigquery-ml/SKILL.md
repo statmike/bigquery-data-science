@@ -1,15 +1,15 @@
 ---
 name: bigquery-ml
-description: Use when training, evaluating, deploying, or monitoring a machine learning model in BigQuery with SQL (CREATE MODEL and ML.* functions) — picking a model type, choosing a preprocessing function, point-in-time feature retrieval, causal inference (including AI.CAUSAL_EFFECT), or production retraining pipelines across 23 model types, 49 functions, 18 workflows, and 8 pipelines.
+description: Use when training, evaluating, deploying, or monitoring a machine learning model in BigQuery with SQL (CREATE MODEL and ML.* functions) — picking a model type, choosing a preprocessing function, point-in-time feature retrieval, causal inference (including AI.CAUSAL_EFFECT), or production retraining pipelines across 23 model types, 49 functions, 18 workflows, and 9 pipelines.
 metadata:
-  version: "0.12.0"
+  version: "0.13.0"
 ---
 
 # BigQuery ML (`bigquery-ml`)
 
 BigQuery ML trains and serves models with SQL and Python (`bigframes.ml`): `CREATE MODEL` selects an algorithm via `model_type`, and `ML.*` functions evaluate, predict, explain, and monitor it — no data leaves BigQuery.
 
-This skill packages a verified, field-tested 4-Lens reference distilled from live-executing all 23 model types, 49 functions, 18 workflows, and 8 orchestration pipelines in `bigquery-ml/`.
+This skill packages a verified, field-tested 4-Lens reference distilled from live-executing all 23 model types, 49 functions, 18 workflows, and 9 orchestration pipelines in `bigquery-ml/`.
 
 ## Decision Tree (Lens 1 → Lens 2)
 
@@ -21,7 +21,7 @@ This skill packages a verified, field-tested 4-Lens reference distilled from liv
    - **`REMOTE WITH CONNECTION` builds two different things:** `OPTIONS(endpoint = 'https://...')` is your deployed Vertex AI Endpoint consumed with `ML.PREDICT` ([`reference/model-management.md`](reference/model-management.md)). `OPTIONS(REMOTE_SERVICE_TYPE = '...')` is a handle to a pre-trained Google Cloud AI service (`ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`, `ML.PROCESS_DOCUMENT`) documented in [`../bigquery-ai/reference/cloud-ai-service-models.md`](../bigquery-ai/reference/cloud-ai-service-models.md).
 3. **Are you exploring or preprocessing data independent of any model type** (`ML.DESCRIBE_DATA`, `ML.CORRELATION`, scalers, bucketizers, encoders, `ML.IMPUTER`, `ML.FEATURES_AT_TIME` / `ML.ENTITY_FEATURES_AT_TIME`, text, distance, or SQL image preprocessing) → see [`reference/preprocessing-functions.md`](reference/preprocessing-functions.md)
    - **Image tensor functions (`ML.DECODE_IMAGE`, `ML.RESIZE_IMAGE`, `ML.CONVERT_COLOR_SPACE`, `ML.CONVERT_IMAGE_TYPE`)** require a BigQuery `ENTERPRISE` Edition reservation and fail on on-demand pricing.
-4. **Are you composing an end-to-end workflow or scheduling a production pipeline** (drift-check → conditional retrain → score across 8 orchestrators) → see [`reference/workflows-and-pipelines.md`](reference/workflows-and-pipelines.md)
+4. **Are you composing an end-to-end workflow or scheduling a production pipeline** (drift-check → conditional retrain → score across 9 orchestrators) → see [`reference/workflows-and-pipelines.md`](reference/workflows-and-pipelines.md)
 5. **Are you estimating the causal effect of an intervention or treatment?** → see the causal cluster in [`reference/workflows-and-pipelines.md`](reference/workflows-and-pipelines.md): `propensity_score_matching`, `price_elasticity_dml`, `uplift_cate`, `difference_in_differences`, `synthetic_control`, and `causal_effect` (`AI.CAUSAL_EFFECT`, documented in `bigquery-ml` so all causal estimators live side by side).
 6. **Do you already have saved predictions (from BQML, `AI.PREDICT` TabFM, or an external endpoint) and just need evaluation metrics?** → `ML.METRICS` requires no model object; see [`reference/regression.md`](reference/regression.md) and [`reference/classification.md`](reference/classification.md).
 7. **Are you joining historical features to labeled events?** → use `ML.ENTITY_FEATURES_AT_TIME` / `ML.FEATURES_AT_TIME` in [`reference/preprocessing-functions.md`](reference/preprocessing-functions.md) and the `feature_store_workflow` narrative in [`narrative/feature_store_workflow.md`](narrative/feature_store_workflow.md).
@@ -33,7 +33,7 @@ If the task is ambiguous between trained models (`bigquery-ml`), zero-training f
 | When Your `bigquery-ml` Task Also Needs... | Combine With... | Exact Handoff Guide |
 | --- | --- | --- |
 | Unstructured text/PDF/image featurization (`AI.EMBED`, `AI.GENERATE_TABLE`, `ML.PROCESS_DOCUMENT`), zero-shot teacher labels (`AI.CLASSIFY`), or executive narrative synthesis (`AI.AGG`) | **[`bigquery-ai`](../bigquery-ai/SKILL.md)** | [`../bigquery-data-science/reference/cross-skill-playbooks.md`](../bigquery-data-science/reference/cross-skill-playbooks.md) (Playbooks 1–4) |
-| Production scheduling across the 8 orchestrators, Vertex AI Model Registry (`model_registry='VERTEX_AI'`), `EXPORT` / `IMPORT` / `REMOTE` hybrid serving, universal drift monitoring (`ML.VALIDATE_DATA_DRIFT`), model-free `ML.METRICS`, or point-in-time feature store (`ML.ENTITY_FEATURES_AT_TIME`) | **[`bigquery-mlops`](../bigquery-mlops/SKILL.md)** | [`../bigquery-mlops/reference/orchestration-and-pipelines.md`](../bigquery-mlops/reference/orchestration-and-pipelines.md) · [`../bigquery-mlops/reference/model-registry-export-and-serving.md`](../bigquery-mlops/reference/model-registry-export-and-serving.md) · [`../bigquery-mlops/reference/monitoring-drift-and-evaluation.md`](../bigquery-mlops/reference/monitoring-drift-and-evaluation.md) · [`../bigquery-mlops/reference/feature-store-and-temporal-joins.md`](../bigquery-mlops/reference/feature-store-and-temporal-joins.md) |
+| Production scheduling across the 9 orchestrators, Vertex AI Model Registry (`model_registry='VERTEX_AI'`), `EXPORT` / `IMPORT` / `REMOTE` hybrid serving, universal drift monitoring (`ML.VALIDATE_DATA_DRIFT`), model-free `ML.METRICS`, or point-in-time feature store (`ML.ENTITY_FEATURES_AT_TIME`) | **[`bigquery-mlops`](../bigquery-mlops/SKILL.md)** | [`../bigquery-mlops/reference/orchestration-and-pipelines.md`](../bigquery-mlops/reference/orchestration-and-pipelines.md) · [`../bigquery-mlops/reference/model-registry-export-and-serving.md`](../bigquery-mlops/reference/model-registry-export-and-serving.md) · [`../bigquery-mlops/reference/monitoring-drift-and-evaluation.md`](../bigquery-mlops/reference/monitoring-drift-and-evaluation.md) · [`../bigquery-mlops/reference/feature-store-and-temporal-joins.md`](../bigquery-mlops/reference/feature-store-and-temporal-joins.md) |
 
 ## Tool Wrapper & Generator Rules (SQL + `bigframes.ml`)
 
@@ -72,6 +72,6 @@ Before returning any `bigquery-ml` SQL or Python code, verify against this check
   - [`reference/unsupervised-and-specialized.md`](reference/unsupervised-and-specialized.md) — `KMEANS`, `PCA`, `AUTOENCODER`, `MATRIX_FACTORIZATION`, `CONTRIBUTION_ANALYSIS`, `ARIMA_PLUS`, `ARIMA_PLUS_XREG`, `ML.TREND`, `ML.SEASONALITY`, `ML.DETECT_CHANGE_POINTS`
   - [`reference/model-management.md`](reference/model-management.md) — `TRANSFORM_ONLY`, imported models (`TENSORFLOW`, `TENSORFLOW_LITE`, `ONNX`, `XGBOOST`), `REMOTE WITH CONNECTION`, `EXPORT MODEL`, `ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW`
   - [`reference/preprocessing-functions.md`](reference/preprocessing-functions.md) — `ML.DESCRIBE_DATA`, `ML.CORRELATION`, scalers, bucketizers, encoders, `ML.IMPUTER`, `ML.FEATURES_AT_TIME`, `ML.ENTITY_FEATURES_AT_TIME`, text, distance, image preprocessing
-  - [`reference/workflows-and-pipelines.md`](reference/workflows-and-pipelines.md) — 18 composed workflows (including causal inference & `AI.CAUSAL_EFFECT`) and 8 production orchestration pipelines
+  - [`reference/workflows-and-pipelines.md`](reference/workflows-and-pipelines.md) — 18 composed workflows (including causal inference & `AI.CAUSAL_EFFECT`) and 9 production orchestration pipelines
 - **Lens 3 — Per-Statement Syntax Cards (`syntax/`, < 25 KB each)**: [`syntax/INDEX.md`](syntax/INDEX.md) (93 H2-sliced syntax cards)
-- **Lens 4 — Worked Walkthroughs (`narrative/`)**: 61 extracted notebook narratives in `narrative/*.md` (e.g., [`narrative/arima_plus.md`](narrative/arima_plus.md), [`narrative/feature_store.md`](narrative/feature_store.md), [`narrative/feature_store_workflow.md`](narrative/feature_store_workflow.md))
+- **Lens 4 — Worked Walkthroughs (`narrative/`)**: 62 extracted notebook narratives in `narrative/*.md` (e.g., [`narrative/arima_plus.md`](narrative/arima_plus.md), [`narrative/feature_store.md`](narrative/feature_store.md), [`narrative/feature_store_workflow.md`](narrative/feature_store_workflow.md))

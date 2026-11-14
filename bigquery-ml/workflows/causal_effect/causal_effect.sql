@@ -356,18 +356,22 @@ ORDER BY forecast_timestamp;
 
 
 -- =============================================================================
--- Example 6: Three estimators, one dataset, identical units
+-- Example 6: Four estimators, one dataset, identical units
 -- =============================================================================
--- The same Texas mask-mandate question, measured three structurally different
+-- The same Texas mask-mandate question, measured four structurally different
 -- ways on the same weekly per-100k series:
 --
---   method                       estimate (per post-period week)   identifies off
---   difference-in-differences    -19.29                            a control state (GA)
---   synthetic control            -19.28                            a weighted donor pool
---   AI.CAUSAL_EFFECT             -56.52  (= -282.61 / 5 weeks)     the unit's own past
+--   method                            estimate (per post-period week)  identifies off
+--   naive pre-vs-post diff-in-means   +137.37 (= 199.77 - 62.40)       Texas's pre-period mean (flat)
+--   difference-in-differences          -19.29                          a control state (GA)
+--   synthetic control                  -19.28                          a weighted donor pool (82% GA + 18% ID)
+--   AI.CAUSAL_EFFECT                   -56.52 (= -282.61 / 5 weeks)    the unit's own past (ARIMA(0,2,0))
 --
--- All three agree on SIGN. They do not agree on magnitude: the univariate
--- counterfactual is about 2.9x larger.
+-- Naive pre-vs-post gets the SIGN backwards (+137.37/wk) because it implicitly
+-- assumes Texas would have stayed flat at its 9-week pre-period mean (62.40),
+-- ignoring the steep June surge (25.12 -> 159.60). All three causal estimators
+-- replace that static average with a time-varying trajectory and agree on SIGN
+-- (negative), while disagreeing on magnitude by roughly 2.9x (-56.52 vs -19.28).
 --
 -- This is not a defect in any of them -- it is what the different identifying
 -- assumptions buy. AI.CAUSAL_EFFECT asks "how far did Texas fall below its own
@@ -397,13 +401,14 @@ ORDER BY forecast_timestamp;
 -- effect from a cresting epidemic wave on 9 pre-period weeks -- and the
 -- interval says that far more usefully than the threshold does.
 --
--- The wider map of what each causal method in this project identifies off:
---   ../propensity_score_matching/  covariates (matched comparable units)
---   ../difference_in_differences/  a control group with parallel pre-trends
---   ../synthetic_control/          a weighted donor pool of control units
---   ../uplift_cate/                treatment assignment plus covariates
---   ../price_elasticity_dml/       covariates, via double machine learning
---   this notebook                  the treated unit's own pre-intervention history
+-- The wider map of what each causal method in this project identifies off and
+-- its mandatory diagnostic check:
+--   ../propensity_score_matching/  covariates (matched comparable units; check positivity 0.05 < e(X) < 0.95 & |SMD| < 0.10)
+--   ../difference_in_differences/  a control group with parallel pre-trends (check pre-period event-study slopes ~ 0)
+--   ../synthetic_control/          a weighted donor pool of control units (check pre-period RMSPE & convex-hull support)
+--   ../uplift_cate/                treatment assignment plus covariates for CATE (check Qini curve & uplift decile calibration)
+--   ../price_elasticity_dml/       covariates, via double machine learning (check first-stage nuisance R^2 & residual tails)
+--   this notebook                  the treated unit's own pre-intervention history (check ML.ARIMA_EVALUATE d order & T_pre/T_post)
 
 
 -- =============================================================================

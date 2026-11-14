@@ -2,7 +2,7 @@
 
 Contents: [Choosing a starting template](#choosing-a-starting-template) · [Go deeper](#go-deeper)
 
-Individual functions rarely answer a real business question alone. These 14 workflows compose several functions into a genuine end-to-end task — use them as worked patterns to copy from, not just a function catalog.
+Individual functions rarely answer a real business question alone. These 15 workflows compose several functions into a genuine end-to-end task — use them as worked patterns to copy from, not just a function catalog.
 
 | Workflow | Functions used | What it does |
 |---|---|---|
@@ -16,6 +16,7 @@ Individual functions rarely answer a real business question alone. These 14 work
 | `time_series_intelligence` | `AI.FORECAST`, `AI.DETECT_ANOMALIES`, `AI.EVALUATE`, `AI.KEY_DRIVERS` | Forecast a series, detect anomalies in it, evaluate forecast accuracy, then explain movement by segment — the single most complete tour of the forecasting/anomaly/driver functions together. |
 | `metric_diagnostics` | `AI.KEY_DRIVERS`, `AI.PREDICT`, `AI.CAUSAL_EFFECT`, `AI.GENERATE` | Explain why a metric moved between two periods, project where it goes next, then narrate both in plain language — pairs structured analysis and zero-shot prediction with a generation function for a readable output. Ends by *refusing* the causal claim: a placebo test runs `AI.CAUSAL_EFFECT` at six dates where nothing happened and one of them comes back significant, which is why the earlier steps stay descriptive. |
 | `document_intelligence` | `AI.CLASSIFY`, `AI.GENERATE`, `AI.SCORE`, `AI.AGG` | Classify mixed documents, extract key fields, score quality, and synthesize typed portfolio rollups with `AI.AGG` (`output_schema`). |
+| `claims_adjustment` | `AI.IF`, `AI.SCORE`, `AI.CLASSIFY`, `AI.GENERATE`, `AI.AGG` | Multi-stage multimodal insurance claims triage over Object Table photos: gate image clarity and inspectability (`AI.SCORE` + `AI.IF`) to divert defective uploads to a Claimant Re-Upload Queue, classify primary line of business (`AI.CLASSIFY` into `'auto'`, `'roof'`, `'unclassified'`), conditionally sub-classify per peril (`collision_panel`, `glass_windshield`, `hail_dents`, `wind_missing_shingles`, `hail_impact`, `tree_structural_impact`, `other_unclear`) with Human Specialist Review routing, grade branch-specific schemas (`AI.GENERATE` `output_schema` + `AI.SCORE` severity), and synthesize cohort dispatch plans (`AI.AGG` `output_schema`). |
 | `content_moderation` | `AI.GENERATE_TABLE`, `AI.IF`, `AI.CLASSIFY`, `AI.SCORE`, `AI.GENERATE`, `AI.AGG` | Flag, categorize, score, and synthesize typed category digests (`AI.AGG` with `output_schema`) over user-generated content — the broadest single-workflow tour of the managed functions. |
 | `multimodal_analysis` | `AI.EMBED`, `AI.SIMILARITY`, `AI.GENERATE` | Embed document images, find similar documents, generate visual descriptions. |
 | `log_analysis` | `AI.GENERATE_TABLE`, `AI.CLASSIFY`, `AI.SCORE`, `AI.AGG`, `AI.EMBED`, `VECTOR_SEARCH` | Classify tickets, score priority, synthesize patterns and typed escalation scorecards with `AI.AGG` (`output_schema`), then retrieve by error code with hybrid search — a support/ops-triage template, and the sub-project's clearest measurement of how far up the ranking a lexical hit can lift a row (vector rank 24 of 30 → fused position 11) and why `top_k` decides whether you ever see it. |
@@ -23,20 +24,21 @@ Individual functions rarely answer a real business question alone. These 14 work
 
 ## Choosing a starting template
 
-- **Need to classify + score + summarize unstructured records at volume** (tickets, documents, user content) → `content_analysis`, `document_intelligence`, `content_moderation`, or `log_analysis` — pick by how many of the managed functions (`AI.CLASSIFY`/`AI.SCORE`/`AI.IF`/`AI.AGG`) you need together; `content_moderation` is the most complete template.
+- **Need to classify + score + summarize unstructured records at volume** (tickets, documents, claim photos, user content) → `content_analysis`, `document_intelligence`, `claims_adjustment`, `content_moderation`, or `log_analysis` — pick by how many of the managed functions (`AI.CLASSIFY`/`AI.SCORE`/`AI.IF`/`AI.AGG`) you need together; `claims_adjustment` demonstrates a 5-stage multimodal intake gate + hierarchical sub-classification + human review routing + per-branch schema extraction funnel, while `content_moderation` is the broadest text moderation template.
 - **Need to answer questions grounded in your own data** → `rag_pipeline` (synthetic/tabular text) or `document_rag` (real PDF documents in Cloud Storage chunked with `AI.CHUNK_DOCUMENT`).
 - **Need to find similar items** (text, images, documents) → `semantic_search` or `image_deduplication` depending on whether you need a queryable index or a one-off grouping pass.
 - **Need search that weighs exact tokens** (SKUs, error codes, part numbers) → `catalog_search` for the full hybrid treatment on a real corpus with a vector index, or `log_analysis`'s Step 5 for the compact version. `semantic_search` shows hybrid alongside the two semantic-only approaches for contrast. **Set expectations first:** hybrid re-ranks and modestly widens, and `top_k` decides how far — a lexical hit reaches 10 semantic ranks deep at `top_k => 5`, 110 at `top_k => 30`, and 640 at `top_k => 64`. Two gates set that reach and effective reach is `min( score gate, 10 * top_k )`: the fused score has to beat the last slot on the page, which is what binds at `top_k` below 51, and BigQuery only pools the top `10 * top_k` rows for the lexical leg, which is what binds from 51 up. So it pays off when the query carries descriptive words *alongside* the token, and exact-token retrieval for a target at semantic rank `R` needs `top_k` of **at least** `R/10` — a floor, not a recipe, since below a few hundred ranks deep the score gate demands considerably more (a target at rank 100 needs `top_k` near 29, not 10). Read the reach table for the number that actually applies. When the token is the entire query and the answer must be certain, point the user at a `WHERE` predicate instead — `catalog_search` demonstrates exactly that trade-off. See `reference/embeddings-and-search.md` for the arithmetic and the reach table.
 - **Need to predict a value or category from structured rows with no training** → `tabular_prediction` (the full TabFM tour: predict, score, explain, narrate) or `metric_diagnostics` (drivers + a lighter projection).
 - **Need to explain a metric or forecast something over time** → `time_series_intelligence` (the full forecast/anomaly/evaluate/drivers tour) or `metric_diagnostics` (drivers + narration, lighter weight).
 - **Need to enrich/clean records against external knowledge** → `data_enrichment`, which contrasts the Google Search grounding pattern against zero-shot tabular inference for the same gap.
-- **Working with images/visual content specifically** → `multimodal_analysis`.
+- **Working with images/visual content specifically** → `claims_adjustment` (multi-stage image quality gate, hierarchical peril classification, structured damage extraction, and dispatch rollup) or `multimodal_analysis` (image embeddings, similarity search, and visual descriptions).
 
 ## Go deeper
 
 Full extracted notebook walkthroughs live in this skill's `narrative/` folder:
 
 - [`narrative/catalog_search.md`](../narrative/catalog_search.md) (source: `workflows/catalog_search/`)
+- [`narrative/claims_adjustment.md`](../narrative/claims_adjustment.md) (source: `workflows/claims_adjustment/`)
 - [`narrative/content_analysis.md`](../narrative/content_analysis.md) (source: `workflows/content_analysis/`)
 - [`narrative/content_moderation.md`](../narrative/content_moderation.md) (source: `workflows/content_moderation/`)
 - [`narrative/data_enrichment.md`](../narrative/data_enrichment.md) (source: `workflows/data_enrichment/`)

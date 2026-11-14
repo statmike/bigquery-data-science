@@ -2,17 +2,17 @@
 name: bigquery-data-science
 description: "Use FIRST when someone wants to explore, predict, classify, forecast, embed, search, extract, explain, monitor, or operationalize data science in BigQuery and needs to choose or combine a trained model (bigquery-ml — CREATE MODEL + ML.*), a zero-training generative or foundation model function (bigquery-ai — AI.* + TimesFM + TabFM + Cloud AI services), or production MLOps orchestration, model registry, export/import, drift monitoring, and point-in-time feature store (bigquery-mlops)."
 metadata:
-  version: "0.12.0"
+  version: "0.13.0"
 ---
 
 # BigQuery Data Science — Umbrella Router & Multi-Skill Composer (`bigquery-data-science`)
 
 BigQuery provides **four composable surfaces** for end-to-end data science in SQL and Python (`bigframes`), packaged as four collaborating skills:
 
-1. **Umbrella Router, Namespace Decoder & Multi-Skill Playbooks (`bigquery-data-science` — this skill)** — arbitrates between `ML.*` and `AI.*`, decodes prerequisite connections/reservations ([`reference/namespace-matrix.md`](reference/namespace-matrix.md)), and prescribes **multi-skill combinations** across the 32 workflows and 8 pipelines ([`reference/cross-skill-playbooks.md`](reference/cross-skill-playbooks.md)).
+1. **Umbrella Router, Namespace Decoder & Multi-Skill Playbooks (`bigquery-data-science` — this skill)** — arbitrates between `ML.*` and `AI.*`, decodes prerequisite connections/reservations ([`reference/namespace-matrix.md`](reference/namespace-matrix.md)), and prescribes **multi-skill combinations** across the 33 workflows and 9 pipelines ([`reference/cross-skill-playbooks.md`](reference/cross-skill-playbooks.md)).
 2. **Trained Models, Statistical Diagnostics & Causal Inference ([`bigquery-ml`](../bigquery-ml/SKILL.md))** — `CREATE MODEL` + `ML.*` across 23 model types, 49 model-free/lifecycle functions (including `ML.DESCRIBE_DATA`, `ML.CORRELATION`, `ML.TREND`, `ML.SEASONALITY`, `ML.DECODE_IMAGE`), and 18 end-to-end workflows (including `AI.CAUSAL_EFFECT` and econometric causal inference).
 3. **Foundation Models, Generative SQL, Search & Cloud AI Services ([`bigquery-ai`](../bigquery-ai/SKILL.md))** — zero-training foundation functions (`AI.GENERATE*`, `AI.COUNT_TOKENS`, `AI.IF`, `AI.SCORE`, `AI.CLASSIFY`, `AI.AGG`, `AI.TRANSLATE`, `AI.PARSE_DOCUMENT`, `AI.CHUNK_DOCUMENT`, `AI.EMBED`, `AI.SIMILARITY`, `AI.SEARCH`, `VECTOR_SEARCH`, `AI.FORECAST` on TimesFM, `AI.DETECT_ANOMALIES`, `AI.KEY_DRIVERS`, `AI.PREDICT` + `AI.EVALUATE` on TabFM), `ObjectRef` multimodal processing, and pre-trained Cloud AI service models (`ML.PROCESS_DOCUMENT`, `ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`).
-4. **Production MLOps, Registry, Hybrid Serving, Drift Monitoring & Temporal Feature Store ([`bigquery-mlops`](../bigquery-mlops/SKILL.md))** — the 8 production orchestrators (`sql_scripting`, `scheduled_queries`, `dataform`, `cloud_workflows`, `dbt`, `vertex_kfp`, `composer_airflow`, `airflow_with_kfp`) across both `ML.*` and `AI.*`, Vertex AI Model Registry (`model_registry='VERTEX_AI'`), `EXPORT MODEL` / `IMPORT MODEL` (`ONNX`, `XGBOOST`, `TENSORFLOW`, `TENSORFLOW_LITE`), `REMOTE WITH CONNECTION` custom Vertex AI Endpoints, universal table-native drift monitoring (`ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW`) and model-free evaluation (`ML.METRICS`) — including external models served outside BigQuery that log inference tables to BigQuery — and point-in-time feature store (`ML.ENTITY_FEATURES_AT_TIME`, `ML.FEATURES_AT_TIME`).
+4. **Production MLOps, Registry, Hybrid Serving, Drift Monitoring & Temporal Feature Store ([`bigquery-mlops`](../bigquery-mlops/SKILL.md))** — the 9 production orchestrators (`sql_scripting`, `scheduled_queries`, `dataform`, `bigquery_pipelines`, `cloud_workflows`, `dbt`, `vertex_kfp`, `composer_airflow`, `airflow_with_kfp`) across both `ML.*` and `AI.*`, Vertex AI Model Registry (`model_registry='VERTEX_AI'`), `EXPORT MODEL` / `IMPORT MODEL` (`ONNX`, `XGBOOST`, `TENSORFLOW`, `TENSORFLOW_LITE`), `REMOTE WITH CONNECTION` custom Vertex AI Endpoints, universal table-native drift monitoring (`ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW`) and model-free evaluation (`ML.METRICS`) — including external models served outside BigQuery that log inference tables to BigQuery — and point-in-time feature store (`ML.ENTITY_FEATURES_AT_TIME`, `ML.FEATURES_AT_TIME`).
 
 Before writing SQL or Python, check the [Namespace & Prerequisite Matrix (`reference/namespace-matrix.md`)](reference/namespace-matrix.md) to verify whether a symbol requires a Cloud Resource Connection, IAM role, or BigQuery Enterprise Edition reservation, and check [Multi-Skill Composition Playbooks (`reference/cross-skill-playbooks.md`)](reference/cross-skill-playbooks.md) whenever a task spans multiple stages.
 
@@ -73,7 +73,7 @@ Before writing SQL or Python, check the [Namespace & Prerequisite Matrix (`refer
 ## Routing Links
 
 - **Prerequisite & Namespace Matrix (Lens 2)**: [`reference/namespace-matrix.md`](reference/namespace-matrix.md)
-- **Multi-Skill Composition Playbooks & Unified 32-Workflow Index (Lens 2)**: [`reference/cross-skill-playbooks.md`](reference/cross-skill-playbooks.md)
+- **Multi-Skill Composition Playbooks & Unified 33-Workflow Index (Lens 2)**: [`reference/cross-skill-playbooks.md`](reference/cross-skill-playbooks.md)
 - **BigQuery ML Skill (`CREATE MODEL`, `ML.*`, EDA, Preprocessing, Causal Inference)**: [`../bigquery-ml/SKILL.md`](../bigquery-ml/SKILL.md)
 - **BigQuery AI Skill (`AI.*`, Cloud AI Service Models, Vector/Hybrid Search, RAG)**: [`../bigquery-ai/SKILL.md`](../bigquery-ai/SKILL.md)
-- **BigQuery MLOps Skill (8 Orchestrators, Vertex Registry/Export/Import/Remote, Drift Monitoring, `ML.METRICS`, Feature Store)**: [`../bigquery-mlops/SKILL.md`](../bigquery-mlops/SKILL.md)
+- **BigQuery MLOps Skill (9 Orchestrators, Vertex Registry/Export/Import/Remote, Drift Monitoring, `ML.METRICS`, Feature Store)**: [`../bigquery-mlops/SKILL.md`](../bigquery-mlops/SKILL.md)

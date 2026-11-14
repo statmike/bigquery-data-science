@@ -66,9 +66,9 @@ def test_get_skills_dir_and_list_bundled_skills() -> None:
     }
     assert by_name["bigquery-data-science"]["reference_count"] == 2
     assert by_name["bigquery-ml"]["syntax_count"] == 93
-    assert by_name["bigquery-ml"]["narrative_count"] == 61
+    assert by_name["bigquery-ml"]["narrative_count"] == 62
     assert by_name["bigquery-ai"]["syntax_count"] == 46
-    assert by_name["bigquery-ai"]["narrative_count"] == 45
+    assert by_name["bigquery-ai"]["narrative_count"] == 46
     assert not (get_skills_dir() / "bigquery-ai" / "narrative" / "overview.md").exists()
     assert by_name["bigquery-mlops"]["reference_count"] == 4
     assert by_name["bigquery-mlops"]["syntax_count"] == 0

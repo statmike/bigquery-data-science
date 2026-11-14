@@ -1,20 +1,21 @@
 # Production Orchestration & Retraining Pipelines Across `ML.*` and `AI.*`
 
-Contents: [1. Choosing among the 8 orchestrators](#1-choosing-among-the-8-orchestrators) · [2. Standard 4-stage MLOps & AI pipeline pattern](#2-standard-4-stage-mlops--ai-pipeline-pattern) · [3. Orchestrating BigQuery AI (`AI.*`) workloads](#3-orchestrating-bigquery-ai-ai-workloads) · [4. Query-cache bypass rules across engines](#4-query-cache-bypass-rules-across-engines) · [5. Verified empirical gotchas & cost teardown](#5-verified-empirical-gotchas--cost-teardown) · [6. Canonical snippets](#6-canonical-snippets) · [7. Go deeper (Lens 3 & Lens 4)](#7-go-deeper-lens-3--lens-4)
+Contents: [1. Choosing among the 9 orchestrators](#1-choosing-among-the-9-orchestrators) · [2. Standard 4-stage MLOps & AI pipeline pattern](#2-standard-4-stage-mlops--ai-pipeline-pattern) · [3. Orchestrating BigQuery AI (`AI.*`) workloads](#3-orchestrating-bigquery-ai-ai-workloads) · [4. Query-cache bypass rules across engines](#4-query-cache-bypass-rules-across-engines) · [5. Verified empirical gotchas & cost teardown](#5-verified-empirical-gotchas--cost-teardown) · [6. Canonical snippets](#6-canonical-snippets) · [7. Go deeper (Lens 3 & Lens 4)](#7-go-deeper-lens-3--lens-4)
 
 Every production BigQuery ML (`CREATE MODEL` + `ML.*`) or BigQuery AI (`AI.*`, `VECTOR_SEARCH`, `ML.PROCESS_DOCUMENT`) workload eventually needs to run unattended: checking for new data or distribution drift, conditionally retraining or refreshing embeddings, gating on evaluation metrics, and materializing batch predictions.
 
-All **8 production pipelines** in this repository operationalize the **exact same business workflow** ([`ga4_churn_prediction`](../../bigquery-ml/narrative/ga4_churn_prediction.md)) so you can compare their operational complexity, branching mechanics, lineage tracking, and cost head-to-head.
+All **9 production pipelines** in this repository operationalize the **exact same business workflow** ([`ga4_churn_prediction`](../../bigquery-ml/narrative/ga4_churn_prediction.md)) so you can compare their operational complexity, branching mechanics, lineage tracking, and cost head-to-head.
 
 ---
 
-## 1. Choosing among the 8 orchestrators
+## 1. Choosing among the 9 orchestrators
 
 | Orchestrator | Execution Surface | Conditional Branching & Quality Gating | Best Fit When... | Walkthrough (Lens 4) |
 | --- | --- | --- | --- | --- |
 | **`sql_scripting`** | Pure BigQuery procedural SQL (`DECLARE` / `SET` / `IF ... THEN` / `BEGIN ... END`) | Native SQL `IF drift_count > 0 THEN CREATE OR REPLACE MODEL ... END IF;`; surfaces alert payload via `SELECT ERROR(...)` | You want zero external orchestration infrastructure and everything inside one atomic BigQuery job. | [`sql_scripting.md`](../../bigquery-ml/narrative/sql_scripting.md) |
 | **`scheduled_queries`** | BigQuery Data Transfer Service (`TransferConfig`, `ScheduleOptions`, `EmailPreferences`) | Executes the unmodified `sql_scripting` multi-statement script on a cron schedule; `SELECT ERROR(...)` triggers the native failure email alert | You want a zero-infrastructure cron schedule and email alerting directly from BigQuery Studio / DTS. | [`scheduled_queries.md`](../../bigquery-ml/narrative/scheduled_queries.md) |
-| **`dataform`** | Dataform SQLX (`config { type: "operations", hasOutput: true }`, `assertions`) | `dependOnDependencyAssertions: true` blocks downstream `ML.PREDICT` / `AI.*` tables when a drift or metric assertion fails | You want Git-versioned SQL pipelines with a DAG dependency graph and built-in data-quality assertion gates (also powers BigQuery Studio Pipelines). | [`dataform.md`](../../bigquery-ml/narrative/dataform.md) |
+| **`dataform`** | Dataform SQLX (`config { type: "operations", hasOutput: true }`, `assertions`) | `dependOnDependencyAssertions: true` blocks downstream `ML.PREDICT` / `AI.*` tables when a drift or metric assertion fails | You want Git-versioned SQL pipelines with a DAG dependency graph and built-in data-quality assertion gates. | [`dataform.md`](../../bigquery-ml/narrative/dataform.md) |
+| **`bigquery_pipelines`** | BigQuery Studio Pipelines (renamed from *BigQuery Workflows*, built on `google.cloud.dataform_v1` / `@dataform/core` `3.1.0`) | Pre-execution SQL unit tests (`type: "test"` with inline mocked inputs, `0` bytes billed) + runtime `assertions` (`dependOnDependencyAssertions: true`) + mixed SQL & Colab Enterprise `.ipynb` notebook tasks (`notebook({...})`) | You want BigQuery Studio's native Pipelines experience with zero-cost SQL unit tests, mixed SQL + Python `.ipynb` notebook tasks, `preserveGovernanceControls: true`, concurrency limits, automatic Knowledge Catalog lineage, and `ReleaseConfig` + `WorkflowConfig` scheduling. | [`bigquery_pipelines.md`](../../bigquery-ml/narrative/bigquery_pipelines.md) |
 | **`cloud_workflows`** | Serverless Google Cloud Workflows YAML (`googleapis.bigquery.v2.jobs.insert` + polling) | Native YAML `switch` steps inspect query output rows (`drift_detected`, `roc_auc_improved`) between separate BigQuery jobs | You want serverless, near-zero-cost declarative orchestration across BigQuery, Vertex AI, and HTTP APIs without running Airflow. | [`cloud_workflows.md`](../../bigquery-ml/narrative/cloud_workflows.md) |
 | **`dbt`** | `dbt-bigquery` custom `model` materialization macro + `dbt build` | `dbt test` / custom schema tests between models; `dbt build` automatically skips downstream scoring models when an upstream test fails | Your analytics engineering team already standardizes on `dbt` and wants `CREATE MODEL` and `AI.*` tables inside the same DAG. | [`dbt.md`](../../bigquery-ml/narrative/dbt.md) |
 | **`vertex_kfp`** | Vertex AI Pipelines (KFP v2) + `google_cloud_pipeline_components.v1.bigquery` | `dsl.If` conditional blocks evaluate custom metric-extractor component outputs; auto-logs artifacts to Vertex ML Metadata | You want ML-native lineage tracking, experiment comparison, and integration with Vertex AI Model Registry or custom Python training steps. | [`vertex_kfp.md`](../../bigquery-ml/narrative/vertex_kfp.md) |
@@ -51,7 +52,7 @@ flowchart TD
 
 ## 3. Orchestrating BigQuery AI (`AI.*`) workloads
 
-The same 8 orchestrators schedule and govern zero-training `bigquery-ai` workloads (`AI.*` + `VECTOR_SEARCH` + Cloud AI `REMOTE_SERVICE_TYPE` models). Four production patterns recur across `bigquery-ai`:
+The same 9 orchestrators schedule and govern zero-training `bigquery-ai` workloads (`AI.*` + `VECTOR_SEARCH` + Cloud AI `REMOTE_SERVICE_TYPE` models). Four production patterns recur across `bigquery-ai`:
 
 1. **Incremental Document Parsing, Chunking, Embedding & Vector Index Maintenance (`AI.PARSE_DOCUMENT` + `AI.CHUNK_DOCUMENT` + `AI.EMBED` + `VECTOR_SEARCH`)**:
    - **Never re-parse, re-chunk, or re-embed the entire corpus on every run.** In `sql_scripting`, `dataform`, or `dbt`, left-join the source table (or `OBJ.LIST` prefix) against the materialized parsed/chunks/embeddings table and call `AI.PARSE_DOCUMENT` (`options => JSON '{"schema": "raw-docai"}'` aliased `AS parsed_document`), `AI.CHUNK_DOCUMENT`, and `AI.EMBED` only where `existing.id IS NULL OR source.updated_at > existing.embedded_at` (and `status = ''`). Materializing `parsed_document` once lets you re-chunk at new `chunk_size` settings with zero additional Document AI calls.
@@ -168,6 +169,7 @@ def bqml_pipeline(project: str, location: str, model_name: str, eval_query: str)
   - [`sql_scripting.md`](../../bigquery-ml/narrative/sql_scripting.md) (`bigquery-ml/pipelines/sql_scripting/`)
   - [`scheduled_queries.md`](../../bigquery-ml/narrative/scheduled_queries.md) (`bigquery-ml/pipelines/scheduled_queries/`)
   - [`dataform.md`](../../bigquery-ml/narrative/dataform.md) (`bigquery-ml/pipelines/dataform/`)
+  - [`bigquery_pipelines.md`](../../bigquery-ml/narrative/bigquery_pipelines.md) (`bigquery-ml/pipelines/bigquery_pipelines/`)
   - [`cloud_workflows.md`](../../bigquery-ml/narrative/cloud_workflows.md) (`bigquery-ml/pipelines/cloud_workflows/`)
   - [`dbt.md`](../../bigquery-ml/narrative/dbt.md) (`bigquery-ml/pipelines/dbt/`)
   - [`vertex_kfp.md`](../../bigquery-ml/narrative/vertex_kfp.md) (`bigquery-ml/pipelines/vertex_kfp/`)

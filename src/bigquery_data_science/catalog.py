@@ -312,6 +312,9 @@ _MEDIA_KEYWORDS: tuple[str, ...] = (
     "vision",
     "image",
     "images",
+    "claim",
+    "claims",
+    "claims adjustment",
     "objectref",
     "object table",
     "process_document",
@@ -1299,10 +1302,10 @@ def triage_task(
                     "in `bigquery-mlops`"
                 ),
                 (
-                    "8 production orchestrators (`sql_scripting`, `scheduled_queries`, "
-                    "`dataform`, `cloud_workflows`, `dbt`, `vertex_kfp`, `composer_airflow`, "
-                    "`airflow_with_kfp`) and Vertex AI Model Registry / `EXPORT` / "
-                    "`IMPORT` / `REMOTE` in `bigquery-mlops`"
+                    "9 production orchestrators (`sql_scripting`, `scheduled_queries`, "
+                    "`dataform`, `bigquery_pipelines`, `cloud_workflows`, `dbt`, "
+                    "`vertex_kfp`, `composer_airflow`, `airflow_with_kfp`) and Vertex AI "
+                    "Model Registry / `EXPORT` / `IMPORT` / `REMOTE` in `bigquery-mlops`"
                 ),
             ],
             head_to_head=(
@@ -1450,6 +1453,9 @@ _WALKTHROUGH_ALIASES: Mapping[str, str] = MappingProxyType(
         "translation_llm": "ai_translate",
         "tllm": "ai_translate",
         "nmt": "ai_translate",
+        "bq_pipelines": "bigquery_pipelines",
+        "studio_pipelines": "bigquery_pipelines",
+        "bigquery_workflows": "bigquery_pipelines",
     }
 )
 

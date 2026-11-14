@@ -18,7 +18,7 @@
 
 **Multimodal:** Supports document, image, and video input via `reference/unstructured-data-infrastructure.md#objectref-and-objectrefruntime-schema-reference` (ObjectRef). Pass a STRUCT condition with `ObjectRef` fields to evaluate conditions on unstructured data.
 
-**Featured in:** `workflows/content_moderation` (Content Moderation)
+**Featured in:** `workflows/content_moderation` (Content Moderation) | `workflows/claims_adjustment` (Insurance Claims Adjustment)
 
 **References:** `RESOURCES.md` (Full syntax reference) | [Official documentation](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-if) | `setup` (Setup guide)
 

@@ -209,8 +209,8 @@ def test_convert_notebook_and_narrative_drift_detection(tmp_path: Path) -> None:
         shutil.copytree(SKILLS_ROOT, staged_skills)
         sync_all_narratives(staged_skills, REPO_ROOT)
         results = check_all_narratives(staged_skills, REPO_ROOT)
-    assert results["bigquery-ml"].checked == 61
-    assert results["bigquery-ai"].checked == 45
+    assert results["bigquery-ml"].checked == 62
+    assert results["bigquery-ai"].checked == 46
     assert results["bigquery-ml"].ok
     assert results["bigquery-ai"].ok
     assert not (SKILLS_ROOT / "bigquery-ai" / "narrative" / "overview.md").exists()

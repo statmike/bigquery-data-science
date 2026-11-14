@@ -1,13 +1,13 @@
 {
   "name": "bigquery-ml",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "source_project": "bigquery-ml",
   "narrative_sources": {
     "feature_store.md": "functions/feature_store/feature_store.ipynb",
     "feature_store_workflow.md": "workflows/feature_store/feature_store.ipynb"
   },
-  "generated_date": "2026-11-13",
-  "source_commit": "5ed579b",
+  "generated_date": "2026-11-14",
+  "source_commit": "63f2000",
   "reference_files": [
     "classification.md",
     "model-management.md",
@@ -119,6 +119,7 @@
     "autoencoder.md",
     "automl_classifier.md",
     "automl_regressor.md",
+    "bigquery_pipelines.md",
     "boosted_tree_classifier.md",
     "boosted_tree_regressor.md",
     "bucketizing.md",

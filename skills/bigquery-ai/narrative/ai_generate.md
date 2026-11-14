@@ -20,7 +20,7 @@
 
 **Thinking:** Supports extended reasoning via `model_params` — use `thinking_level` (`"LOW"`, `"MEDIUM"`, `"HIGH"` on Gemini 3.x and Gemini 4 models `gemini-3.8-flash`, `gemini-4-argon`, `gemini-4-carbon`, and `gemini-4-hydrogen`; legacy Gemini 2.5 models used `thinking_budget`) to control reasoning depth.
 
-**Featured in:** `workflows/content_analysis` (Content Analysis Pipeline) | `workflows/data_enrichment` (Data Enrichment) | `workflows/rag_pipeline` (RAG Pipeline) | `workflows/document_intelligence` (Document Intelligence) | `workflows/content_moderation` (Content Moderation) | `workflows/multimodal_analysis` (Multimodal Analysis) | `workflows/document_rag` (Document RAG Pipeline) | `workflows/metric_diagnostics` (Metric Diagnostics) | `workflows/tabular_prediction` (Zero-Shot Tabular Prediction)
+**Featured in:** `workflows/content_analysis` (Content Analysis Pipeline) | `workflows/data_enrichment` (Data Enrichment) | `workflows/rag_pipeline` (RAG Pipeline) | `workflows/document_intelligence` (Document Intelligence) | `workflows/content_moderation` (Content Moderation) | `workflows/multimodal_analysis` (Multimodal Analysis) | `workflows/document_rag` (Document RAG Pipeline) | `workflows/metric_diagnostics` (Metric Diagnostics) | `workflows/tabular_prediction` (Zero-Shot Tabular Prediction) | `workflows/claims_adjustment` (Insurance Claims Adjustment)
 
 **References:** `RESOURCES.md` (Full syntax reference) | [Official documentation](https://cloud.google.com/bigquery/docs/reference/standard-sql/bigqueryml-syntax-ai-generate) | `setup` (Setup guide)
 

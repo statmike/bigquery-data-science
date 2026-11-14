@@ -17,15 +17,15 @@
 
   <!-- BQML -->
   <rect x="64" y="34" width="364" height="76" rx="4" fill="#E8F0FE" stroke="#4285F4" stroke-width="2"/>
-  <text x="246" y="54" text-anchor="middle" font-size="13" fill="#174EA6"><tspan font-weight="700">bigquery-ml/</tspan> (61 Notebooks · 58 SQL)</text>
+  <text x="246" y="54" text-anchor="middle" font-size="13" fill="#174EA6"><tspan font-weight="700">bigquery-ml/</tspan> (62 Notebooks · 58 SQL)</text>
   <text x="246" y="73" text-anchor="middle" font-size="12" fill="#174EA6">23 CREATE MODEL · 12 ML.* Families</text>
-  <text x="246" y="92" text-anchor="middle" font-size="12" fill="#174EA6">18 Applied Workflows · 8 MLOps Pipelines</text>
+  <text x="246" y="92" text-anchor="middle" font-size="12" fill="#174EA6">18 Applied Workflows · 9 MLOps Pipelines</text>
 
   <!-- BQAI -->
   <rect x="458" y="34" width="364" height="76" rx="4" fill="#E8F0FE" stroke="#4285F4" stroke-width="2"/>
-  <text x="640" y="54" text-anchor="middle" font-size="13" fill="#174EA6"><tspan font-weight="700">bigquery-ai/</tspan> (45 Notebooks · 31 SQL)</text>
+  <text x="640" y="54" text-anchor="middle" font-size="13" fill="#174EA6"><tspan font-weight="700">bigquery-ai/</tspan> (46 Notebooks · 31 SQL)</text>
   <text x="640" y="73" text-anchor="middle" font-size="12" fill="#174EA6">31 AI.* &amp; Cloud AI SQL Functions</text>
-  <text x="640" y="92" text-anchor="middle" font-size="12" fill="#174EA6">14 Multi-Function Workflows</text>
+  <text x="640" y="92" text-anchor="middle" font-size="12" fill="#174EA6">15 Multi-Function Workflows</text>
 
   <!-- REFS -->
   <rect x="852" y="34" width="364" height="76" rx="4" fill="#FEF7E0" stroke="#F9AB00" stroke-width="2"/>
@@ -70,7 +70,7 @@
   <!-- S_OPS -->
   <rect x="852" y="272" width="364" height="76" rx="4" fill="#FEF7E0" stroke="#F9AB00" stroke-width="2"/>
   <text x="1034" y="292" text-anchor="middle" font-size="13" fill="#7A5A00"><tspan font-weight="700">bigquery-mlops</tspan> (Production Ops)</text>
-  <text x="1034" y="311" text-anchor="middle" font-size="12" fill="#7A5A00">8 Orchestrators · Vertex AI Registry</text>
+  <text x="1034" y="311" text-anchor="middle" font-size="12" fill="#7A5A00">9 Orchestrators · Vertex AI Registry</text>
   <text x="1034" y="330" text-anchor="middle" font-size="12" fill="#7A5A00">EXPORT / IMPORT · Drift &amp; Feature Store</text>
 
   <!-- Arrow Stage 2 -> Stage 3 -->
@@ -96,7 +96,7 @@
   <rect x="458" y="408" width="364" height="76" rx="4" fill="#E6F4EA" stroke="#34A853" stroke-width="2"/>
   <text x="640" y="428" text-anchor="middle" font-size="13" font-weight="700" fill="#0D652D">Lens 3 &amp; Lens 4 — Write &amp; Build</text>
   <text x="640" y="447" text-anchor="middle" font-size="12" fill="#0D652D">139 Surgical Syntax Cards (&lt; 25 KB)</text>
-  <text x="640" y="466" text-anchor="middle" font-size="12" fill="#0D652D">106 Worked Walkthroughs (~20 KB)</text>
+  <text x="640" y="466" text-anchor="middle" font-size="12" fill="#0D652D">108 Worked Walkthroughs (~20 KB)</text>
 
   <line x1="822" y1="446" x2="848" y2="446" stroke="#4A4E54" stroke-width="1.6" marker-end="url(#arrow)"/>
 

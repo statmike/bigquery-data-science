@@ -1,6 +1,6 @@
 # Contributing to `bigquery-data-science`
 
-Thank you for your interest in contributing to `bigquery-data-science`. This repository unifies **106 live-executed BigQuery ML and BigQuery AI notebooks and SQL scripts**, **4-Lens Agent Skills** (`skills/`), and the **zero-dependency `bigquery-data-science` Python CLI and stdio MCP server** (`src/bigquery_data_science/`).
+Thank you for your interest in contributing to `bigquery-data-science`. This repository unifies **108 live-executed BigQuery ML and BigQuery AI notebooks and SQL scripts**, **4-Lens Agent Skills** (`skills/`), and the **zero-dependency `bigquery-data-science` Python CLI and stdio MCP server** (`src/bigquery_data_science/`).
 
 Issues and pull requests for bug fixes, documentation improvements, release-note updates, and workflow enhancements are welcome.
 
@@ -15,7 +15,8 @@ Issues and pull requests for bug fixes, documentation improvements, release-note
 Run the full verification suite from the repository root before submitting a pull request (this is the exact gate that `.github/workflows/ci.yml` runs across Python 3.11, 3.12, and 3.13):
 
 ```bash
-uv run ruff check src tests && \
+uv run ruff format --check src tests && \
+  uv run ruff check src tests && \
   uv run mypy src && \
   uv run pytest -q && \
   uv run bigquery-data-science sweep && \
@@ -23,12 +24,12 @@ uv run ruff check src tests && \
   ./scripts/check_install.sh
 ```
 
-- **Linted & Typed:** `ruff check src tests` and `mypy src` (strict mode) must exit with zero errors.
+- **Formatted, Linted & Typed:** `ruff format --check src tests`, `ruff check src tests`, and `mypy src` (strict mode) must exit with zero errors.
 - **Tested:** `uv run pytest -q` runs the offline unit test suite covering version parity, README link rewriting, `uv.lock` public index hygiene, the skill installer, catalog `lookup`/`search`/`triage`, the stdio MCP server, and all maintainer tooling checks.
 - **Skills & Reference Sweep:** `uv run bigquery-data-science sweep` validates all 4 skills (`validate --all`), markdown links and `#anchors` (`check-links`), `RESOURCES.md` coverage (`check-reference`), H2-sliced syntax cards (`check-syntax-sync`), model version pins (`check-pinned-models`), extracted notebook narratives (`check-narratives`), status labels (`check-status-labels`), bidirectional cross-references (`check-crossrefs`), numeric prose claims (`check-notebook-claims`), Markdown/Mermaid compilation (`check-markdown`), and `.ipynb` $\to$ `.sql` companion parity & static SQL review (`check-sql-companions`).
-- **Headers:** `python3 architectures/headers/sync_headers.py --check` verifies all 109 notebooks and 21 domain markdown files carry current `statmike/bigquery-data-science` headers.
-- **Cold-Install Smoke Gate:** `./scripts/check_install.sh` builds the wheel and sdist via `uv build`, verifies the wheel is `< 1.5 MB` with zero `.ipynb` files, installs it into an isolated virtualenv, and exercises the CLI and stdio MCP server.
-- **Optional Local Pre-Commit Hooks:** Run `uv run pre-commit install` once after cloning to run `ruff check`, `mypy`, and `bigquery-data-science sweep` automatically on `git commit` (configured in [`.pre-commit-config.yaml`](.pre-commit-config.yaml)).
+- **Headers:** `python3 architectures/headers/sync_headers.py --check` verifies all 112 notebooks and 21 domain markdown files carry current `statmike/bigquery-data-science` headers.
+- **Cold-Install Smoke Gate:** `./scripts/check_install.sh` builds the wheel and sdist via `uv build`, verifies the wheel is `< 2.0 MB` with zero `.ipynb` files, installs it into an isolated virtualenv, and exercises the CLI and stdio MCP server.
+- **Optional Local Pre-Commit Hooks:** Run `uv run pre-commit install` once after cloning to run `ruff format --check`, `ruff check`, `mypy`, and `bigquery-data-science sweep` automatically on `git commit` (configured in [`.pre-commit-config.yaml`](.pre-commit-config.yaml)).
 
 ## Public-Repository & Credential Hygiene
 
@@ -106,7 +107,7 @@ Then add the `## [X.Y.Z] - YYYY-MM-DD` section to `CHANGELOG.md`, re-lock with `
 ### 4. Patch / Hotfix Releases & CI Refusals
 
 - For patch releases (`X.Y.Z+1`), branch from `main` (or from `vX.Y.Z`), apply the fix, bump all 7 version locations, and tag `vX.Y.Z+1`.
-- CI and `release.yml` automatically refuse any build where the 7 version locations disagree, where `README.md` has broken or un-rewritten relative links, where the wheel exceeds `1.5 MB` or contains `.ipynb` files, or where the git tag does not match `pyproject.toml`.
+- CI and `release.yml` automatically refuse any build where the 7 version locations disagree, where `README.md` has broken or un-rewritten relative links, where the wheel exceeds `2.0 MB` or contains `.ipynb` files, or where the git tag does not match `pyproject.toml`.
 
 ## Contributor License Agreement
 
