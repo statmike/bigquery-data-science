@@ -1,22 +1,20 @@
 > **Source (`statmike/bigquery-data-science`):** **Notebook:** [`bigquery-ai/workflows/claims_adjustment/claims_adjustment.ipynb`](https://github.com/statmike/bigquery-data-science/blob/main/bigquery-ai/workflows/claims_adjustment/claims_adjustment.ipynb)
 
-# Insurance Claims Adjustment
+# Insurance Claims Adjustment — BigQuery AI Functions
 
-> Gate claimant photo quality with `AI.SCORE` and `AI.IF`, classify and sub-classify Auto and Roof claims with `AI.CLASSIFY`, route edge cases to human review, extract type-specific damage schemas with `AI.GENERATE`, and compile adjuster dispatch queues with `AI.AGG`.
+An end-to-end multimodal Property & Casualty (P&C) insurance claims triage and adjustment pipeline that composes **five BigQuery AI functions** over 24 First-Notice-of-Loss (FNOL) claim photos in Cloud Storage:
 
-**Functions used:** `functions/ai_if` (`AI.IF`) | `functions/ai_score` (`AI.SCORE`) | `functions/ai_classify` (`AI.CLASSIFY`) | `functions/ai_generate` (`AI.GENERATE`) | `functions/ai_agg` (`AI.AGG`)
+1. **Gate intake photo quality** (`AI.SCORE` + `AI.IF`) and generate retake guidance (`AI.GENERATE`) for uninspectable uploads
+2. **Classify primary line of business** (`AI.CLASSIFY` with `STRUCT<category, description>`) into `'auto'`, `'roof'`, or `'unclassified'`
+3. **Sub-classify domain perils** (`AI.CLASSIFY` branched by line of business) and route out-of-scope or ambiguous claims to **Human Specialist Review** (`AI.GENERATE`)
+4. **Grade type+subtype damage schemas & severity** (`AI.GENERATE` with `output_schema` + `AI.SCORE`) for Auto and Roof claims
+5. **Synthesize cohort adjuster dispatch plans** (`AI.AGG` with `output_schema`) across all `(claim_type, claim_subtype)` cohorts
 
----
-
-## Why a Multi-Stage Multimodal Pipeline?
-
-In Property & Casualty (P&C) insurance, First-Notice-of-Loss (FNOL) mobile uploads arrive as raw image files with generic identifiers (`claim_001.jpg`–`claim_024.jpg`) and no reliable structured metadata. Running a single monolithic `AI.GENERATE` call across every uploaded file creates three operational failure modes:
-
-1. **Garbage-In Hallucinations on Uninspectable Photos:** Claimants frequently upload motion-blurred snapshots, pitch-dark night photos, out-of-focus macro blurs, or accidental photos of paperwork and thumbs over the lens. Asking a generative model to fill out a damage schema on an uninspectable photo wastes tokens and risks fabricated severity estimates.
-2. **Out-of-Scope & Ambiguous Perils:** Not every clear photo belongs to a standard automated line of business (e.g., a collapsed backyard fence or an indoor leaking water heater when the automated pipeline handles Auto and Roof claims), and not every Auto or Roof photo fits standard automated sub-perils (e.g., a tire sidewall blowout with undamaged body panels, or detached chimney flashing on an otherwise intact roof).
-3. **Line-of-Business Schema Mismatch:** Auto claims require vehicle-specific attributes (`affected_component`, `drivable_status`, `structural_or_safety_risk`), whereas residential Roof claims require property-specific attributes (`roof_material`, `deck_or_underlayment_exposed`, `emergency_tarp_required`).
-
-By chaining **five BigQuery AI functions** inside SQL over an Object Table, each stage narrows and specializes the workload:
+**What this demonstrates:**
+- **Stopping garbage-in hallucinations before extraction**: Mobile claim uploads frequently include motion blur, pitch-dark night photos, extreme macro defocus, or accidental non-asset shots (paperwork/fingers over the lens). Gating with `AI.SCORE` + `AI.IF` diverts defective uploads to a **Claimant Re-Upload Queue** before downstream classification or schema extraction runs.
+- **Hierarchical classification with explicit catch-all routing**: Using `STRUCT(category, description)` in `AI.CLASSIFY` separates standard `'auto'` and `'roof'` claims from out-of-scope property perils at Step 2 (`'unclassified'`) and separates standard auto/roof sub-perils from unusual edge cases at Step 3 (`'other_unclear'`).
+- **Line-of-business schema specialization**: Auto claims extract vehicle-specific fields (`affected_component`, `drivable_status`, `structural_or_safety_risk`, `recommended_repair_method`), whereas Roof claims extract property-specific fields (`roof_material`, `deck_or_underlayment_exposed`, `active_water_intrusion_risk`, `emergency_tarp_required`, `recommended_repair_scope`).
+- **Validating multi-stage AI decisions against ground truth**: Joining Step 1, Step 2, and Step 3 outputs against `data/claims/manifest.json` verifies `24/24` (`100%`) quality gating, classification, sub-classification, and queue routing accuracy.
 
 ```mermaid
 flowchart TD
@@ -49,40 +47,91 @@ flowchart TD
 | **Step 4 — Type+Subtype Schema Grading** | `AI.GENERATE` (`output_schema`) + `AI.SCORE` | Extract line-of-business damage attributes and score severity (`1–10`) to assign SLA dispatch tiers (`Fast-Track Auto-Approve`, `Standard Adjuster Review`, `Urgent Field Inspector`) | `8` Auto + `8` Roof (`16` graded) |
 | **Step 5 — Adjuster Dispatch Rollup** | `AI.AGG` (`output_schema`) | Synthesize cohort-level adjuster dispatch plans and dominant damage patterns across all 6 `(claim_type, claim_subtype)` groups | `6` subtype cohorts summarized |
 
-**Prerequisites:** Completed `setup` (Setup Reference) (BigQuery API, Vertex AI API, Cloud Resource connection `bq_ai_functions`, GCS bucket).
+**Functions used:** `functions/ai_if` (`AI.IF`) | `functions/ai_score` (`AI.SCORE`) | `functions/ai_classify` (`AI.CLASSIFY`) | `functions/ai_generate` (`AI.GENERATE`) | `functions/ai_agg` (`AI.AGG`)
+
+**Dataset:** `data/claims` (`data/claims/`) (`24` synthetic JPEG photos + `manifest.json`, generated by `data/claims/generate.ipynb` (`data/claims/generate.ipynb`))
+
+**Prerequisites:** `setup` (Setup guide) | `RESOURCES.md` (Function reference)
 
 ---
-
 ## Setup
 
-Configure your environment, upload the 24 synthetic insurance claim photos (`data/claims` (`bigquery-ai/data/claims/`)) to Cloud Storage, and create a BigQuery Object Table over the images.
+Set your project and location, authenticate, and create shared resources.
+
+> This workflow uses `AI.IF`, `AI.SCORE`, `AI.CLASSIFY`, `AI.GENERATE`, and `AI.AGG` — none require a remote `CREATE MODEL` statement. A Cloud Resource connection is used for the Object Table and GCS access. See the `setup` (Setup Reference) for details.
 
 ```python
-# --- Configuration ---
-PROJECT_ID = 'your-gcp-project-id'  # @param {type:"string"}
-LOCATION = 'US'  # @param {type:"string"}
-DATASET_ID = 'bq_ai_functions'  # @param {type:"string"}
-CONNECTION_ID = 'bq_ai_functions'  # @param {type:"string"}
-BUCKET = PROJECT_ID  # @param {type:"string"}
+import os
+from pathlib import Path
+import google.auth
+
+PROJECT_ID = 'your-gcp-project-id'  # <-- Replace with your project ID (or leave to auto-detect)
+if PROJECT_ID == 'your-gcp-project-id':
+    for _p in [Path.cwd(), *Path.cwd().parents]:
+        if (_p / '.env').is_file():
+            for _k, _v in (l.split('=', 1) for l in (_p / '.env').read_text().splitlines() if '=' in l and not l.strip().startswith('#')):
+                os.environ.setdefault(_k.strip(), _v.strip().strip('\'"'))
+            break
+    PROJECT_ID = os.environ.get('GOOGLE_CLOUD_PROJECT') or google.auth.default()[1] or 'your-gcp-project-id'
+LOCATION = 'US'  # BigQuery dataset location
+DATASET_ID = 'bq_ai_functions'  # Shared dataset across all notebooks
+CONNECTION_ID = 'bq_ai_functions'  # Shared connection
+BUCKET = PROJECT_ID  # GCS bucket (same name as project)
+CONN = f'{PROJECT_ID}.{LOCATION}.{CONNECTION_ID}'
+GCS_PREFIX = 'bq_ai_functions/claims_adjustment'
+```
+
+### Environment
+
+> **Already set up the project environment?** The cell below is a no-op — packages are already in your kernel. See the `setup` (Setup Reference) for details.
+>
+> **Running standalone** (Colab, Colab Enterprise, Vertex AI Workbench)? The cell below installs required packages into your current kernel.
+
+```python
+from google.cloud import bigquery, storage
+import pandas as pd
+
+client = bigquery.Client(project=PROJECT_ID)
+gcs = storage.Client(project=PROJECT_ID)
+pd.set_option('display.max_colwidth', 140)
+
+# Create the shared dataset (idempotent)
+dataset_ref = bigquery.DatasetReference(PROJECT_ID, DATASET_ID)
+dataset = bigquery.Dataset(dataset_ref)
+dataset.location = LOCATION
+client.create_dataset(dataset, exists_ok=True)
+print(f'Dataset {PROJECT_ID}.{DATASET_ID} ready')
+
+# Register %%bigquery cell magic (auto-loaded in Colab, needed elsewhere)
+%load_ext bigquery_magics
 ```
 
 ```python
-import subprocess
-import sys
+import subprocess as _sp, json as _json, re as _re
 
-try:
-    import google.colab  # noqa: F401
-    subprocess.check_call([
-        sys.executable, '-m', 'pip', 'install', '-q',
-        'google-cloud-bigquery', 'google-cloud-storage', 'pandas', 'db-dtypes',
-    ])
-except ImportError:
-    pass
+# Create connection (idempotent)
+_sp.run(['bq', 'mk', '--connection', '--location', LOCATION,
+         '--connection_type', 'CLOUD_RESOURCE',
+         '--project_id', PROJECT_ID, CONNECTION_ID],
+        capture_output=True, text=True)
+
+# Get service account and grant required roles
+r = _sp.run(['bq', 'show', '--connection', '--format=json',
+             '--project_id', PROJECT_ID, '--location', LOCATION, CONNECTION_ID],
+            capture_output=True, text=True, check=True)
+sa = _json.loads(r.stdout)['cloudResource']['serviceAccountId']
+sa_display = _re.sub(r'bqcx-\d+-', 'bqcx-000000000000-', sa)
+for role in ['roles/aiplatform.user', 'roles/storage.objectViewer']:
+    _sp.run(['gcloud', 'projects', 'add-iam-policy-binding', PROJECT_ID,
+             f'--member=serviceAccount:{sa}', '--role=' + role, '--quiet'],
+            capture_output=True, text=True)
+print(f'Connection {CONNECTION_ID} ready (SA: {sa_display})')
 ```
 
-### Upload Claim Photos & Ground-Truth Manifest
+---
+## Step 0 — Upload Claim Photos & Create Object Table
 
-The dataset in `data/claims` (`bigquery-ai/data/claims/`) (generated by `data/claims/generate.ipynb` (`generate.ipynb`)) contains **24 photorealistic JPEG claim photos** named `claim_001.jpg` through `claim_024.jpg` in shuffled order so filenames carry zero category hints:
+The dataset in `data/claims` (`data/claims/`) (generated by `data/claims/generate.ipynb` (`generate.ipynb`)) contains **24 photorealistic JPEG claim photos** named `claim_001.jpg` through `claim_024.jpg` in shuffled order so filenames carry zero category hints:
 
 - **8 Auto Claims (`quality_pass = true`, `claim_type = 'auto'`)**: `collision_panel` (3), `glass_windshield` (3), `hail_dents` (2).
 - **8 Roof Claims (`quality_pass = true`, `claim_type = 'roof'`)**: `wind_missing_shingles` (3), `hail_impact` (2), `tree_structural_impact` (3).
@@ -93,12 +142,19 @@ The dataset in `data/claims` (`bigquery-ai/data/claims/`) (generated by `data/cl
   - `claim_004` (`non_asset_obstructed_lens`), `claim_013` (`pitch_dark_underexposed`), `claim_017` (`extreme_out_of_focus`), and `claim_024` (`severe_motion_blur`).
 
 ```python
+import io
 import json
+import textwrap
 import urllib.request
+from IPython.display import Image as IPyImage, display
+import matplotlib.pyplot as plt
+from PIL import Image
 
 local_claims_dir = Path('../../data/claims')
 if not local_claims_dir.exists():
     local_claims_dir = Path('bigquery-ai/data/claims')
+if not local_claims_dir.exists():
+    local_claims_dir = Path('data/claims')
 
 GITHUB_RAW_BASE = 'https://raw.githubusercontent.com/statmike/bigquery-data-science/main/bigquery-ai/data/claims'
 
@@ -124,45 +180,84 @@ for item in manifest_records:
 # Load ground-truth manifest into BigQuery for evaluation in Steps 1 and 3
 manifest_df = pd.DataFrame(manifest_records)
 job_config = bigquery.LoadJobConfig(write_disposition='WRITE_TRUNCATE')
-bq.load_table_from_dataframe(
+client.load_table_from_dataframe(
     manifest_df,
     f'{PROJECT_ID}.{DATASET_ID}.workflow_claims_manifest',
     job_config=job_config,
 ).result()
+
+
+def show_claim_grid(items: list[dict], ncols: int = 4, suptitle: str = '') -> None:
+    '''Render a compact JPEG visual strip of claim photos with pipeline annotations.'''
+    nrows = (len(items) + ncols - 1) // ncols
+    fig, axes = plt.subplots(nrows, ncols, figsize=(3.4 * ncols, 3.3 * nrows), dpi=75)
+    axes_flat = [axes] if len(items) == 1 else list(axes.flat)
+    for ax, item in zip(axes_flat, items):
+        cid = item['claim_id']
+        img_path = local_claims_dir / 'images' / f'{cid}.jpg'
+        if img_path.exists():
+            img = Image.open(img_path)
+        else:
+            blob = bucket_obj.blob(f'{GCS_PREFIX}/images/{cid}.jpg')
+            img = Image.open(io.BytesIO(blob.download_as_bytes()))
+        ax.imshow(img)
+        ax.set_title(item['title'], fontsize=8.5, pad=4)
+        ax.axis('off')
+    for ax in axes_flat[len(items):]:
+        ax.axis('off')
+    if suptitle:
+        plt.suptitle(suptitle, fontsize=11.5, fontweight='bold', y=1.01)
+    plt.tight_layout()
+    buf = io.BytesIO()
+    fig.savefig(buf, format='jpeg', pil_kwargs={'quality': 80}, bbox_inches='tight')
+    plt.close(fig)
+    display(IPyImage(data=buf.getvalue(), format='jpeg'))
+
 
 print(f'Uploaded {uploaded_count} claim photos to GCS under {GCS_PREFIX}/images/')
 print(f'Loaded {len(manifest_df)} ground-truth records into {DATASET_ID}.workflow_claims_manifest')
 ```
 
 ```python
-bq.query(f"""
+# Create an Object Table over the 24 claim photos in Cloud Storage
+client.query(f'''
 CREATE OR REPLACE EXTERNAL TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_claims_photos`
 WITH CONNECTION `{CONN}`
 OPTIONS (
   object_metadata = 'SIMPLE',
   uris = ['gs://{BUCKET}/{GCS_PREFIX}/images/*.jpg']
 )
-""").result()
+''').result()
 
-photos_df = run_sql(f"""
+photos_df = client.query(f'''
 SELECT
   REGEXP_EXTRACT(uri, r'(claim_\\d+)\\.jpg$') AS claim_id,
   content_type,
   ROUND(size / 1024.0, 1) AS size_kb
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_photos`
 ORDER BY claim_id
-""")
-print(f'Object table indexed {len(photos_df)} claim photos:')
-print(photos_df.head(8).to_string(index=False))
+''').to_dataframe()
+print(f'Object table workflow_claims_photos indexed {len(photos_df)} claim photos (showing first 6 raw intake photos):')
+
+show_claim_grid(
+    [
+        {'claim_id': row.claim_id, 'title': f"{row.claim_id}.jpg ({row.size_kb} KB)\n[Unlabeled raw FNOL upload]"}
+        for row in photos_df.head(6).itertuples()
+    ],
+    ncols=6,
+    suptitle='Incoming FNOL Stream (First 6 of 24 Shuffled Claim Uploads — Filenames Reveal Nothing)',
+)
+photos_df.head(8)
 ```
 
 ---
-
 ## Step 1 — Image Quality & Inspectability Gate (`AI.SCORE` + `AI.IF`)
+
+Look at `claim_004.jpg` in the intake strip above: it is an uninspectable blurry shot with a thumb covering the lens, mixed right alongside clear roof and auto photos (`claim_001.jpg`, `claim_002.jpg`, `claim_003.jpg`).
 
 Before classifying damage or extracting structured schemas, every uploaded photo passes through a two-part visual quality gate:
 
-1. **`AI.SCORE` (Continuous `1–10` Photographic Clarity Score):** Evaluates sharpness, exposure, and framing on a `1–10` rubric (`1–3` for severe motion blur, pitch-black underexposure, extreme defocus, or lens obstruction; `7–10` for clear, well-lit inspection photos).
+1. **`AI.SCORE` (Continuous `1–10` Photographic Clarity Score):** Evaluates sharpness, exposure, and framing on a `1–10` rubric (`1–3` for severe motion blur, pitch-black underexposure, extreme defocus, or lens obstruction; `6–10` for clear, well-lit inspection photos).
 2. **`AI.IF` (Boolean Asset Inspectability Gate):** Evaluates whether the image clearly shows an identifiable physical asset (a vehicle or building/property structure) whose condition can be visually inspected (`TRUE` vs `FALSE`).
 
 > **Multimodal `ObjectRef` input syntax:**
@@ -172,7 +267,7 @@ Before classifying damage or extracting structured schemas, every uploaded photo
 A photo passes the intake gate (`quality_gate_passed = TRUE`) only when **`quality_score >= 5.0 AND is_inspectable = TRUE`**.
 
 ```python
-bq.query(f"""
+client.query(f'''
 CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_claims_quality_gate` AS
 WITH scored AS (
   SELECT
@@ -210,9 +305,9 @@ SELECT
   is_inspectable,
   (quality_score >= 5.0 AND is_inspectable) AS quality_gate_passed
 FROM scored
-""").result()
+''').result()
 
-gate_eval_df = run_sql(f"""
+gate_eval_df = client.query(f'''
 SELECT
   q.claim_id,
   q.quality_score,
@@ -224,19 +319,19 @@ FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_quality_gate` AS q
 JOIN `{PROJECT_ID}.{DATASET_ID}.workflow_claims_manifest` AS m
   USING (claim_id)
 ORDER BY q.quality_gate_passed ASC, q.claim_id
-""")
+''').to_dataframe()
 
 matches = (gate_eval_df['quality_gate_passed'] == gate_eval_df['ground_truth_pass']).sum()
-print(f'Step 1 Quality Gate Accuracy vs Ground-Truth Manifest: {matches}/{len(gate_eval_df)} ({matches/len(gate_eval_df):.0%})\n')
-print(gate_eval_df.to_string(index=False))
+print(f'Step 1 Quality Gate Accuracy vs Ground-Truth Manifest: {matches}/{len(gate_eval_df)} ({matches/len(gate_eval_df):.0%})')
+gate_eval_df
 ```
 
-### Claimant Re-Upload Queue (`AI.GENERATE` Retake Instructions)
+### Step 1b — Claimant Re-Upload Queue (`AI.GENERATE` Retake Instructions)
 
-Photos that fail Step 1 (`quality_gate_passed = FALSE`) are stopped immediately and routed to `workflow_claims_reupload_queue`. Using `AI.GENERATE` with a concise `output_schema`, we diagnose the exact photographic defect and generate friendly mobile-app retake instructions for the policyholder.
+Photos that fail Step 1 (`quality_gate_passed = FALSE`) are stopped immediately and routed to `workflow_claims_reupload_queue`. Using `AI.GENERATE` with a concise `output_schema`, we diagnose the exact photographic defect and generate friendly mobile-app retake instructions for the policyholder — and display the **4 stopped uploads** alongside their live `AI.SCORE`, `AI.IF`, and `AI.GENERATE` outputs.
 
 ```python
-bq.query(f"""
+client.query(f'''
 CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_claims_reupload_queue` AS
 SELECT
   claim_id,
@@ -264,9 +359,9 @@ FROM (
   FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_quality_gate`
   WHERE NOT quality_gate_passed
 )
-""").result()
+''').result()
 
-reupload_df = run_sql(f"""
+reupload_df = client.query(f'''
 SELECT
   claim_id,
   quality_score,
@@ -275,13 +370,28 @@ SELECT
   retake_instructions
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_reupload_queue`
 ORDER BY claim_id
-""")
+''').to_dataframe()
 print(f'Claimant Re-Upload Queue ({len(reupload_df)} stopped uploads):')
-print(reupload_df.to_string(index=False))
+
+show_claim_grid(
+    [
+        {
+            'claim_id': r.claim_id,
+            'title': (
+                f"{r.claim_id} | score={r.quality_score:.0f}/10 | inspectable={r.is_inspectable}\n"
+                f"Defect: {r.detected_defect}\n"
+                + textwrap.fill(str(r.retake_instructions), width=38)
+            ),
+        }
+        for r in reupload_df.itertuples()
+    ],
+    ncols=4,
+    suptitle='Step 1 Claimant Re-Upload Queue — All 4 Defective Uploads Stopped Before Classification',
+)
+reupload_df
 ```
 
 ---
-
 ## Step 2 — Primary Line-of-Business Classification (`AI.CLASSIFY`)
 
 The 20 photos that pass the Step 1 quality gate advance to **Step 2**, where `AI.CLASSIFY` categorizes each photo into one of three primary buckets using explicit `STRUCT<category, description>` definitions:
@@ -293,7 +403,7 @@ The 20 photos that pass the Step 1 quality gate advance to **Step 2**, where `AI
 Providing explicit `STRUCT(category, description)` boundaries ensures that clear photos of out-of-scope perils (such as a collapsed backyard fence or an indoor flooded basement utility room) are cleanly labeled `'unclassified'` rather than forced into `'auto'` or `'roof'`.
 
 ```python
-bq.query(f"""
+client.query(f'''
 CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_claims_primary` AS
 SELECT
   claim_id,
@@ -320,9 +430,9 @@ SELECT
   ) AS claim_type
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_quality_gate`
 WHERE quality_gate_passed = TRUE
-""").result()
+''').result()
 
-primary_summary_df = run_sql(f"""
+primary_summary_df = client.query(f'''
 SELECT
   p.claim_type,
   COUNT(*) AS photo_count,
@@ -330,13 +440,12 @@ SELECT
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_primary` AS p
 GROUP BY p.claim_type
 ORDER BY photo_count DESC, p.claim_type
-""")
+''').to_dataframe()
 print('Step 2 Primary Line-of-Business Distribution:')
-print(primary_summary_df.to_string(index=False))
+primary_summary_df
 ```
 
 ---
-
 ## Step 3 — Conditional Sub-Classification & Human Review Routing (`AI.CLASSIFY`)
 
 Now that Step 2 has separated `'auto'` and `'roof'` claims from `'unclassified'` claims, **Step 3** branches in SQL (`WHERE claim_type = 'auto'` vs `WHERE claim_type = 'roof'`) so each line of business is evaluated against its own domain-specific subtype taxonomy:
@@ -353,7 +462,7 @@ Now that Step 2 has separated `'auto'` and `'roof'` claims from `'unclassified'`
   - `'other_unclear'`: Other roof issue that does not fit missing wind shingles, hail impact bruises, or fallen tree impact (such as detached metal chimney flashing with intact shingles).
 
 ```python
-bq.query(f"""
+client.query(f'''
 CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_claims_subclassified` AS
 -- Branch 1: Auto Sub-Classification
 SELECT
@@ -433,9 +542,9 @@ SELECT
   'other_unclear' AS claim_subtype
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_primary`
 WHERE claim_type = 'unclassified'
-""").result()
+''').result()
 
-subclass_summary_df = run_sql(f"""
+subclass_summary_df = client.query(f'''
 SELECT
   claim_type,
   claim_subtype,
@@ -444,19 +553,19 @@ SELECT
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_subclassified`
 GROUP BY claim_type, claim_subtype
 ORDER BY claim_type, claim_subtype
-""")
+''').to_dataframe()
 print('Step 3 Conditional Sub-Classification Breakdown:')
-print(subclass_summary_df.to_string(index=False))
+subclass_summary_df
 ```
 
-### Human Specialist Review Queue & Ground-Truth Validation
+### Step 3b — Human Specialist Review Queue & Ground-Truth Validation
 
-Claims classified as `'unclassified'` at Step 2 or `'other_unclear'` at Step 3 are routed to `workflow_claims_human_review`. Rather than handing an adjuster a raw image with no context, we use `AI.GENERATE` (`output_schema`) to summarize what is visible in the photo, why automated Auto/Roof grading escalated it, and which specialist desk should review it.
+Claims classified as `'unclassified'` at Step 2 (`claim_007` collapsed fence, `claim_010` flooded basement water heater) or `'other_unclear'` at Step 3 (`claim_003` blown-out tire sidewall, `claim_019` detached chimney flashing) are routed to `workflow_claims_human_review`. Rather than handing an adjuster a raw image with no context, we use `AI.GENERATE` (`output_schema`) to summarize what is visible in the photo, why automated Auto/Roof grading escalated it, and which specialist desk should review it.
 
-We then join our pipeline's Step 1, Step 2, and Step 3 decisions against `workflow_claims_manifest` to verify classification and routing accuracy across all 24 claims.
+Below we visually inspect all **4 escalated edge-case photos** and validate our pipeline's Step 1, Step 2, and Step 3 decisions against `workflow_claims_manifest` across all 24 claims.
 
 ```python
-bq.query(f"""
+client.query(f'''
 CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_claims_human_review` AS
 SELECT
   claim_id,
@@ -492,21 +601,43 @@ FROM (
   FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_subclassified`
   WHERE claim_type = 'unclassified' OR claim_subtype = 'other_unclear'
 )
-""").result()
+''').result()
 
-human_review_df = run_sql(f"""
+human_review_df = client.query(f'''
 SELECT
   claim_id,
+  claim_type,
+  claim_subtype,
   escalation_stage,
   observed_scene,
+  escalation_reason,
   recommended_specialist
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_human_review`
-ORDER BY claim_id
-""")
+ORDER BY escalation_stage, claim_id
+''').to_dataframe()
 print(f'Human Specialist Review Queue ({len(human_review_df)} escalated claims):')
-print(human_review_df.to_string(index=False))
 
-accuracy_df = run_sql(f"""
+show_claim_grid(
+    [
+        {
+            'claim_id': r.claim_id,
+            'title': (
+                f"{r.claim_id} ({r.claim_type} -> {r.claim_subtype})\n"
+                f"[{r.escalation_stage}]\n"
+                + textwrap.fill(f"Desk: {r.recommended_specialist}", width=38)
+            ),
+        }
+        for r in human_review_df.itertuples()
+    ],
+    ncols=4,
+    suptitle='Step 2 & Step 3 Human Specialist Review Queue — All 4 Out-of-Scope / Edge-Case Claims',
+)
+human_review_df
+```
+
+```python
+# Validate Step 1-3 quality gating, primary classification, sub-classification, and routing against manifest.json
+accuracy_df = client.query(f'''
 WITH pipeline_decisions AS (
   SELECT
     q.claim_id,
@@ -536,16 +667,14 @@ FROM pipeline_decisions AS p
 JOIN `{PROJECT_ID}.{DATASET_ID}.workflow_claims_manifest` AS m
   USING (claim_id)
 ORDER BY p.claim_id
-""")
+''').to_dataframe()
+
 exact_matches = accuracy_df['exact_match'].sum()
-print(f'\nEnd-to-End Routing & Classification Accuracy (Steps 1-3 vs Manifest): {exact_matches}/{len(accuracy_df)} ({exact_matches/len(accuracy_df):.0%})')
-if exact_matches < len(accuracy_df):
-    print('\nMismatched rows:')
-    print(accuracy_df[~accuracy_df['exact_match']].to_string(index=False))
+print(f'End-to-End Routing & Classification Accuracy (Steps 1-3 vs Manifest): {exact_matches}/{len(accuracy_df)} ({exact_matches/len(accuracy_df):.0%})')
+accuracy_df
 ```
 
 ---
-
 ## Step 4 — Type+Subtype Schema Grading & Damage Severity Scoring (`AI.GENERATE` + `AI.SCORE`)
 
 The 16 verified Auto and Roof claims (`claim_type IN ('auto', 'roof') AND claim_subtype != 'other_unclear'`) now enter **Step 4**, where each line of business is graded against a dedicated structured schema (`AI.GENERATE` with `output_schema`) alongside a `1–10` damage severity score (`AI.SCORE`):
@@ -555,8 +684,11 @@ The 16 verified Auto and Roof claims (`claim_type IN ('auto', 'roof') AND claim_
 | **Auto (`workflow_claims_graded_auto`)** | `affected_component STRING`, `damage_mechanism STRING`, `structural_or_safety_risk BOOL`, `drivable_status STRING`, `recommended_repair_method STRING`, `damage_summary STRING` | `severity_score >= 7.0 OR structural_or_safety_risk` $\to$ `Urgent Field Inspector`; `severity_score <= 4.0` $\to$ `Fast-Track Auto-Approve`; else `Standard Adjuster Review` |
 | **Roof (`workflow_claims_graded_roof`)** | `roof_material STRING`, `deck_or_underlayment_exposed BOOL`, `active_water_intrusion_risk STRING`, `emergency_tarp_required BOOL`, `recommended_repair_scope STRING`, `damage_summary STRING` | `severity_score >= 7.0 OR emergency_tarp_required` $\to$ `Urgent Field Inspector`; `severity_score <= 4.0` $\to$ `Fast-Track Auto-Approve`; else `Standard Adjuster Review` |
 
+### Step 4a — Auto Claims Schema Grading & Visual Inspection (`8` Claims)
+
 ```python
-bq.query(f"""
+# Step 4a: Grade Auto Claims (workflow_claims_graded_auto)
+client.query(f'''
 CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_claims_graded_auto` AS
 WITH raw_auto AS (
   SELECT
@@ -589,14 +721,7 @@ WITH raw_auto AS (
       connection_id => '{CONN}',
       endpoint => 'gemini-3.8-flash',
       model_params => JSON '{{"generation_config": {{"max_output_tokens": 2048, "thinking_config": {{"thinking_level": "LOW"}}}}}}',
-      output_schema => '''
-        affected_component STRING,
-        drivable_status STRING,
-        recommended_repair_method STRING,
-        structural_or_safety_risk BOOL,
-        damage_mechanism STRING,
-        damage_summary STRING
-      '''
+      output_schema => 'affected_component STRING, drivable_status STRING, recommended_repair_method STRING, structural_or_safety_risk BOOL, damage_mechanism STRING, damage_summary STRING'
     ) AS details
   FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_subclassified`
   WHERE claim_type = 'auto'
@@ -619,26 +744,47 @@ SELECT
     ELSE 'Standard Adjuster Review'
   END AS sla_dispatch_tier
 FROM raw_auto
-""").result()
+''').result()
 
-auto_graded_df = run_sql(f"""
+auto_graded_df = client.query(f'''
 SELECT
   claim_id,
   claim_subtype,
   severity_score,
   affected_component,
   drivable_status,
+  structural_or_safety_risk,
   recommended_repair_method,
-  sla_dispatch_tier
+  sla_dispatch_tier,
+  damage_summary
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_graded_auto`
 ORDER BY severity_score DESC, claim_id
-""")
+''').to_dataframe()
 print(f'Graded Auto Claims ({len(auto_graded_df)} claims):')
-print(auto_graded_df.to_string(index=False))
+
+show_claim_grid(
+    [
+        {
+            'claim_id': r.claim_id,
+            'title': (
+                f"{r.claim_id} | {r.claim_subtype} (sev={r.severity_score:.0f}/10)\n"
+                f"{r.drivable_status} | {r.recommended_repair_method}\n"
+                f"Tier: {r.sla_dispatch_tier}"
+            ),
+        }
+        for r in auto_graded_df.itertuples()
+    ],
+    ncols=4,
+    suptitle='Step 4a Graded Auto Claims — All 8 Vehicle Photos Ordered by AI.SCORE Severity',
+)
+auto_graded_df
 ```
 
+### Step 4b — Roof Claims Schema Grading & Visual Inspection (`8` Claims)
+
 ```python
-bq.query(f"""
+# Step 4b: Grade Roof Claims (workflow_claims_graded_roof)
+client.query(f'''
 CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_claims_graded_roof` AS
 WITH raw_roof AS (
   SELECT
@@ -671,14 +817,7 @@ WITH raw_roof AS (
       connection_id => '{CONN}',
       endpoint => 'gemini-3.8-flash',
       model_params => JSON '{{"generation_config": {{"max_output_tokens": 2048, "thinking_config": {{"thinking_level": "LOW"}}}}}}',
-      output_schema => '''
-        deck_or_underlayment_exposed BOOL,
-        emergency_tarp_required BOOL,
-        recommended_repair_scope STRING,
-        active_water_intrusion_risk STRING,
-        roof_material STRING,
-        damage_summary STRING
-      '''
+      output_schema => 'deck_or_underlayment_exposed BOOL, emergency_tarp_required BOOL, recommended_repair_scope STRING, active_water_intrusion_risk STRING, roof_material STRING, damage_summary STRING'
     ) AS details
   FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_subclassified`
   WHERE claim_type = 'roof'
@@ -701,32 +840,49 @@ SELECT
     ELSE 'Standard Adjuster Review'
   END AS sla_dispatch_tier
 FROM raw_roof
-""").result()
+''').result()
 
-roof_graded_df = run_sql(f"""
+roof_graded_df = client.query(f'''
 SELECT
   claim_id,
   claim_subtype,
   severity_score,
+  roof_material,
   deck_or_underlayment_exposed,
   emergency_tarp_required,
   recommended_repair_scope,
-  sla_dispatch_tier
+  sla_dispatch_tier,
+  damage_summary
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_graded_roof`
 ORDER BY severity_score DESC, claim_id
-""")
+''').to_dataframe()
 print(f'Graded Roof Claims ({len(roof_graded_df)} claims):')
-print(roof_graded_df.to_string(index=False))
+
+show_claim_grid(
+    [
+        {
+            'claim_id': r.claim_id,
+            'title': (
+                f"{r.claim_id} | {r.claim_subtype} (sev={r.severity_score:.0f}/10)\n"
+                f"tarp={r.emergency_tarp_required} | {r.recommended_repair_scope}\n"
+                f"Tier: {r.sla_dispatch_tier}"
+            ),
+        }
+        for r in roof_graded_df.itertuples()
+    ],
+    ncols=4,
+    suptitle='Step 4b Graded Roof Claims — All 8 Property Photos Ordered by AI.SCORE Severity',
+)
+roof_graded_df
 ```
 
 ---
-
 ## Step 5 — Adjuster Dispatch Queue & Portfolio Summary (`AI.AGG`)
 
-Finally, **Step 5** uses `AI.AGG` with `output_schema` to aggregate the 16 graded claims by `(claim_type, claim_subtype)` into an executive dispatch plan for each damage cohort — combining exact SQL metrics (`COUNT(*)`, `AVG(severity_score)`) with `AI.AGG`'s cross-row synthesis of dominant damage patterns and adjuster staffing recommendations.
+Finally, **Step 5** uses `AI.AGG` with `output_schema` to aggregate the 16 graded claims by `(claim_type, claim_subtype)` into an executive dispatch plan for each damage cohort — combining exact SQL metrics (`COUNT(*)`, `AVG(severity_score)`, SLA tier counts) with `AI.AGG`'s cross-row synthesis of dominant damage patterns and adjuster staffing recommendations.
 
 ```python
-bq.query(f"""
+client.query(f'''
 CREATE OR REPLACE TABLE `{PROJECT_ID}.{DATASET_ID}.workflow_claims_dispatch_rollup` AS
 WITH unified_graded AS (
   SELECT
@@ -776,9 +932,9 @@ SELECT
   ) AS cohort_synthesis
 FROM unified_graded
 GROUP BY claim_type, claim_subtype
-""").result()
+''').result()
 
-rollup_df = run_sql(f"""
+rollup_df = client.query(f'''
 SELECT
   claim_type,
   claim_subtype,
@@ -791,13 +947,14 @@ SELECT
   cohort_synthesis.adjuster_dispatch_recommendation
 FROM `{PROJECT_ID}.{DATASET_ID}.workflow_claims_dispatch_rollup`
 ORDER BY claim_type, avg_severity_score DESC
-""")
+''').to_dataframe()
 print('Step 5 Cohort-Level Adjuster Dispatch Rollup (AI.AGG):')
-print(rollup_df.to_string(index=False))
+rollup_df
 ```
 
 ```python
-portfolio_df = run_sql(f"""
+# Complete 24-claim portfolio disposition across all 3 operational queues
+portfolio_df = client.query(f'''
 WITH all_dispositions AS (
   SELECT
     claim_id,
@@ -845,7 +1002,24 @@ SELECT
 FROM all_dispositions
 GROUP BY operational_queue, line_of_business
 ORDER BY operational_queue, line_of_business
-""")
+''').to_dataframe()
 print(f'Complete 24-Claim Portfolio Disposition ({portfolio_df["claim_count"].sum()} total photos accounted for):')
-print(portfolio_df.to_string(index=False))
+portfolio_df
 ```
+
+---
+## Key Takeaways & Production Patterns
+
+1. **Gate Multimodal Quality Before Extraction (`AI.SCORE` + `AI.IF`):**
+   - Combining a numeric clarity score (`AI.SCORE >= 5.0`) with a boolean asset-visibility check (`AI.IF`) stops uninspectable uploads at intake (`4/4` defective photos caught) and avoids hallucinated schema fields downstream.
+2. **Use `STRUCT<category, description>` for Hierarchical `AI.CLASSIFY` Taxonomies:**
+   - Passing descriptive `STRUCT(category, description)` definitions to `AI.CLASSIFY` lets you explicitly define what belongs in `'unclassified'` (Step 2) and `'other_unclear'` (Step 3), routing out-of-scope claims (`4/4` edge cases) to human specialists with an `AI.GENERATE` escalation brief.
+3. **Branch `AI.GENERATE(output_schema)` by Line of Business:**
+   - Separating Auto (`workflow_claims_graded_auto`) and Roof (`workflow_claims_graded_roof`) grading allows each SQL branch to enforce domain-specific `output_schema` attributes and combine `AI.SCORE` severity with safety booleans (`structural_or_safety_risk`, `emergency_tarp_required`).
+4. **Keep Gemini 3.8 Structured Extraction Concise:**
+   - When calling `AI.GENERATE(..., endpoint => 'gemini-3.8-flash', output_schema => ...)` over multimodal `ObjectRef` inputs, pass `thinking_config.thinking_level = "LOW"` and `max_output_tokens = 2048` so reasoning tokens never truncate the structured JSON response.
+
+**Related content:**
+- **Dataset generator:** `data/claims/generate.ipynb` (`data/claims/generate.ipynb`)
+- **Function deep dives:** `functions/ai_if` (`AI.IF`) | `functions/ai_score` (`AI.SCORE`) | `functions/ai_classify` (`AI.CLASSIFY`) | `functions/ai_generate` (`AI.GENERATE`) | `functions/ai_agg` (`AI.AGG`)
+- **Sister workflows:** `workflows/document_intelligence` (`document_intelligence`) | `workflows/content_moderation` (`content_moderation`) | `workflows/multimodal_analysis` (`multimodal_analysis`)
