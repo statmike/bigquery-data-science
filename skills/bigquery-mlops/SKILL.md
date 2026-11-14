@@ -2,7 +2,7 @@
 name: bigquery-mlops
 description: "Use when operationalizing, deploying, registering, exporting, importing, serving, monitoring, or scheduling BigQuery ML (ML.*), BigQuery AI (AI.*), or external models logging to BigQuery — across 9 production orchestrators (Scheduled Queries, Dataform, BigQuery Pipelines, Cloud Workflows, dbt, Vertex AI KFP, Managed Airflow), Vertex AI Model Registry, EXPORT/IMPORT MODEL (XGBoost, ONNX, TensorFlow), REMOTE endpoints, drift/skew monitoring (ML.VALIDATE_DATA_DRIFT, ML.METRICS), and point-in-time feature stores (ML.ENTITY_FEATURES_AT_TIME)."
 metadata:
-  version: "0.12.0"
+  version: "0.13.0"
 ---
 
 # BigQuery MLOps & Production Operations (`bigquery-mlops`)
@@ -71,7 +71,7 @@ flowchart TD
 | --- | --- | --- |
 | Choosing which `CREATE MODEL` estimator to train or tune inside a retraining pipeline | **[`bigquery-ml`](../bigquery-ml/SKILL.md)** | `bigquery-mlops` owns the orchestration, drift gate, registry, and serving topology; `bigquery-ml` owns the 23 model types (`classification.md`, `regression.md`, `unsupervised-and-specialized.md`). |
 | Orchestrating or monitoring `AI.GENERATE*`, `AI.CLASSIFY`, `AI.EMBED`, `VECTOR_SEARCH`, `AI.FORECAST`, or `AI.PREDICT` | **[`bigquery-ai`](../bigquery-ai/SKILL.md)** | `bigquery-ai` owns foundation-model prompt/schema design, RRF hybrid search sizing, and pinned endpoints (`skills/pinned-models.json`); `bigquery-mlops` schedules them, monitors `ARRAY<FLOAT64>` drift, and scores saved predictions via `ML.METRICS`. |
-| Multi-stage hybrid architectures (e.g., `AI.EMBED` featurization → `ML.ENTITY_FEATURES_AT_TIME` → `BOOSTED_TREE_*` → `AI.AGG` drift alert summary) | **[`bigquery-data-science`](../bigquery-data-science/SKILL.md)** | Read [`../bigquery-data-science/reference/cross-skill-playbooks.md`](../bigquery-data-science/reference/cross-skill-playbooks.md) for 6 end-to-end multi-skill playbooks and the unified 32-workflow + 9-pipeline index. |
+| Multi-stage hybrid architectures (e.g., `AI.EMBED` featurization → `ML.ENTITY_FEATURES_AT_TIME` → `BOOSTED_TREE_*` → `AI.AGG` drift alert summary) | **[`bigquery-data-science`](../bigquery-data-science/SKILL.md)** | Read [`../bigquery-data-science/reference/cross-skill-playbooks.md`](../bigquery-data-science/reference/cross-skill-playbooks.md) for 6 end-to-end multi-skill playbooks and the unified 33-workflow + 9-pipeline index. |
 
 ## Tool Wrapper & Generator Rules (SQL + Python Control Plane)
 

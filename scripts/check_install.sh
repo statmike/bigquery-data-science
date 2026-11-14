@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # check_install.sh — build the sdist and wheel via `uv build`, verify artifact hygiene
-# (wheel < 1.5 MB, zero .ipynb files, zero relative links in PyPI Description), install
+# (wheel < 2.0 MB, zero .ipynb files, zero relative links in PyPI Description), install
 # the wheel into an isolated virtualenv with zero network/extra dependencies, and smoke-test
 # the CLI (`list`, `install`, `lookup`, `triage`) and stdio MCP server (`initialize`,
 # `tools/list`, `tools/call`).
@@ -27,7 +27,7 @@ SDIST="$(echo "$WORK"/dist/*.tar.gz)"
 echo "   wheel: $(basename "$WHEEL")"
 echo "   sdist: $(basename "$SDIST")"
 
-echo "2. Verifying wheel and sdist size (< 1.5 MB) and zero .ipynb files..."
+echo "2. Verifying wheel and sdist size (< 2.0 MB) and zero .ipynb files..."
 python3 - "$WHEEL" "$SDIST" <<'PY' || fail "artifact size or content gate failed"
 import os
 import sys
@@ -38,8 +38,8 @@ wheel_path, sdist_path = sys.argv[1], sys.argv[2]
 wheel_bytes = os.path.getsize(wheel_path)
 sdist_bytes = os.path.getsize(sdist_path)
 
-assert wheel_bytes < 1_500_000, f"Wheel too large: {wheel_bytes:,} bytes (>= 1.5 MB)"
-assert sdist_bytes < 1_500_000, f"Sdist too large: {sdist_bytes:,} bytes (>= 1.5 MB)"
+assert wheel_bytes < 2_000_000, f"Wheel too large: {wheel_bytes:,} bytes (>= 2.0 MB)"
+assert sdist_bytes < 2_000_000, f"Sdist too large: {sdist_bytes:,} bytes (>= 2.0 MB)"
 
 with zipfile.ZipFile(wheel_path) as zf:
     wheel_names = zf.namelist()

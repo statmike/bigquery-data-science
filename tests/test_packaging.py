@@ -10,7 +10,7 @@ import tomllib
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_VERSION = "0.12.0"
+EXPECTED_VERSION = "0.13.0"
 SKILL_NAMES: tuple[str, ...] = (
     "bigquery-data-science",
     "bigquery-ml",
@@ -190,7 +190,7 @@ def test_all_109_notebooks_have_unified_kernelspec_and_clean_links() -> None:
     notebooks = sorted((REPO_ROOT / "bigquery-ml").rglob("*.ipynb")) + sorted(
         (REPO_ROOT / "bigquery-ai").rglob("*.ipynb")
     )
-    assert len(notebooks) == 109
+    assert len(notebooks) == 112
     leak_proj_num_re = re.compile(r"projects/[1-9]\d{10,12}/")
     v0110_executed = (
         "bigquery-ai/functions/ai_chunk_document/ai_chunk_document.ipynb",
@@ -200,6 +200,9 @@ def test_all_109_notebooks_have_unified_kernelspec_and_clean_links() -> None:
         "bigquery-ai/workflows/content_moderation/content_moderation.ipynb",
         "bigquery-ai/workflows/document_intelligence/document_intelligence.ipynb",
         "bigquery-ai/workflows/log_analysis/log_analysis.ipynb",
+        "bigquery-ai/workflows/claims_adjustment/claims_adjustment.ipynb",
+        "bigquery-ai/data/claims/generate.ipynb",
+        "bigquery-ml/pipelines/bigquery_pipelines/bigquery_pipelines.ipynb",
         "bigquery-ai/overview.ipynb",
     )
     for rel_nb in v0110_executed:

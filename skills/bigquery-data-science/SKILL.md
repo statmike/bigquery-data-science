@@ -2,7 +2,7 @@
 name: bigquery-data-science
 description: "Use FIRST when someone wants to explore, predict, classify, forecast, embed, search, extract, explain, monitor, or operationalize data science in BigQuery and needs to choose or combine a trained model (bigquery-ml — CREATE MODEL + ML.*), a zero-training generative or foundation model function (bigquery-ai — AI.* + TimesFM + TabFM + Cloud AI services), or production MLOps orchestration, model registry, export/import, drift monitoring, and point-in-time feature store (bigquery-mlops)."
 metadata:
-  version: "0.12.0"
+  version: "0.13.0"
 ---
 
 # BigQuery Data Science — Umbrella Router & Multi-Skill Composer (`bigquery-data-science`)
