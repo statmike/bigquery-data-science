@@ -75,7 +75,7 @@ This repository pairs **three tightly connected layers** that stay synchronized 
 
 ### Journey 1 — Equip your AI coding agent (`uvx`, `uv`, `pip`, `pipx`, `npx skills`, or MCP)
 
-The core `bigquery-data-science` package has **zero third-party runtime dependencies** (`< 1.5 MB` wheel) and installs the 4 skills (`bigquery-data-science`, `bigquery-ml`, `bigquery-ai`, `bigquery-mlops`) into `.agents/skills/` and `.claude/skills/`:
+The core `bigquery-data-science` package has **zero third-party runtime dependencies** (`< 2.0 MB` wheel) and installs the 4 skills (`bigquery-data-science`, `bigquery-ml`, `bigquery-ai`, `bigquery-mlops`) into `.agents/skills/` and `.claude/skills/`:
 
 ```bash
 # Option A — Zero-install ephemeral CLI via uvx (recommended for instant setup):

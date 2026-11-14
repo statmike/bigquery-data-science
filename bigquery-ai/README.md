@@ -303,6 +303,9 @@ bigquery-ai/
 ├── reference/               ◄ The detailed function reference, one page per category
 ├── overview.ipynb           ◄ Interactive overview notebook
 ├── setup/                   ◄ Connections, models, quotas reference
+├── data/                    ◄ Synthetic dataset generators & ground-truth manifests
+│   ├── documents/           ◄ 100 PDFs (50 invoices + 50 receipts) + manifest.json
+│   └── claims/              ◄ 24 JPEG insurance claim photos + manifest.json
 ├── functions/               ◄ Per-function deep dives (SQL + notebook)
 │   ├── ai_generate/
 │   ├── ai_generate_text/
@@ -330,7 +333,7 @@ bigquery-ai/
 │   ├── ml_annotate_image/
 │   ├── ml_transcribe/
 │   └── ... (+ legacy/variant functions)
-└── workflows/               ◄ End-to-end composed workflows
+└── workflows/               ◄ End-to-end composed workflows (15 workflows)
     ├── data_enrichment/
     ├── document_rag/
     ├── content_analysis/
@@ -341,6 +344,7 @@ bigquery-ai/
     ├── tabular_prediction/
     ├── time_series_intelligence/
     ├── document_intelligence/
+    ├── claims_adjustment/
     ├── content_moderation/
     ├── multimodal_analysis/
     ├── log_analysis/

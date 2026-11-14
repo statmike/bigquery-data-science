@@ -95,7 +95,7 @@ Work through [the individual function notebooks](../functions/) first. A workflo
 
 ## Conventions every workflow follows
 
-- **Self-contained data.** A workflow either generates its own sample data with `AI.GENERATE_TABLE`/inline SQL, stages bundled sample files from [`data/documents/`](../data/documents/), or reads from `bigquery-public-data`. Nothing depends on another notebook having run first.
+- **Self-contained data.** A workflow either generates its own sample data with `AI.GENERATE_TABLE`/inline SQL, stages bundled sample files from [`data/documents/`](../data/documents/) or [`data/claims/`](../data/claims/), or reads from `bigquery-public-data`. Nothing depends on another notebook having run first.
 - **Named tables.** Tables use a `workflow_{short}_{stage}` prefix so it is obvious what created them and at what point in the pipeline.
 - **A `**Functions used:**` line** in the overview cell, linking each function back to its deep-dive notebook. Every function named there must also name this workflow in its own `**Featured in:**` line — the cross-references are required to be bidirectional, and the round-trip check is a step on the "New workflow" checklist in [PLANS.md](../PLANS.md) rather than something to remember by hand.
 - **A closing comparison table** where the workflow demonstrates more than one approach, always ending with a `**Best for**` row.
