@@ -3,8 +3,8 @@
   "version": "0.12.0",
   "source_project": null,
   "narrative_sources": {},
-  "generated_date": "2026-11-13",
-  "source_commit": "5ed579b",
+  "generated_date": "2026-11-14",
+  "source_commit": "f44f823",
   "reference_files": [
     "feature-store-and-temporal-joins.md",
     "model-registry-export-and-serving.md",

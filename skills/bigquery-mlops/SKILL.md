@@ -1,6 +1,6 @@
 ---
 name: bigquery-mlops
-description: "Use when operationalizing, deploying, registering, exporting, importing, serving, monitoring, or scheduling BigQuery ML (ML.*), BigQuery AI (AI.*), or external models logging to BigQuery — across 8 production orchestrators (Scheduled Queries, Dataform, Cloud Workflows, dbt, Vertex AI KFP, Managed Airflow), Vertex AI Model Registry, EXPORT/IMPORT MODEL (XGBoost, ONNX, TensorFlow), REMOTE endpoints, drift/skew monitoring (ML.VALIDATE_DATA_DRIFT, ML.METRICS), and point-in-time feature stores (ML.ENTITY_FEATURES_AT_TIME)."
+description: "Use when operationalizing, deploying, registering, exporting, importing, serving, monitoring, or scheduling BigQuery ML (ML.*), BigQuery AI (AI.*), or external models logging to BigQuery — across 9 production orchestrators (Scheduled Queries, Dataform, BigQuery Pipelines, Cloud Workflows, dbt, Vertex AI KFP, Managed Airflow), Vertex AI Model Registry, EXPORT/IMPORT MODEL (XGBoost, ONNX, TensorFlow), REMOTE endpoints, drift/skew monitoring (ML.VALIDATE_DATA_DRIFT, ML.METRICS), and point-in-time feature stores (ML.ENTITY_FEATURES_AT_TIME)."
 metadata:
   version: "0.12.0"
 ---
@@ -32,10 +32,10 @@ flowchart TD
         P_FS ~~~ P_REG ~~~ P_MON
     end
 
-    subgraph ORCH["3. Pillar 5 — Production Orchestration Across 8 GCP &amp; SQL Engines"]
+    subgraph ORCH["3. Pillar 5 — Production Orchestration Across 9 GCP &amp; SQL Engines"]
         direction LR
         O_SQL["<b>BigQuery-Native SQL (2)</b><br/>sql_scripting (Procedural SQL)<br/>scheduled_queries (DTS Cron + Alert)"]
-        O_DAG["<b>Declarative SQL DAGs (2)</b><br/>dataform (SQLX + Assertions)<br/>dbt (Custom Model Macro + Tests)"]
+        O_DAG["<b>Declarative SQL DAGs (3)</b><br/>dataform · bigquery_pipelines<br/>dbt (Custom Model Macro + Tests)"]
         O_CP["<b>Serverless &amp; ML Control Plane (4)</b><br/>cloud_workflows · vertex_kfp<br/>composer_airflow · airflow_with_kfp"]
         O_SQL ~~~ O_DAG ~~~ O_CP
     end
@@ -57,7 +57,7 @@ flowchart TD
 ## Decision Tree (Lens 1 → Lens 2)
 
 1. **Are you scheduling or orchestrating a multi-step ML or AI workflow** (drift check → conditional `CREATE OR REPLACE MODEL` retrain → `ML.EVALUATE` gate → batch `ML.PREDICT` / `AI.*` scoring, or incremental `AI.EMBED` refresh)?
-   - Choose among the **8 production orchestrators** (`sql_scripting`, `scheduled_queries`, `dataform`, `cloud_workflows`, `dbt`, `vertex_kfp`, `composer_airflow`, `airflow_with_kfp`) → see [`reference/orchestration-and-pipelines.md`](reference/orchestration-and-pipelines.md).
+   - Choose among the **9 production orchestrators** (`sql_scripting`, `scheduled_queries`, `dataform`, `bigquery_pipelines`, `cloud_workflows`, `dbt`, `vertex_kfp`, `composer_airflow`, `airflow_with_kfp`) → see [`reference/orchestration-and-pipelines.md`](reference/orchestration-and-pipelines.md).
 2. **Are you registering a model in Vertex AI Model Registry, exporting a BQML model to GCS, importing an external ONNX/XGBoost/TensorFlow/TFLite model into BigQuery, or calling a custom Vertex AI Endpoint via `REMOTE WITH CONNECTION`?**
    - See [`reference/model-registry-export-and-serving.md`](reference/model-registry-export-and-serving.md).
 3. **Are you monitoring feature/embedding/prediction drift (`ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW`) or computing accuracy metrics (`ML.METRICS`, `ML.EVALUATE`, `AI.EVALUATE`) on saved prediction tables — including predictions logged from external Vertex AI or microservice endpoints?**
@@ -71,7 +71,7 @@ flowchart TD
 | --- | --- | --- |
 | Choosing which `CREATE MODEL` estimator to train or tune inside a retraining pipeline | **[`bigquery-ml`](../bigquery-ml/SKILL.md)** | `bigquery-mlops` owns the orchestration, drift gate, registry, and serving topology; `bigquery-ml` owns the 23 model types (`classification.md`, `regression.md`, `unsupervised-and-specialized.md`). |
 | Orchestrating or monitoring `AI.GENERATE*`, `AI.CLASSIFY`, `AI.EMBED`, `VECTOR_SEARCH`, `AI.FORECAST`, or `AI.PREDICT` | **[`bigquery-ai`](../bigquery-ai/SKILL.md)** | `bigquery-ai` owns foundation-model prompt/schema design, RRF hybrid search sizing, and pinned endpoints (`skills/pinned-models.json`); `bigquery-mlops` schedules them, monitors `ARRAY<FLOAT64>` drift, and scores saved predictions via `ML.METRICS`. |
-| Multi-stage hybrid architectures (e.g., `AI.EMBED` featurization → `ML.ENTITY_FEATURES_AT_TIME` → `BOOSTED_TREE_*` → `AI.AGG` drift alert summary) | **[`bigquery-data-science`](../bigquery-data-science/SKILL.md)** | Read [`../bigquery-data-science/reference/cross-skill-playbooks.md`](../bigquery-data-science/reference/cross-skill-playbooks.md) for 6 end-to-end multi-skill playbooks and the unified 32-workflow + 8-pipeline index. |
+| Multi-stage hybrid architectures (e.g., `AI.EMBED` featurization → `ML.ENTITY_FEATURES_AT_TIME` → `BOOSTED_TREE_*` → `AI.AGG` drift alert summary) | **[`bigquery-data-science`](../bigquery-data-science/SKILL.md)** | Read [`../bigquery-data-science/reference/cross-skill-playbooks.md`](../bigquery-data-science/reference/cross-skill-playbooks.md) for 6 end-to-end multi-skill playbooks and the unified 32-workflow + 9-pipeline index. |
 
 ## Tool Wrapper & Generator Rules (SQL + Python Control Plane)
 
@@ -102,7 +102,7 @@ Before returning any MLOps SQL, DAG, workflow YAML, or Python pipeline code, ver
 ## 4-Lens Index
 
 - **Lens 2 — Operational Decision Guides (`reference/`)**:
-  - [`reference/orchestration-and-pipelines.md`](reference/orchestration-and-pipelines.md) — Choosing and wiring the 8 production orchestrators across both `ML.*` and `AI.*`, cache-bypass rules, Managed Airflow Gen 3 sizing, and teardown patterns
+  - [`reference/orchestration-and-pipelines.md`](reference/orchestration-and-pipelines.md) — Choosing and wiring the 9 production orchestrators across both `ML.*` and `AI.*`, cache-bypass rules, Managed Airflow Gen 3 sizing, and teardown patterns
   - [`reference/model-registry-export-and-serving.md`](reference/model-registry-export-and-serving.md) — Vertex AI Model Registry (`model_registry='VERTEX_AI'`), `EXPORT MODEL`, `IMPORT MODEL` (`ONNX`, `XGBOOST`, `TENSORFLOW`, `TENSORFLOW_LITE`), `REMOTE WITH CONNECTION`, and `TRANSFORM_ONLY`
   - [`reference/monitoring-drift-and-evaluation.md`](reference/monitoring-drift-and-evaluation.md) — Universal table-native drift/skew monitoring (`ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW`, `ML.DESCRIBE_DATA`) and model-free evaluation (`ML.METRICS`, `ML.EVALUATE`, `AI.EVALUATE`) for BQML, `AI.*`, and external models logging to BigQuery
   - [`reference/feature-store-and-temporal-joins.md`](reference/feature-store-and-temporal-joins.md) — Point-in-time feature store (`ML.ENTITY_FEATURES_AT_TIME`, `ML.FEATURES_AT_TIME`), table-shape rules (`ignore_feature_nulls`), the 3-arm skew audit, and Vertex AI Feature Store sync
@@ -110,5 +110,5 @@ Before returning any MLOps SQL, DAG, workflow YAML, or Python pipeline code, ver
   - [`../bigquery-ml/syntax/INDEX.md`](../bigquery-ml/syntax/INDEX.md) — [`export-model.md`](../bigquery-ml/syntax/export-model.md), [`imported-models-tensorflow-tensorflow_lite-onnx-xgboost.md`](../bigquery-ml/syntax/imported-models-tensorflow-tensorflow_lite-onnx-xgboost.md), [`remote-remote-model-over-a-vertex-ai-endpoint-the-mechanism.md`](../bigquery-ml/syntax/remote-remote-model-over-a-vertex-ai-endpoint-the-mechanism.md), [`transform_only.md`](../bigquery-ml/syntax/transform_only.md), [`mlvalidate_data_drift.md`](../bigquery-ml/syntax/mlvalidate_data_drift.md), [`mlvalidate_data_skew.md`](../bigquery-ml/syntax/mlvalidate_data_skew.md), [`mlmetrics.md`](../bigquery-ml/syntax/mlmetrics.md), [`mlentity_features_at_time.md`](../bigquery-ml/syntax/mlentity_features_at_time.md), [`mlfeatures_at_time.md`](../bigquery-ml/syntax/mlfeatures_at_time.md)
   - [`../bigquery-ai/syntax/INDEX.md`](../bigquery-ai/syntax/INDEX.md) — [`aievaluate.md`](../bigquery-ai/syntax/aievaluate.md), [`aiembed.md`](../bigquery-ai/syntax/aiembed.md), [`vector_search.md`](../bigquery-ai/syntax/vector_search.md), [`aichunk_document.md`](../bigquery-ai/syntax/aichunk_document.md), [`aitranslate.md`](../bigquery-ai/syntax/aitranslate.md)
 - **Lens 4 — Worked Walkthroughs (`../bigquery-ml/narrative/` & `../bigquery-ai/narrative/`)**:
-  - Pipelines: [`sql_scripting.md`](../bigquery-ml/narrative/sql_scripting.md), [`scheduled_queries.md`](../bigquery-ml/narrative/scheduled_queries.md), [`dataform.md`](../bigquery-ml/narrative/dataform.md), [`cloud_workflows.md`](../bigquery-ml/narrative/cloud_workflows.md), [`dbt.md`](../bigquery-ml/narrative/dbt.md), [`vertex_kfp.md`](../bigquery-ml/narrative/vertex_kfp.md), [`composer_airflow.md`](../bigquery-ml/narrative/composer_airflow.md), [`airflow_with_kfp.md`](../bigquery-ml/narrative/airflow_with_kfp.md)
+  - Pipelines: [`sql_scripting.md`](../bigquery-ml/narrative/sql_scripting.md), [`scheduled_queries.md`](../bigquery-ml/narrative/scheduled_queries.md), [`dataform.md`](../bigquery-ml/narrative/dataform.md), [`bigquery_pipelines.md`](../bigquery-ml/narrative/bigquery_pipelines.md), [`cloud_workflows.md`](../bigquery-ml/narrative/cloud_workflows.md), [`dbt.md`](../bigquery-ml/narrative/dbt.md), [`vertex_kfp.md`](../bigquery-ml/narrative/vertex_kfp.md), [`composer_airflow.md`](../bigquery-ml/narrative/composer_airflow.md), [`airflow_with_kfp.md`](../bigquery-ml/narrative/airflow_with_kfp.md)
   - Registry, Serving, Monitoring & Feature Store: [`export.md`](../bigquery-ml/narrative/export.md), [`imported.md`](../bigquery-ml/narrative/imported.md), [`remote.md`](../bigquery-ml/narrative/remote.md), [`transform_only.md`](../bigquery-ml/narrative/transform_only.md), [`model_monitoring.md`](../bigquery-ml/narrative/model_monitoring.md), [`evaluation.md`](../bigquery-ml/narrative/evaluation.md), [`feature_store.md`](../bigquery-ml/narrative/feature_store.md), [`feature_store_workflow.md`](../bigquery-ml/narrative/feature_store_workflow.md)

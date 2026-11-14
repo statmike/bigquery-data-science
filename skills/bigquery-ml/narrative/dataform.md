@@ -2,14 +2,26 @@
 
 # Dataform — BigQuery ML Pipeline
 
-Version-controlled SQL pipeline: `CREATE MODEL` as an `operations`-type `.sqlx` file, `ML.EVALUATE` as an **assertion** that halts a dependent downstream action when it fails. One of Google's own three officially-documented BQML pipeline paths (alongside plain SQL scripting and Vertex AI Pipelines) — and the engine behind BigQuery Studio's newer native "Pipelines" UI feature.
+Version-controlled SQL pipeline: `CREATE MODEL` as an `operations`-type `.sqlx` file, `ML.EVALUATE` as an **assertion** that halts a dependent downstream action when it fails. One of Google's own three officially-documented BQML pipeline paths (alongside plain SQL scripting and Vertex AI Pipelines) — and the engine behind BigQuery Studio's native **"Pipelines"** UI (renamed from *"BigQuery Workflows"*).
 
 **Workflow operationalized:** `workflows/ga4_churn_prediction` (`workflows/ga4_churn_prediction/`)
+**Sister notebook on the same API:** `pipelines/bigquery_pipelines` (`pipelines/bigquery_pipelines/`)
 **API:** `google.cloud.dataform_v1` (`Repository`, `Workspace`, `CompilationResult`, `WorkflowInvocation`)
 
 **Data:** [`bigquery-public-data.ga4_obfuscated_sample_ecommerce`](https://console.cloud.google.com/marketplace/product/bigquery-public-datasets)
 
-**References:** `RESOURCES.md` (Full reference) | [Dataform overview](https://cloud.google.com/dataform/docs/overview) | [Assertions](https://cloud.google.com/dataform/docs/assertions) | `setup` (Setup guide)
+**References:** `RESOURCES.md` (Full reference) | [Dataform overview](https://cloud.google.com/dataform/docs/overview) | [BigQuery Pipelines overview](https://cloud.google.com/bigquery/docs/pipelines-introduction) | [Assertions](https://cloud.google.com/dataform/docs/assertions) | `setup` (Setup guide)
+
+### Dataform vs BigQuery Studio Pipelines — Same `dataform_v1` API, Two Complementary Walkthroughs
+
+Google originally launched **Dataform** (`dataform.googleapis.com`) for declarative `.sqlx` DAGs, later introduced **BigQuery Workflows** inside BigQuery Studio to build visual SQL + Colab Enterprise notebook DAGs on top of Dataform, and then **renamed "BigQuery Workflows" to "BigQuery Pipelines"** to distinguish it from Google Cloud Workflows (`workflows.googleapis.com`). Both experiences share the **exact same `google.cloud.dataform_v1` backend API**:
+
+| Dimension | **This Notebook (`pipelines/dataform/`)** | **`pipelines/bigquery_pipelines` (`pipelines/bigquery_pipelines/`)** |
+| --- | --- | --- |
+| **Control-Plane API** | `google.cloud.dataform_v1` | `google.cloud.dataform_v1` *(identical backend)* |
+| **Compiler Version (`workflow_settings.yaml`)** | `dataformCoreVersion: 3.0.0` | `dataformCoreVersion: 3.1.0` (unlocks `bigqueryUnitTest` & `notebook` actions) |
+| **Primary Focus** | Core `.sqlx` dependency graph (`table` $\to$ `operations` model $\to$ `assertion` gates $\to$ `table`) | 2026 BigQuery Studio Pipelines feature set: **SQL unit tests (`type: "test"`)**, **mixed SQL + `.ipynb` notebook DAG (`notebook({...})`)**, **metadata enrichment & lineage**, and **scheduled `ReleaseConfig` + `WorkflowConfig`** |
+| **Quality Gate Outcome Demonstrated** | Deliberately **fails** a strict assertion (`roc_auc < 0.99`) to prove downstream `scoring` is `SKIPPED` | Runs pre-flight **SQL unit tests** (`0` bytes scanned), then **passes** the `roc_auc >= 0.60` assertion so downstream `scoring` materializes `SUCCEEDED` |
 
 ---
 ## Setup
@@ -378,6 +390,6 @@ Without `dependOnDependencyAssertions`, `scoring` would have run anyway — a fa
 ---
 ## Related content
 
+- `pipelines/bigquery_pipelines` (`pipelines/bigquery_pipelines/`) — the companion walkthrough on the same `google.cloud.dataform_v1` API covering BigQuery Studio Pipelines' 2026 capabilities: SQL unit tests (`type: "test"`), mixed SQL + `.ipynb` notebook tasks (`notebook({...})`), metadata/lineage enrichment, and scheduled `ReleaseConfig` + `WorkflowConfig`.
 - `pipelines/sql_scripting` (`pipelines/sql_scripting/`) — the plain-SQL alternative to this same drift/quality-gate idea, no version control or dependency graph.
-- BigQuery Studio's newer native **"Pipelines" UI** (2026) is built on Dataform under the hood — this API-driven approach is the same engine, just without the console's drag-and-drop task sequencing.
 - `workflows/ga4_churn_prediction` (`workflows/ga4_churn_prediction/`) — the workflow this pipeline operationalizes.

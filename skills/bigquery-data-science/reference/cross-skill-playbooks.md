@@ -1,6 +1,6 @@
 # Multi-Skill Composition Playbooks & Unified 32-Workflow Index
 
-Contents: [1. When to combine multiple skills](#1-when-to-combine-multiple-skills) · [2. Six multi-skill composition playbooks (`bigquery-ai` + `bigquery-ml` + `bigquery-mlops`)](#2-six-multi-skill-composition-playbooks-bigquery-ai--bigquery-ml--bigquery-mlops) · [3. Unified 7-stage problem-first index of all 32 workflows & 8 pipelines](#3-unified-7-stage-problem-first-index-of-all-32-workflows--8-pipelines)
+Contents: [1. When to combine multiple skills](#1-when-to-combine-multiple-skills) · [2. Six multi-skill composition playbooks (`bigquery-ai` + `bigquery-ml` + `bigquery-mlops`)](#2-six-multi-skill-composition-playbooks-bigquery-ai--bigquery-ml--bigquery-mlops) · [3. Unified 7-stage problem-first index of all 32 workflows & 9 pipelines](#3-unified-7-stage-problem-first-index-of-all-32-workflows--9-pipelines)
 
 Real-world data science problems on BigQuery rarely stop at a single SQL namespace. A production system often extracts features from unstructured text or PDFs with **[`bigquery-ai`](../../bigquery-ai/SKILL.md)**, joins them point-in-time and trains an interpretable or high-throughput model with **[`bigquery-ml`](../../bigquery-ml/SKILL.md)**, and schedules drift detection, evaluation, and retraining with **[`bigquery-mlops`](../../bigquery-mlops/SKILL.md)**.
 
@@ -16,7 +16,7 @@ flowchart TD
         direction LR
         Q_UNSTRUCT["<b>Stage A — bigquery-ai</b><br/>Unstructured or Zero-Shot Baseline?<br/>AI.EMBED · AI.GENERATE_TABLE<br/>AI.CHUNK_DOCUMENT · ML.PROCESS_DOCUMENT · AI.FORECAST"]
         Q_TRAIN["<b>Stage B — bigquery-ml</b><br/>Supervised, Unsupervised, or Causal?<br/>CREATE MODEL · TRANSFORM<br/>BOOSTED_TREE_* · ARIMA_PLUS · Causal"]
-        Q_OPS["<b>Stage C — bigquery-mlops</b><br/>Temporal Joins, Registry, or Drift?<br/>ML.ENTITY_FEATURES_AT_TIME · Registry<br/>ML.VALIDATE_DATA_DRIFT · 8 Pipelines"]
+        Q_OPS["<b>Stage C — bigquery-mlops</b><br/>Temporal Joins, Registry, or Drift?<br/>ML.ENTITY_FEATURES_AT_TIME · Registry<br/>ML.VALIDATE_DATA_DRIFT · 9 Pipelines"]
         Q_UNSTRUCT --> Q_TRAIN --> Q_OPS
     end
 
@@ -41,7 +41,7 @@ flowchart TD
 | Forecast, attribute metric drivers, or estimate causal impact, then write an executive narrative per segment | **`bigquery-ml` + `bigquery-ai`** | `ARIMA_PLUS` / `CONTRIBUTION_ANALYSIS` / `AI.CAUSAL_EFFECT` / `ML.EXPLAIN_PREDICT` → `AI.AGG(..., output_schema => ...)` |
 | Retrieve candidate items via hybrid vector+lexical search, then re-rank with a trained propensity/recommendation model | **`bigquery-ai` + `bigquery-ml`** | `VECTOR_SEARCH` (`lexical_search_columns`) / `AI.SEARCH` (`mode => 'HYBRID'`) → `BOOSTED_TREE_CLASSIFIER` / `MATRIX_FACTORIZATION` |
 | Monitor, evaluate, and summarize an external Vertex AI / Cloud Run model whose request-response logs land in BigQuery | **`bigquery-mlops` + `bigquery-ai`** | `ML.VALIDATE_DATA_DRIFT` + `ML.METRICS` on logged prediction tables → `AI.AGG` drift/accuracy brief → `vertex_kfp` / `cloud_workflows` |
-| Take any worked `bigquery-ml` or `bigquery-ai` notebook and run it unattended on a production schedule | **`bigquery-ml` / `bigquery-ai` + `bigquery-mlops`** | Wrap SQL in `sql_scripting`, `scheduled_queries`, `dataform`, `cloud_workflows`, `dbt`, `vertex_kfp`, or `composer_airflow` |
+| Take any worked `bigquery-ml` or `bigquery-ai` notebook and run it unattended on a production schedule | **`bigquery-ml` / `bigquery-ai` + `bigquery-mlops`** | Wrap SQL in `sql_scripting`, `scheduled_queries`, `dataform`, `bigquery_pipelines`, `cloud_workflows`, `dbt`, `vertex_kfp`, or `composer_airflow` |
 
 ---
 
@@ -89,11 +89,11 @@ flowchart TD
 
 ### Playbook 6 — End-to-End Production Operationalization
 - **Skills**: [`bigquery-ml`](../../bigquery-ml/SKILL.md) / [`bigquery-ai`](../../bigquery-ai/SKILL.md) + [`bigquery-mlops`](../../bigquery-mlops/SKILL.md)
-- **Architecture**: Take any worked workflow from the table below, add a pre-retrain `ML.VALIDATE_DATA_DRIFT` gate and a post-retrain `ML.EVALUATE` / `ML.METRICS` gate (with `useQueryCache = false` / `'false'`), and deploy it into one of the 8 production orchestrators in [`orchestration-and-pipelines.md`](../../bigquery-mlops/reference/orchestration-and-pipelines.md).
+- **Architecture**: Take any worked workflow from the table below, add a pre-retrain `ML.VALIDATE_DATA_DRIFT` gate and a post-retrain `ML.EVALUATE` / `ML.METRICS` gate (with `useQueryCache = false` / `'false'`), and deploy it into one of the 9 production orchestrators in [`orchestration-and-pipelines.md`](../../bigquery-mlops/reference/orchestration-and-pipelines.md).
 
 ---
 
-## 3. Unified 7-stage problem-first index of all 32 workflows & 8 pipelines
+## 3. Unified 7-stage problem-first index of all 32 workflows & 9 pipelines
 
 Use this master index to find every end-to-end workflow and orchestration pipeline across **both** `bigquery-ml/` and `bigquery-ai/` by the data science stage you are solving:
 
@@ -107,7 +107,7 @@ Use this master index to find every end-to-end workflow and orchestration pipeli
 | **2. Feature Store & Preprocessing** | Grounded web lookup & zero-shot tabular imputation for dirty records | `bigquery-ai` | `AI.GENERATE` (Search grounding + `output_schema`), `AI.PREDICT` | [`data_enrichment.md`](../../bigquery-ai/narrative/data_enrichment.md) | `bigquery-ai/workflows/data_enrichment/` |
 | **2. Feature Store & Preprocessing** | Near-duplicate image detection to protect train/test split integrity | `bigquery-ai` | `AI.EMBED`, `VECTOR_SEARCH` | [`image_deduplication.md`](../../bigquery-ai/narrative/image_deduplication.md) | `bigquery-ai/workflows/image_deduplication/` |
 | **3. Supervised, Unsupervised & Time-Series ML** | Order-lapse customer churn prediction & threshold vs `roc_auc` literacy | `bigquery-ml` | `BOOSTED_TREE_CLASSIFIER`, `ML.EVALUATE`, `ML.EXPLAIN_PREDICT` | [`churn_retention.md`](../../bigquery-ml/narrative/churn_retention.md) | `bigquery-ml/workflows/churn_retention/` |
-| **3. Supervised, Unsupervised & Time-Series ML** | GA4 behavioral engagement churn prediction (base for all 8 pipelines) | `bigquery-ml` + `bigquery-mlops` | `BOOSTED_TREE_CLASSIFIER`, `ML.GLOBAL_EXPLAIN`, `ML.EXPLAIN_PREDICT` | [`ga4_churn_prediction.md`](../../bigquery-ml/narrative/ga4_churn_prediction.md) | `bigquery-ml/workflows/ga4_churn_prediction/` |
+| **3. Supervised, Unsupervised & Time-Series ML** | GA4 behavioral engagement churn prediction (base for all 9 pipelines) | `bigquery-ml` + `bigquery-mlops` | `BOOSTED_TREE_CLASSIFIER`, `ML.GLOBAL_EXPLAIN`, `ML.EXPLAIN_PREDICT` | [`ga4_churn_prediction.md`](../../bigquery-ml/narrative/ga4_churn_prediction.md) | `bigquery-ml/workflows/ga4_churn_prediction/` |
 | **3. Supervised, Unsupervised & Time-Series ML** | RFM customer segmentation into interpretable personas | `bigquery-ml` | `KMEANS`, `ML.STANDARD_SCALER`, `ML.CENTROIDS` | [`customer_segmentation.md`](../../bigquery-ml/narrative/customer_segmentation.md) | `bigquery-ml/workflows/customer_segmentation/` |
 | **3. Supervised, Unsupervised & Time-Series ML** | Collaborative filtering recommendation & cold-start fallback analysis | `bigquery-ml` | `MATRIX_FACTORIZATION`, `ML.RECOMMEND`, `ML.EVALUATE` | [`recommendation.md`](../../bigquery-ml/narrative/recommendation.md) | `bigquery-ml/workflows/recommendation/` |
 | **3. Supervised, Unsupervised & Time-Series ML** | Unsupervised vs supervised credit-card fraud detection | `bigquery-ml` | `PCA`, `AUTOENCODER`, `BOOSTED_TREE_CLASSIFIER`, `ML.DETECT_ANOMALIES` | [`anomaly_fraud_detection.md`](../../bigquery-ml/narrative/anomaly_fraud_detection.md) | `bigquery-ml/workflows/anomaly_fraud_detection/` |
@@ -135,4 +135,4 @@ Use this master index to find every end-to-end workflow and orchestration pipeli
 | **5. Causal Inference & Attribution** | Synthetic control counterfactual weighting | `bigquery-ml` | `LINEAR_REG` (+ constrained `scipy.optimize` simplex fit) | [`synthetic_control.md`](../../bigquery-ml/narrative/synthetic_control.md) | `bigquery-ml/workflows/synthetic_control/` |
 | **5. Causal Inference & Attribution** | Interrupted time-series counterfactual (`AI.CAUSAL_EFFECT` vs `ARIMA_PLUS`) | `bigquery-ml` + `bigquery-ai` | `AI.CAUSAL_EFFECT`, `ARIMA_PLUS`, `ML.FORECAST` | [`causal_effect.md`](../../bigquery-ml/narrative/causal_effect.md) | `bigquery-ml/workflows/causal_effect/` |
 | **6. Evaluation & Monitoring** | Model-free table evaluation (`ML.METRICS`) & dataset drift monitoring | `bigquery-mlops` + `bigquery-ml` | `ML.METRICS`, `ML.VALIDATE_DATA_DRIFT`, `ML.VALIDATE_DATA_SKEW` | [`evaluation.md`](../../bigquery-ml/narrative/evaluation.md) · [`model_monitoring.md`](../../bigquery-ml/narrative/model_monitoring.md) | `bigquery-ml/functions/{evaluation,model_monitoring}/` |
-| **7. Production MLOps Pipelines (8)** | Drift-gated conditional retrain & batch scoring across 8 orchestrators | `bigquery-mlops` + `bigquery-ml` | `sql_scripting`, `scheduled_queries`, `dataform`, `cloud_workflows`, `dbt`, `vertex_kfp`, `composer_airflow`, `airflow_with_kfp` | [`orchestration-and-pipelines.md`](../../bigquery-mlops/reference/orchestration-and-pipelines.md) | `bigquery-ml/pipelines/*/` |
+| **7. Production MLOps Pipelines (9)** | Drift-gated conditional retrain & batch scoring across 9 orchestrators | `bigquery-mlops` + `bigquery-ml` | `sql_scripting`, `scheduled_queries`, `dataform`, `bigquery_pipelines`, `cloud_workflows`, `dbt`, `vertex_kfp`, `composer_airflow`, `airflow_with_kfp` | [`orchestration-and-pipelines.md`](../../bigquery-mlops/reference/orchestration-and-pipelines.md) | `bigquery-ml/pipelines/*/` |

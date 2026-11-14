@@ -17,7 +17,7 @@ A single `CREATE MODEL` is rarely the whole task. Two layers build on the model 
 | `embeddings_classification` | `BOOSTED_TREE_CLASSIFIER` + `AI.EMBED`/`VECTOR_SEARCH` | The two *simpler* baselines (direct multiclass classifier; zero-training `VECTOR_SEARCH` lookup) beat the more elaborate pairwise classifier on both accuracy and cost — don't reach for the fancier technique by default. |
 | `customer_segmentation` | `KMEANS` | The real content is RFM feature engineering, not `KMEANS` mechanics (see `unsupervised-and-specialized.md`). |
 | `churn_retention` | `BOOSTED_TREE_CLASSIFIER` | Order-history-lapse churn definition. Richer features move accuracy/recall/F1 a lot but barely move `roc_auc` — a real lesson that headline metrics can hide weak individual-level signal. |
-| `ga4_churn_prediction` | `BOOSTED_TREE_CLASSIFIER` | Engagement-based churn from a real GA4 export — first-week behavioral features give `roc_auc` 0.74-0.77 vs. 0.53 from order-history RFM alone. This is the workflow operationalized across all 8 pipelines below. |
+| `ga4_churn_prediction` | `BOOSTED_TREE_CLASSIFIER` | Engagement-based churn from a real GA4 export — first-week behavioral features give `roc_auc` 0.74-0.77 vs. 0.53 from order-history RFM alone. This is the workflow operationalized across all 9 pipelines below. |
 | `recommendation` | `MATRIX_FACTORIZATION` | Personalized top-10 shares 0/10 items with a popularity baseline (real evidence personalization works); absent users fall back to a ranking that closely approximates the popularity baseline (cold start). |
 | `anomaly_fraud_detection` | `PCA`, `AUTOENCODER`, `BOOSTED_TREE_CLASSIFIER` | Ground-truth validation against real labeled fraud — unsupervised recall roughly triples once you add labels and go supervised. Also found `pca_explained_variance_ratio` can shift materially across identical retrainings even though `ML.EVALUATE`'s own metric stays stable. |
 | `cross_validation` | `LOGISTIC_REG` | BigQuery ML has no native k-fold CV — hand-roll it with deterministic hash-based fold assignment; a single holdout split can land on the low end of the real fold-to-fold variance. |
@@ -35,13 +35,14 @@ Go deeper: `workflows/<name>/`.
 
 ## Pipelines: choosing an orchestrator
 
-All 8 pipelines operationalize the *same* workflow (`ga4_churn_prediction`) so they're a genuine apples-to-apples comparison. Use this to pick one:
+All 9 pipelines operationalize the *same* workflow (`ga4_churn_prediction`) so they're a genuine apples-to-apples comparison. Use this to pick one:
 
 | If you... | Reach for | Why |
 |---|---|---|
 | Have no orchestrator at all and want the simplest possible thing | `sql_scripting` | Pure `DECLARE`/`SET`/`IF`/`BEGIN...END` — one BigQuery script, no external system. Reports failures via `SELECT ERROR()` (becomes the job's error message). |
 | Just want that script to run on a schedule | `scheduled_queries` | Wraps the exact same script in BigQuery Data Transfer API scheduling — the same mechanism behind BigQuery Studio's "Scheduled queries" UI. `FAILED` is a legitimate terminal state, not a bug. |
-| Want version-controlled SQL with a dependency graph and built-in data-quality gates | `dataform` | One of Google's own officially-documented BQML pipeline paths (also powers BigQuery Studio's native "Pipelines" UI). `dependOnDependencyAssertions: true` makes a downstream table depend on a model's quality assertions, not just the model — a failing assertion genuinely blocks the downstream table. |
+| Want version-controlled SQL with a dependency graph and built-in data-quality gates | `dataform` | One of Google's own officially-documented BQML pipeline paths (`google.cloud.dataform_v1`). `dependOnDependencyAssertions: true` makes a downstream table depend on a model's quality assertions, not just the model — a failing assertion genuinely blocks the downstream table. |
+| Want BigQuery Studio's native Pipelines experience — zero-cost SQL unit tests, mixed SQL + Colab Enterprise `.ipynb` notebooks, governance preservation, and scheduled `ReleaseConfig` + `WorkflowConfig` | `bigquery_pipelines` | Built on the exact same `google.cloud.dataform_v1` API (`@dataform/core` `3.1.0`) after Google renamed *BigQuery Workflows* to **BigQuery Pipelines**. Adds SQL unit tests (`type: "test"` with inline mocked inputs, `0` bytes billed), mixed SQL + `.ipynb` notebook tasks (`notebook({...})`), metadata enrichment, `preserveGovernanceControls: true`, concurrency limits, automatic Knowledge Catalog lineage, and `ReleaseConfig` + `WorkflowConfig` scheduling. |
 | Want serverless, near-free declarative orchestration without adopting Airflow | `cloud_workflows` | YAML-based; one BigQuery job per step (`jobs.insert` + poll `jobs.get`), branching in YAML. This is where the query-cache-staleness bug was originally found (see below). |
 | Already run dbt for your other transformations | `dbt` | No *built-in* `CREATE MODEL` materialization (unlike Dataform) — closed with a one-time custom materialization macro. `dbt build` natively skips a downstream model when an upstream test fails, comparable to Dataform's assertion-gating. |
 | Want managed ML orchestration with automatic lineage tracking | `vertex_kfp` | Official prebuilt `google_cloud_pipeline_components.v1.bigquery` ops (`BigqueryCreateModelJobOp`/`EvaluateModelJobOp`/`PredictModelJobOp`), auto-tracked in Vertex ML Metadata. Gate retraining with `dsl.If` on a custom metric-reading component. |
@@ -100,6 +101,7 @@ Full extracted notebook walkthroughs live in this skill's `narrative/` folder:
 - [`narrative/sql_scripting.md`](../narrative/sql_scripting.md) (source: `pipelines/sql_scripting/`)
 - [`narrative/scheduled_queries.md`](../narrative/scheduled_queries.md) (source: `pipelines/scheduled_queries/`)
 - [`narrative/dataform.md`](../narrative/dataform.md) (source: `pipelines/dataform/`)
+- [`narrative/bigquery_pipelines.md`](../narrative/bigquery_pipelines.md) (source: `pipelines/bigquery_pipelines/`)
 - [`narrative/cloud_workflows.md`](../narrative/cloud_workflows.md) (source: `pipelines/cloud_workflows/`)
 - [`narrative/dbt.md`](../narrative/dbt.md) (source: `pipelines/dbt/`)
 - [`narrative/vertex_kfp.md`](../narrative/vertex_kfp.md) (source: `pipelines/vertex_kfp/`)
