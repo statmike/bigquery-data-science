@@ -21,18 +21,18 @@ Two things are worth knowing before you read the results:
 
 **Its counterfactual is `ARIMA_PLUS`, and this notebook proves it bit-for-bit.** Step 5 trains a plain `ARIMA_PLUS` on the pre-intervention window with default options and gets forecasts and prediction intervals identical to the function's, to the last digit. So the counterfactual is not the thing you are paying for. The p-value is — and Step 7 shows that is the one piece that does *not* reproduce from documented BigQuery parts.
 
-**Where it sits in this project's causal family.** Every method here answers the same question with a different identifying assumption, and this one has the weakest:
+**Where it sits in this project's causal family.** Observational data almost never gives you a clean before-vs-after answer: if you compare post-intervention outcomes directly to pre-intervention outcomes (**naive difference-in-means**), any pre-existing trend or seasonal wave is misattributed to the intervention; if you compare treated units directly to untreated units, baseline differences (**confounders**) bias the gap. Every causal workflow in this repository answers the same counterfactual question by adjusting for a different source of confounding, and this one makes the strongest single-series assumption:
 
-| Workflow | Identifies the counterfactual off |
-|---|---|
-| `workflows/propensity_score_matching` (`propensity_score_matching`) | covariates — matched comparable units |
-| `workflows/difference_in_differences` (`difference_in_differences`) | a control group with parallel pre-trends |
-| `workflows/synthetic_control` (`synthetic_control`) | a weighted donor pool of control units |
-| `workflows/uplift_cate` (`uplift_cate`) | randomized assignment plus covariates |
-| `workflows/price_elasticity_dml` (`price_elasticity_dml`) | covariates, via double machine learning |
-| **this notebook** | **the treated unit's own pre-intervention history** |
+| Workflow | Estimand | Identifies the counterfactual off | Primary confounder removed |
+|---|---|---|---|
+| `workflows/propensity_score_matching` (`propensity_score_matching`) | Unit-level ATT / ATE | Covariates $X$ — matched comparable units via propensity $\hat{e}(X) = P(T=1\mid X)$ | Observed baseline selection bias |
+| `workflows/difference_in_differences` (`difference_in_differences`) | Aggregate ATT | A control group with parallel pre-trends | Time-invariant unit differences + common time shocks |
+| `workflows/synthetic_control` (`synthetic_control`) | Aggregate ATE (1 treated series) | A convex-hull weighted donor pool of untreated series | Time-varying common macro shocks |
+| `workflows/uplift_cate` (`uplift_cate`) | Heterogeneous CATE $\tau(X)$ | Randomized/unconfounded assignment + covariates $X$ | Subgroup heterogeneity for targeted treatment routing |
+| `workflows/price_elasticity_dml` (`price_elasticity_dml`) | Continuous/binary ATE | Covariates $X$, orthogonalized via Double/Debiased ML | High-dimensional nonlinear confounding |
+| **this notebook (`AI.CAUSAL_EFFECT`)** | **Aggregate cumulative ATE (1 or $N$ series)** | **The treated unit's own pre-intervention history (`ARIMA_PLUS`)** | **Pre-existing level, trend, and seasonal momentum** |
 
-Step 8 runs three of them on this one dataset and they do **not** agree on magnitude. That disagreement is the most useful thing in the notebook.
+Step 8 runs four estimators — naive pre-vs-post difference-in-means (`+137.37/week`), `AI.CAUSAL_EFFECT` (`-56.52/week`), `difference_in_differences` (`-19.29/week`), and `synthetic_control` (`-19.28/week`) — on this exact Texas dataset. Seeing why naive pre-vs-post gets the *sign* wrong while the three causal estimators disagree by `3x` in *magnitude* is the central diagnostic lesson of the notebook.
 
 ---
 ## Setup
@@ -153,9 +153,11 @@ summary = client.query(query).to_dataframe()
 summary.T
 ```
 
-**Reading the output.** `absolute_effect` is the *cumulative* gap over the whole post-intervention window, not a per-period rate — divide by the 5 post weeks to compare it against the sibling workflows' per-week estimates. `relative_effect` expresses that same cumulative gap as a fraction of the cumulative counterfactual. `prob_causal_effect` is exactly `1 - p_value`, carrying no information the p-value does not. `status` is empty on success and carries the error string otherwise.
+**Reading the output — and why a dynamic counterfactual flips the naive pre-vs-post sign.** `absolute_effect` (`-282.606186`) is the *cumulative* gap over the whole 5-week post-intervention window, not a per-period rate — divide by the 5 post weeks (`-56.521237` per week) to compare it against per-week estimators. `relative_effect` (`-0.220533`, or `-22.05%`) expresses that same cumulative gap as a fraction of the cumulative counterfactual (`1,281.47`). `prob_causal_effect` (`0.695188`) is exactly `1 - p_value`, carrying no information the p-value does not. `status` is empty on success and carries the error string otherwise.
 
-The p-value here does not clear conventional significance. Keep that in view through the rest of the notebook — the point estimate is the number that will be quoted, and it is the number the p-value says not to lean on.
+Notice the contrast with a **naive pre-vs-post difference-in-means**: Texas averaged `62.40` weekly cases per 100k across the 9 pre-intervention weeks and `199.77` across the 5 post-intervention weeks — a raw jump of **`+137.37` per week (`+686.84` cumulative, `+220.1%`)**. A naive before-vs-after comparison implicitly assumes a *flat counterfactual* (`62.40/week`), ignoring the steep June surge (`25.12 -> 159.60`) that was already underway before July 3 and concluding that the mask mandate *increased* cases. By replacing that static pre-period average with a dynamic `ARIMA_PLUS` trajectory (`256.29/week` average post-intervention forecast), `AI.CAUSAL_EFFECT` adjusts for pre-intervention momentum and reverses the point estimate to **`-56.52` per week (`-282.61` cumulative)**.
+
+The p-value here (`0.304812`) does not clear conventional significance. Keep that in view through the rest of the notebook — the point estimate is the number that will be quoted, and it is the number the p-value says not to lean on.
 
 ---
 ## Step 3 — The pointwise view
@@ -338,6 +340,17 @@ That single fact accounts for everything odd about the counterfactual. A twice-d
 `ML.EXPLAIN_FORECAST` shows the same thing from the other side: the whole series decomposes into `trend` alone, with no seasonal or holiday component to separate out.
 
 This is the real cost of the one-call convenience. For a *causal* claim you are being asked to trust a counterfactual you cannot inspect: `AI.CAUSAL_EFFECT` returns no model, so without rebuilding it there is no way to learn that the null hypothesis you are testing against is "the last nine weeks' acceleration continues forever." When the answer matters, build the model.
+
+### Pre-Intervention Diagnostic Checklist
+
+Whenever you use `AI.CAUSAL_EFFECT` for a decision, rebuild the pre-intervention `ARIMA_PLUS` model (Step 5) and run these four checks before trusting the reported effect:
+
+| Diagnostic | How to inspect | What to look for | What this Texas series shows |
+|---|---|---|---|
+| **1. Differencing order (`non_seasonal_d`)** | `ML.ARIMA_EVALUATE` | `d = 0` or `d = 1` projects level or damped/linear drift; **`d = 2` extrapolates acceleration** (the final pre-period slope is locked in forever) and inflates multi-step variance as $\sqrt{\sum_{j=1}^h j^2}$ | `ARIMA(0, 2, 0)` (`d = 2`, `has_drift = False`): projects `+32.23/week` indefinitely |
+| **2. Pre-period to horizon ratio ($T_{\text{pre}} / T_{\text{post}}$)** | Row counts before and after `intervention_timestamp` | Aim for **$T_{\text{pre}} \ge 3 \times T_{\text{post}}$** (and $\ge 2$ full seasonal cycles if seasonal); short pre-periods leave `seasonal_periods = [NO_SEASONALITY]` and wide intervals | $9 / 5 = 1.8\times$ ($T_{\text{post}}$ is $56\%$ of $T_{\text{pre}}$); week-5 interval reaches $\pm 200.90$ |
+| **3. Pre-intervention holdout (in-time placebo)** | Call `AI.CAUSAL_EFFECT` with a fake cutoff inside the pre-period | `p_value` should stay well above `0.05` and the reconstructed effect interval should straddle `0` (see `bigquery-ai/workflows/metric_diagnostics` (`workflows/metric_diagnostics/`) Step 5 for a 6-date placebo sweep) | Steep late-June acceleration makes pre-period cutoffs sensitive to the exact split week |
+| **4. Contemporaneous common shocks** | Plot against untreated comparison series (Step 8) | If untreated units show a simultaneous post-intervention inflection, a univariate counterfactual will misattribute that shared wave to the treatment | Untreated donor states (`GA`, `ID`) also crested in July without a statewide mandate |
 
 ---
 ## Step 7 — The p-value: rebuilding it from two ingredients
@@ -608,14 +621,30 @@ The interval is also strictly more informative than the threshold, not merely fr
 
 **Build it on the function's terms, not the textbook's.** Both columns above use the ceiling variance, because that is what the reported p-value uses; a `psi`-based interval would be narrower and would quietly contradict the p-value sitting next to it. What remains between the two columns is the CDF approximation — under one case per 100k at `0.80` and `0.95`, a few cases at `0.99`. Small enough to ignore when reporting, large enough to be worth knowing which convention produced which number.
 
----
-## Step 8 — Three estimators, one dataset, identical units
+### Business Decision Framing: Acting on Point Estimates, Intervals, and Horizon Length
 
-The Texas mask mandate, measured three structurally different ways on the same weekly per-100k series. The other two are re-derived here rather than quoted, so the comparison is arithmetic rather than assertion.
+When translating `AI.CAUSAL_EFFECT` outputs (`absolute_effect = -282.61`, `relative_effect = -22.05%`, `95% CI = [-820.90, +255.69]`, `p_value = 0.3048`) for product, policy, or executive stakeholders, separate three distinct questions:
+
+1. **"Inconclusive (`p = 0.3048`)" is not "proven zero effect."** The point estimate (`-56.52` cases per 100k per week) is large and directionally favorable, but a 9-week pre-period with `ARIMA(0, 2, 0)` acceleration yields a cumulative standard deviation of `275.14` (`sum(se)`). Reporting "no effect (`p > 0.05`)" discards the directional signal; reporting "cut cases by 22%" hides the uncertainty. Report **both**: *"Estimated `-282.6` cumulative cases per 100k (`-22.1%`), 95% CI `[-820.9, +255.7]`, statistically underpowered on a 9-week pre-period (`p = 0.305`)."*
+2. **Choosing `num_post_intervention_points` trades off treatment lag against variance growth.** As the horizon sweep above (`post points = 2, 3, 5`) demonstrated:
+   - **Too short (`H = 2` weeks):** `Z = +0.6568` (`p = 0.5111`). Biological incubation and reporting delays mean infections contracted *before* the July 3 mandate were still being recorded in weeks 1–2 (`217.59` and `227.73`), masking the policy effect.
+   - **Longer (`H = 5` weeks):** The behavioral and transmission reduction has time to materialize (`194.29 -> 188.90 -> 170.36`, turning `Z` to `-1.0271`), but `sum(se)` balloons from `44.81` (`H = 2`) to `275.14` (`H = 5`), widening the 95% interval to `±538.30` around the cumulative estimate.
+   - **Rule of thumb:** Set `num_post_intervention_points` to the shortest window that fully covers the domain's expected adoption/realization lag.
+3. **What to do next when a single-series estimate is underpowered:**
+   - **Add untreated control series** (`workflows/difference_in_differences` (`difference_in_differences`) or `workflows/synthetic_control` (`synthetic_control`)) so contemporaneous waves are differenced out rather than absorbed into forecast variance (Step 8).
+   - **Extend pre-intervention history or increase frequency** (e.g., daily data with `T_pre >= 60–90` days) so `ARIMA_PLUS` can fit weekly seasonality and mean-reverting dynamics (`d <= 1`) instead of locking in a second-difference (`d = 2`) acceleration fan.
+
+---
+## Step 8 — Four estimators, one dataset, identical units
+
+The Texas mask mandate, measured four structurally different ways on the same weekly per-100k series: a **naive pre-vs-post difference-in-means** (flat pre-period average) plus the **three causal counterfactual estimators** (`difference-in-differences`, `synthetic control`, and `AI.CAUSAL_EFFECT`). Every number is derived directly from the panel table loaded in Step 1, so the comparison is arithmetic rather than assertion.
 
 ```python
 pre_p  = pivot[pivot.index < INTERVENTION]
 post_p = pivot[pivot.index >= INTERVENTION]
+
+# Naive pre-vs-post difference in means: assumes Texas would have stayed flat at its 9-week pre-period mean
+naive_diff = post_p['TX'].mean() - pre_p['TX'].mean()
 
 # Difference-in-differences: the 2x2 means, equal to the balanced-panel interaction coefficient
 did = (post_p['TX'].mean() - pre_p['TX'].mean()) - (post_p['GA'].mean() - pre_p['GA'].mean())
@@ -631,11 +660,14 @@ synth = (post_p['TX'].values - post_p[donor_pool].values @ res.x).mean()
 ce_weekly = summary['absolute_effect'][0] / H
 
 pd.DataFrame({
-    'per-week effect': [did, synth, ce_weekly],
-    'counterfactual built from': ['Georgia', 
-                                  ' + '.join(f'{w:.0%} {d}' for d, w in zip(donor_pool, res.x) if w > 0.01),
-                                  "Texas's own 9 pre-period weeks"],
-}, index=['difference-in-differences', 'synthetic control', 'AI.CAUSAL_EFFECT'])
+    'per-week effect': [naive_diff, did, synth, ce_weekly],
+    'counterfactual built from': [
+        f"Texas's own pre-period mean ({pre_p['TX'].mean():.2f}/wk, flat)",
+        'Georgia',
+        ' + '.join(f'{w:.0%} {d}' for d, w in zip(donor_pool, res.x) if w > 0.01),
+        "Texas's own 9 pre-period weeks",
+    ],
+}, index=['naive pre-vs-post diff-in-means', 'difference-in-differences', 'synthetic control', 'AI.CAUSAL_EFFECT'])
 ```
 
 ```python
@@ -665,15 +697,30 @@ plt.tight_layout()
 plt.show()
 ```
 
-**Verified finding — all three agree on sign, and disagree on magnitude by roughly 3x.** The two control-unit methods land within a rounding error of each other; the univariate counterfactual is far larger.
+**Verified finding — naive pre-vs-post gets the sign backwards (`+137.37/week`), while the three causal estimators agree on sign and disagree on magnitude by roughly 3x (`-19.29`, `-19.28`, `-56.52`).**
 
-The plot shows why, and it is not a defect in any of the three. Georgia and the donor pool lived through the same nationwide summer-2020 surge Texas did: both control-based counterfactuals climb through early July and then **level off**, because the states they are built from levelled off. Using them as the comparison removes that common shock. The univariate counterfactual cannot level off — a twice-differenced model carries June's slope forward forever, and nothing inside it can know that a national wave crested. `AI.CAUSAL_EFFECT` therefore attributes the *entire* deviation from Texas's prior trajectory to the mandate, including the part every state experienced.
+Start with the first row: **`naive pre-vs-post diff-in-means` (`+137.368390/week`)**. Comparing Texas's 5-week post-mandate mean (`199.77/week`) directly to its 9-week pre-mandate mean (`62.40/week`) treats the flat pre-period average as the counterfactual. Because Texas was already surging steeply through June (`25.12 -> 159.60`), a flat baseline blames the entire summer wave on the July 3 policy. All three causal estimators replace that static average with a time-varying trajectory and flip the sign to negative.
+
+Among the three causal estimators, the two control-unit methods (`-19.290079` and `-19.277703`) land within a rounding error of each other, while the univariate counterfactual (`-56.521237`) is roughly `2.9x` larger. The plot shows why, and it is not a defect in any of the three. Georgia and the donor pool lived through the same nationwide summer-2020 surge Texas did: both control-based counterfactuals climb through early July and then **level off**, because the states they are built from levelled off. Using them as the comparison removes that common shock. The univariate counterfactual cannot level off — a twice-differenced model carries June's slope forward forever, and nothing inside it can know that a national wave crested. `AI.CAUSAL_EFFECT` therefore attributes the *entire* deviation from Texas's prior trajectory to the mandate, including the part every state experienced.
 
 **That is the identifying assumption, stated plainly:** absent the intervention, the series would have continued its own pre-intervention pattern. When no common shock hits the post-period, that is reasonable and the method is a genuine gift — it needs no control group at all. When one does, the estimate absorbs it, and there is no diagnostic inside the function that will tell you so.
 
 **The trade runs both ways, though, and this data makes only one direction visible.** A control unit removes the common shock, but it also imports whatever else is happening in the control. Two failure modes are ordinary. If the control is itself affected by the intervention — a neighbouring state whose residents change behaviour because Texas did, a holdout market reached by the same campaign — the spillover lands in the counterfactual and biases the estimate toward zero. And if the control's own trajectory diverges for reasons unrelated to the intervention, that divergence is charged to the treatment. A univariate counterfactual cannot be contaminated in either of those ways, because there is no other unit in it. Here the common shock is large and the spillover plausibly small, so the control-based estimates are the better ones; reverse those two magnitudes and the ranking reverses with them. The choice is which bias you would rather carry, not which method is correct.
 
-**And the significance test is doing its job.** The p-value on this data does not clear 0.05. Read together, the honest summary is not "the mandate cut cases by 56 per 100k per week"; it is that a 9-week pre-period and a 5-week post-period cannot separate a mandate effect from a cresting epidemic wave, and the function says as much if you read past the point estimate.
+**And the significance test is doing its job.** The p-value on this data does not clear 0.05 (`p = 0.3048`). Read together, the honest summary is not "the mandate cut cases by 56 per 100k per week"; it is that a 9-week pre-period and a 5-week post-period cannot separate a mandate effect from a cresting epidemic wave, and the function says as much if you read past the point estimate.
+
+### Choosing Across All Six Causal Workflows — Estimands, Assumptions, and Key Diagnostics
+
+When moving from a single time series to panel or unit-level observational data, each workflow in `workflows` (`bigquery-ml/workflows/`) pairs a distinct causal estimand with a mandatory diagnostic check:
+
+| Workflow | Causal Estimand | Minimum Data Required | Key Diagnostic to Verify Before Acting |
+|---|---|---|---|
+| **This notebook (`AI.CAUSAL_EFFECT`)** | Aggregate cumulative **ATE** on 1 (or $N$) treated time series | 1 treated series split at `intervention_timestamp` | `ML.ARIMA_EVALUATE` differencing order (`d = 2` acceleration lock-in), $T_{\text{pre}} / T_{\text{post}} \ge 3$, and in-time placebo check |
+| `workflows/difference_in_differences` (`difference_in_differences`) | Aggregate **ATT** across treated panel units | Treated + untreated panel units observed pre and post | **Parallel pre-trends test**: pre-intervention `treated × week` event-study slopes indistinguishable from `0` |
+| `workflows/synthetic_control` (`synthetic_control`) | Aggregate **ATE** on 1 treated unit vs donor pool | 1 treated series + $J$ untreated donor series | **Pre-period RMSPE fit & convex-hull check**: treated series lies inside donor range with non-negative weights $\sum w_j = 1$ |
+| `workflows/propensity_score_matching` (`propensity_score_matching`) | Unit-level observational **ATT / ATE** | Cross-sectional units with binary treatment $T$ and confounders $X$ | **Positivity / common-support overlap** ($0.05 < \hat{e}(X) < 0.95$ across both groups) and covariate balance (**Standardized Mean Difference** $\|\text{SMD}\| < 0.10$ after matching) |
+| `workflows/price_elasticity_dml` (`price_elasticity_dml`) | Continuous or binary **ATE** (orthogonalized) | Cross-sectional/panel units with continuous/binary $T$ and high-dim $X$ | **First-stage nuisance residual check**: non-trivial $R^2$ in both outcome and treatment nuisance models without extreme propensity/residual tails |
+| `workflows/uplift_cate` (`uplift_cate`) | Unit-level heterogeneous **CATE** $\tau(X) = E[Y(1) - Y(0) \mid X]$ | Randomized or unconfounded treatment/control split + features $X$ | **Qini coefficient / uplift curve area** above random targeting and **uplift decile calibration** (monotonic realized treated-minus-control lift across predicted CATE deciles) |
 
 ---
 ## Step 9 — `id_cols`: many series in one call
@@ -721,6 +768,48 @@ print(f'\nLargest disagreement against three separate calls: '
 That is worth knowing in both directions. It makes `id_cols` safe — a badly-behaved series cannot contaminate its neighbours, and one row's `status` can carry an error while the rest succeed. It also means `id_cols` buys convenience and one job's worth of overhead rather than any statistical benefit, so there is no reason to prefer it over separate calls except operational tidiness, and no reason to avoid it either.
 
 Note the three states disagree sharply on the same date: Colorado's effect is positive, Georgia's is nearly twice Texas's in magnitude, and none of the three clears `p_value < 0.05`. Three independent univariate counterfactuals through one nationwide summer wave is precisely the situation Step 8 warns about.
+
+### Multiple-Testing Warning & SQL Adjustment (`Bonferroni` and `Benjamini–Hochberg FDR`)
+
+Because `id_cols` runs $N$ independent hypothesis tests with zero pooling or multiplicity correction, screening many segments (stores, campaigns, SKUs, or states) at a naive `p_value < 0.05` inflates the **family-wise false-positive rate** as $1 - (1 - 0.05)^N$:
+- At $N = 3$ series: $1 - 0.95^3 = 14.3\%$ chance of at least one false positive under the global null.
+- At $N = 10$ series: $1 - 0.95^{10} = 40.1\%$.
+- At $N = 50$ series: $1 - 0.95^{50} = 92.3\%$.
+
+Wrap `AI.CAUSAL_EFFECT(..., id_cols => [...])` in a window-function CTE to apply **Bonferroni** (family-wise error rate $\alpha / N$) or **Benjamini–Hochberg** (False Discovery Rate $q = 0.05$, comparing each sorted `p_value` to $(\text{rank} / N) \times q$):
+
+```sql
+WITH raw_effects AS (
+  SELECT subregion1_code, absolute_effect, relative_effect, p_value, status
+  FROM AI.CAUSAL_EFFECT(
+    TABLE `your-gcp-project-id.bq_ml.causal_effect_panel_ts`,
+    timestamp_col          => 'wk_ts',
+    data_col               => 'rate',
+    intervention_timestamp => TIMESTAMP '2020-07-03',
+    id_cols                => ['subregion1_code']
+  )
+  WHERE status = ''
+),
+ranked AS (
+  SELECT
+    *,
+    COUNT(*) OVER () AS n_series,
+    ROW_NUMBER() OVER (ORDER BY p_value ASC) AS p_rank,
+    0.05 / COUNT(*) OVER () AS bonferroni_threshold,
+    (ROW_NUMBER() OVER (ORDER BY p_value ASC) / COUNT(*) OVER ()) * 0.05 AS bh_fdr_threshold
+  FROM raw_effects
+)
+SELECT
+  subregion1_code,
+  absolute_effect,
+  relative_effect,
+  p_value,
+  p_value < 0.05 AS naive_sig_05,
+  p_value < bonferroni_threshold AS bonferroni_sig_05,
+  p_rank <= COALESCE(MAX(IF(p_value <= bh_fdr_threshold, p_rank, NULL)) OVER (), 0) AS bh_fdr_sig_05
+FROM ranked
+ORDER BY p_rank;
+```
 
 ---
 ## Step 10 — Arguments, limits, and gotchas
