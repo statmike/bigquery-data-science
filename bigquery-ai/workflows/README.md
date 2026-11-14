@@ -74,6 +74,7 @@ Work through [the individual function notebooks](../functions/) first. A workflo
 | [Content Moderation](content_moderation/) | AI.GENERATE_TABLE, AI.IF, AI.CLASSIFY, AI.SCORE, AI.GENERATE, AI.AGG (text + output_schema) | Flagging as a cheap first pass before the expensive per-row calls and structured queue triage |
 | [Log Analysis](log_analysis/) | AI.GENERATE_TABLE, AI.CLASSIFY, AI.SCORE, AI.AGG (text + output_schema), AI.EMBED, VECTOR_SEARCH | Triaging support tickets into prose and typed escalation structs, plus hybrid retrieval by error code — and the clearest measurement of how far up the ranking a lexical hit can lift a row, and why `top_k` decides whether you ever see it |
 | [Document Intelligence](document_intelligence/) | AI.CLASSIFY, AI.GENERATE, AI.SCORE, AI.AGG (text + output_schema) | Classify mixed documents, extract fields, score quality, and summarize into executive prose and typed portfolio audits |
+| [Insurance Claims Adjustment](claims_adjustment/) | AI.IF, AI.SCORE, AI.CLASSIFY, AI.GENERATE (output_schema), AI.AGG (output_schema) | Gate claimant photo quality (`AI.SCORE` + `AI.IF`), classify and sub-classify Auto and Roof claims (`AI.CLASSIFY`), route edge cases to human review, extract type-specific damage schemas (`AI.GENERATE`), and compile adjuster dispatch queues (`AI.AGG`) |
 
 ### Enrichment and multimodal
 

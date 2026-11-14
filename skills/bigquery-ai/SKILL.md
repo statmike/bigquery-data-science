@@ -9,7 +9,7 @@ metadata:
 
 BigQuery AI brings foundation models (Gemini, TimesFM, TabFM, EmbeddingGemma, Text/Multimodal Embeddings) and pre-trained Google Cloud AI services directly into SQL and Python (`bigframes.bigquery.ai`) with zero model training.
 
-This skill packages a verified, field-tested 4-Lens reference distilled from live-executing all 31 functions and 14 composed workflows in `bigquery-ai/`.
+This skill packages a verified, field-tested 4-Lens reference distilled from live-executing all 31 functions and 15 composed workflows in `bigquery-ai/`.
 
 ## Decision Tree (Lens 1 → Lens 2)
 
@@ -20,7 +20,7 @@ This skill packages a verified, field-tested 4-Lens reference distilled from liv
 5. **Do you need to explain why a summable metric moved (`AI.KEY_DRIVERS`), or estimate the causal impact of an intervention (`AI.CAUSAL_EFFECT`)?** → see [`reference/augmented-analytics.md`](reference/augmented-analytics.md) (which also routes `AI.CAUSAL_EFFECT` to [`../bigquery-ml/reference/workflows-and-pipelines.md`](../bigquery-ml/reference/workflows-and-pipelines.md))
 6. **Are you parsing or chunking PDF/HTML/DOCX/PPTX/XLSX documents (`AI.PARSE_DOCUMENT`, `AI.CHUNK_DOCUMENT`), extracting structured records from PDFs/images (`ML.PROCESS_DOCUMENT`), or passing `ObjectRef` media into `AI.*` functions?** → see [`reference/document-processing.md`](reference/document-processing.md)
 7. **Do you need a pre-trained Cloud AI service (`REMOTE_SERVICE_TYPE`) with a fixed API schema and per-row status column** (`ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`, `ML.PROCESS_DOCUMENT`)? → see [`reference/cloud-ai-service-models.md`](reference/cloud-ai-service-models.md)
-8. **Are you composing multiple capabilities into an end-to-end application** (RAG, hybrid catalog search, document intelligence, log triage, content moderation, metric diagnostics)? → see [`reference/workflows.md`](reference/workflows.md)
+8. **Are you composing multiple capabilities into an end-to-end application** (RAG, hybrid catalog search, document intelligence, insurance claims adjustment, log triage, content moderation, metric diagnostics)? → see [`reference/workflows.md`](reference/workflows.md)
 
 If the task is ambiguous between zero-training foundation functions (`bigquery-ai`), trained models (`bigquery-ml`), or production orchestration/monitoring (`bigquery-mlops`), consult [`../bigquery-data-science/SKILL.md`](../bigquery-data-science/SKILL.md) first.
 
@@ -71,6 +71,6 @@ Before returning any `bigquery-ai` SQL or Python code, verify against this check
   - [`reference/augmented-analytics.md`](reference/augmented-analytics.md) — `AI.KEY_DRIVERS` and routing for `AI.CAUSAL_EFFECT`
   - [`reference/document-processing.md`](reference/document-processing.md) — `AI.CHUNK_DOCUMENT`, `AI.PARSE_DOCUMENT`, `ML.PROCESS_DOCUMENT`, Object Tables, `OBJ.LIST`, `OBJ.MAKE_REF`, `OBJ.FETCH_METADATA`, `OBJ.GET_ACCESS_URL`
   - [`reference/cloud-ai-service-models.md`](reference/cloud-ai-service-models.md) — `ML.TRANSLATE`, `ML.UNDERSTAND_TEXT`, `ML.ANNOTATE_IMAGE`, `ML.TRANSCRIBE`, `ML.PROCESS_DOCUMENT`
-  - [`reference/workflows.md`](reference/workflows.md) — 14 composed end-to-end workflows (RAG, hybrid catalog search, document intelligence, tabular prediction, etc.)
+  - [`reference/workflows.md`](reference/workflows.md) — 15 composed end-to-end workflows (RAG, hybrid catalog search, document intelligence, insurance claims adjustment, tabular prediction, etc.)
 - **Lens 3 — Per-Statement Syntax Cards (`syntax/`, < 25 KB each)**: [`syntax/INDEX.md`](syntax/INDEX.md) (46 H2-sliced syntax cards)
-- **Lens 4 — Worked Walkthroughs (`narrative/`)**: 45 extracted notebook narratives in `narrative/*.md` (e.g., [`narrative/ai_forecast.md`](narrative/ai_forecast.md), [`narrative/ai_generate.md`](narrative/ai_generate.md), [`narrative/catalog_search.md`](narrative/catalog_search.md))
+- **Lens 4 — Worked Walkthroughs (`narrative/`)**: 46 extracted notebook narratives in `narrative/*.md` (e.g., [`narrative/ai_forecast.md`](narrative/ai_forecast.md), [`narrative/ai_generate.md`](narrative/ai_generate.md), [`narrative/catalog_search.md`](narrative/catalog_search.md), [`narrative/claims_adjustment.md`](narrative/claims_adjustment.md))

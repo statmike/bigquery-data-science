@@ -1,6 +1,6 @@
-# Multi-Skill Composition Playbooks & Unified 32-Workflow Index
+# Multi-Skill Composition Playbooks & Unified 33-Workflow Index
 
-Contents: [1. When to combine multiple skills](#1-when-to-combine-multiple-skills) · [2. Six multi-skill composition playbooks (`bigquery-ai` + `bigquery-ml` + `bigquery-mlops`)](#2-six-multi-skill-composition-playbooks-bigquery-ai--bigquery-ml--bigquery-mlops) · [3. Unified 7-stage problem-first index of all 32 workflows & 9 pipelines](#3-unified-7-stage-problem-first-index-of-all-32-workflows--9-pipelines)
+Contents: [1. When to combine multiple skills](#1-when-to-combine-multiple-skills) · [2. Six multi-skill composition playbooks (`bigquery-ai` + `bigquery-ml` + `bigquery-mlops`)](#2-six-multi-skill-composition-playbooks-bigquery-ai--bigquery-ml--bigquery-mlops) · [3. Unified 7-stage problem-first index of all 33 workflows & 9 pipelines](#3-unified-7-stage-problem-first-index-of-all-33-workflows--9-pipelines)
 
 Real-world data science problems on BigQuery rarely stop at a single SQL namespace. A production system often extracts features from unstructured text or PDFs with **[`bigquery-ai`](../../bigquery-ai/SKILL.md)**, joins them point-in-time and trains an interpretable or high-throughput model with **[`bigquery-ml`](../../bigquery-ml/SKILL.md)**, and schedules drift detection, evaluation, and retraining with **[`bigquery-mlops`](../../bigquery-mlops/SKILL.md)**.
 
@@ -93,7 +93,7 @@ flowchart TD
 
 ---
 
-## 3. Unified 7-stage problem-first index of all 32 workflows & 9 pipelines
+## 3. Unified 7-stage problem-first index of all 33 workflows & 9 pipelines
 
 Use this master index to find every end-to-end workflow and orchestration pipeline across **both** `bigquery-ml/` and `bigquery-ai/` by the data science stage you are solving:
 
@@ -123,6 +123,7 @@ Use this master index to find every end-to-end workflow and orchestration pipeli
 | **4. Foundation AI, Search & Multimodal** | Hybrid RRF catalog search & exact-token SKU reach math | `bigquery-ai` | `AI.EMBED`, `VECTOR_SEARCH` (`lexical_search_columns`), `AI.SEARCH` | [`catalog_search.md`](../../bigquery-ai/narrative/catalog_search.md) | `bigquery-ai/workflows/catalog_search/` |
 | **4. Foundation AI, Search & Multimodal** | End-to-end Retrieval-Augmented Generation (RAG) over text | `bigquery-ai` | `AI.GENERATE_TABLE`, `AI.EMBED`, `VECTOR_SEARCH`, `AI.GENERATE` | [`rag_pipeline.md`](../../bigquery-ai/narrative/rag_pipeline.md) | `bigquery-ai/workflows/rag_pipeline/` |
 | **4. Foundation AI, Search & Multimodal** | Document classification, schema extraction, quality scoring & synthesis | `bigquery-ai` | `AI.CLASSIFY`, `AI.GENERATE`, `AI.SCORE`, `AI.AGG` | [`document_intelligence.md`](../../bigquery-ai/narrative/document_intelligence.md) | `bigquery-ai/workflows/document_intelligence/` |
+| **4. Foundation AI, Search & Multimodal** | Multi-stage multimodal insurance claims adjustment (quality gate, hierarchical classification, human review routing, branch schema grading & `AI.AGG` dispatch) | `bigquery-ai` | `AI.IF`, `AI.SCORE`, `AI.CLASSIFY`, `AI.GENERATE`, `AI.AGG` (`ObjectRef`) | [`claims_adjustment.md`](../../bigquery-ai/narrative/claims_adjustment.md) | `bigquery-ai/workflows/claims_adjustment/` |
 | **4. Foundation AI, Search & Multimodal** | End-to-end Document RAG over PDFs (layout-aware chunking + parse-once tuning → embeddings → grounded Q&A) | `bigquery-ai` | `AI.CHUNK_DOCUMENT`, `AI.PARSE_DOCUMENT`, `AI.EMBED`, `VECTOR_SEARCH`, `AI.GENERATE` | [`document_rag.md`](../../bigquery-ai/narrative/document_rag.md) | `bigquery-ai/workflows/document_rag/` |
 | **4. Foundation AI, Search & Multimodal** | Content analysis: generate, classify, score & summarize at scale | `bigquery-ai` | `AI.GENERATE_TABLE`, `AI.CLASSIFY`, `AI.SCORE`, `AI.GENERATE`, `AI.AGG` | [`content_analysis.md`](../../bigquery-ai/narrative/content_analysis.md) | `bigquery-ai/workflows/content_analysis/` |
 | **4. Foundation AI, Search & Multimodal** | User-generated content moderation pipeline | `bigquery-ai` | `AI.IF`, `AI.CLASSIFY`, `AI.SCORE`, `AI.GENERATE`, `AI.AGG` | [`content_moderation.md`](../../bigquery-ai/narrative/content_moderation.md) | `bigquery-ai/workflows/content_moderation/` |

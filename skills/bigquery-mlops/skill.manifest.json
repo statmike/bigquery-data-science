@@ -4,7 +4,7 @@
   "source_project": null,
   "narrative_sources": {},
   "generated_date": "2026-11-14",
-  "source_commit": "b3c3385",
+  "source_commit": "39beaa0",
   "reference_files": [
     "feature-store-and-temporal-joins.md",
     "model-registry-export-and-serving.md",

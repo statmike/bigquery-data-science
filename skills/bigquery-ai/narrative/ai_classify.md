@@ -16,7 +16,7 @@
 - `functions/ai_if` (`AI.IF`) — Boolean classification (yes/no)
 - `functions/ai_score` (`AI.SCORE`) — Numeric scoring instead of categorical
 
-**Featured in:** `workflows/content_analysis` (Content Analysis Pipeline) | `workflows/document_intelligence` (Document Intelligence) | `workflows/content_moderation` (Content Moderation) | `workflows/log_analysis` (Log Analysis)
+**Featured in:** `workflows/content_analysis` (Content Analysis Pipeline) | `workflows/document_intelligence` (Document Intelligence) | `workflows/content_moderation` (Content Moderation) | `workflows/log_analysis` (Log Analysis) | `workflows/claims_adjustment` (Insurance Claims Adjustment)
 
 **Multimodal:** Supports document, image, and video input via `reference/unstructured-data-infrastructure.md#objectref-and-objectrefruntime-schema-reference` (ObjectRef). Pass a STRUCT input with `ObjectRef` fields to classify documents, images, or video.
 
